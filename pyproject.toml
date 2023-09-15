@@ -1,0 +1,24 @@
+[tool.poetry]
+name = "reez"
+version = "0.1.0"
+description = "pendaftaran pemeriksaan bagi unit radiologi kk"
+authors = ["resakse <resakse@gmail.com>"]
+license = "mit"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+Django = "^4.2.5"
+django-debug-toolbar = "^4.2.0"
+django-htmx = "^1.16.0"
+django-crispy-forms = "^2.0"
+django-filter = "^23.2"
+
+[tool.poetry.group.dev.dependencies]
+crispy-bootstrap5 = "^0.7"
+django-extensions = "^3.2.3"
+django-jet-reboot = "^1.3.3"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
