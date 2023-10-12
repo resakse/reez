@@ -1,0 +1,28 @@
+{% load crispy_forms_tags %}
+<tr hx-trigger="cancel" class="editing" {% if exam.id %}hx-get="{% url 'bcs:exam-get' exam.id %}"
+    {% else %}hx-get="{% url 'bcs:bcs-click' bcs_id %}"{% endif %} hx-target="closest tr" hx-swap="outerHTML">
+    <td colspan="5">
+        {% crispy examform %}
+    </td>
+    {% if exam.id %}
+        <td class="align-middle">
+            <button class="btn btn-icon btn-sm rounded btn-outline-danger"
+                    hx-get="{% url 'bcs:exam-get' exam.id %}"><i class="fas fa-ban" aria-hidden="true"></i></button>
+            <button class="btn btn-icon btn-sm rounded btn-outline-primary"
+                    hx-post="{% url 'bcs:exam-edit' exam.id %}" hx-target="closest tr" hx-swap="outerHTML"
+                    hx-include="closest tr"><i class="fa fa-save" aria-hidden="true"></i></button>
+        </td>
+        {% else %}
+                <td class="align-middle">
+            <button class="btn btn-icon btn-sm rounded btn-outline-danger" hx-get="{% url 'bcs:exam-senarai' bcs_id%}"
+                    hx-target="#exam" hx-swap="outerHTML"><i class="fas fa-ban" aria-hidden="true"></i></button>
+            <button class="btn btn-icon btn-sm rounded btn-outline-primary"
+                    hx-post="{% url 'bcs:exam-tambah' bcs_id %}" hx-target="#exam" hx-swap="outerHTML"
+                    hx-include="closest tr"><i class="fa fa-save" aria-hidden="true"></i></button>
+        </td>
+    {% endif %}
+</tr>
+<script>
+    htmx.process(htmx.find('.form-control'));
+
+</script>

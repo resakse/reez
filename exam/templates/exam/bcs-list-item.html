@@ -1,0 +1,37 @@
+<tr id="item-{{ item.id }}">
+    <td>{{ item.bcs.tarikh|date:'d/m/Y g:i A' }}</td>
+    <td>{{ item.nobcs }}</td>
+    <td>{% if item.bcs.mrn %}{{ item.bcs.mrn }}{% else %}{{ item.bcs.nric }} {% endif %}</td>
+    <td>{{ item.bcs.nama }}</td>
+    <td>{{ item.bcs.ward }}</td>
+    <td>{{ item.exam.modaliti.singkatan }} {{ item.laterality|default:"" }} {{ item.exam }}</td>
+    <td class="text-center align-middle">
+                                <span class="align-middle kt-switch kt-switch--outline kt-switch--icon kt-switch--sm kt-switch--success"
+                                      tabindex="0" data-toggle='tooltip' data-placement='top' title='Merge di PACS'>
+                            <label class="mt-3">
+                                <input id="merged" type="checkbox" {% if item.merged %}checked{% endif %}
+                                       name="merged" hx-post="{% url 'bcs:bcs-merge' item.pk %}" hx-swap="outerHTML"
+                                       hx-target="this" />
+                                <span></span>
+                            </label>
+                        </span>
+    </td>
+    <td>
+        <div class="btn-group align-middle" role="group" aria-label="Detail Exam">
+            <button class="btn btn-icon btn-sm rounded btn-hover-dark"
+                    hx-get="{% url 'bcs:bcs-edit' item.bcs.pk %}" hx-target="#bcs-full"
+                    hx-swap="outerHTML" hx-push-url="true"><i class="fa fa-edit text-danger"
+                                                              aria-hidden="true"></i>
+            </button>
+            <button class="btn btn-icon btn-sm rounded btn-hover-dark"
+                    hx-get="{{ item.get_absolute_url }}" hx-target="#exam-dialog">
+                <i class="fa fa-eye text-primary"></i>
+            </button>
+            <button id="komen-{{ item.id }}" class="btn btn-icon btn-sm rounded btn-hover-dark"
+                    hx-get="{{ item.get_komen_url }}" hx-target="#exam-dialog">
+                <i class="fa fa-comment-alt {% if item.dcatatan %}text-warning{% else %}text-secondary{% endif %}"></i>
+            </button>
+        </div>
+
+    </td>
+</tr>

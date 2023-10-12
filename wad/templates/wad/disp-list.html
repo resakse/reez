@@ -1,0 +1,15 @@
+{% for d in disiplin %}
+    <li id="dis-{{ d.id }}" class="list-group-item d-flex disp-list"><span
+            class="pt-2 flex-grow-1">{{ d.disiplin }}</span>
+        <button type="button" class="btn btn-sm btn-icon btn-outline-primary" hx-get="?disiplin={{ d.id }}" hx-target="#ward"><i
+                class="fas fa-search"></i></button>
+        <button type="button" class="btn btn-sm btn-icon btn-outline-success" hx-target='#dis-{{ d.id }}' hx-swap="outerHTML"
+                hx-get="{% url 'wad:disiplin-kemaskini' d.id %}"><i class="fas fa-pencil-alt"></i></button>
+        <button type="button" class="btn btn-sm btn-icon btn-outline-danger" hx-target='#disiplin' hx-trigger="confirmed"
+                hx-delete="{% url 'wad:disiplin-padam' d.id %}"
+                _="on click call Swal.fire({title: 'Padam Disiplin', text:'Padam Disiplin ini?', showCancelButton: true,confirmButtonColor: '#d33', cancelButtonText: 'Kembali', confirmButtonText: 'Padam' })
+             if result.isConfirmed trigger confirmed"
+        ><i class="fas fa-trash-alt"></i></button>
+        {% empty %}
+    <li class="list-group-item " classes="toggle active">Tiada</li>
+{% endfor %}

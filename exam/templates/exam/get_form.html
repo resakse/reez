@@ -1,0 +1,8 @@
+<tr id="texam">
+    <td colspan="6">
+        <button class="btn btn-sm btn-outline-success" hx-get="{% url 'bcs:exam-tambah' bcs_id %}" hx-swap="outerHTML"
+                hx-target="#texam" onclick="if ($('.editing').length>=1){htmx.trigger('.editing','cancel')}">
+            <i class="fa fa-plus" aria-hidden="true"></i>Tambah Pemeriksaan
+        </button>
+    </td>
+</tr>

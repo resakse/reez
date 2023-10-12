@@ -1,0 +1,93 @@
+{% extends 'index.html' %}
+{% block title %}Business Continuity Service{% endblock %}
+
+{% load crispy_forms_tags %}
+{% block style %}
+    .table th, .table td {
+    vertical-align: middle !important;
+    }
+    .nav-pills .nav-link {
+    border-radius: 0.25rem;
+    }
+{% endblock style %}
+{% block breadcrumbs %}
+    <a href="{% url 'bcs:bcs-list' %}"
+       class="kt-subheader__breadcrumbs-link">Business Continuity Service</a>
+{% endblock breadcrumbs %}
+{% block breadcrumbs2 %}
+    Settings
+{% endblock breadcrumbs2 %}
+{% block subheader_kanan %}
+
+{% endblock subheader_kanan %}
+{% block content %}
+
+    <div class="kt-portlet">
+        <div class="kt-portlet__head">
+            <div class="kt-portlet__head-label">
+                <h3 class="kt-portlet__head-title">
+                    Settings
+                </h3>
+            </div>
+        </div>
+        <div class="kt-portlet__body">
+            <ul class="nav nav-pills" role="tablist">
+                <li class="nav-item">
+                    <a class="nav-link active" data-toggle="tab" href="#modaliti">Modaliti</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" data-toggle="tab" href="#part">Bahagian</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" data-toggle="tab" href="#statistik" hx-get="{% url 'bcs:config-stat-list' %}"
+                       hx-target="#stat-list" hx-swap="outerHTML">Statistik</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" data-toggle="tab" href="#exam" hx-get="{% url 'bcs:config-exam-list' %}"
+                       hx-target="#exam-list" hx-swap="outerHTML">Pemeriksaan</a>
+                </li>
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" data-toggle="dropdown" href="#" role="button"
+                       aria-haspopup="true" aria-expanded="false">Dropdown</a>
+                    <div class="dropdown-menu">
+                        <a class="dropdown-item" data-toggle="tab" href="#kt_tabs_3_2">Action</a>
+                        <a class="dropdown-item" data-toggle="tab" href="#kt_tabs_3_2">Another action</a>
+                        <a class="dropdown-item" data-toggle="tab" href="#kt_tabs_3_2">Something else here</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" data-toggle="tab" href="#kt_tabs_3_2">Separated link</a>
+                    </div>
+                </li>
+            </ul>
+            <div class="tab-content">
+                <div class="tab-pane active" id="modaliti" role="tabpanel">
+                    {% include 'exam/config/modaliti_list.html' %}
+                </div>
+                <div class="tab-pane" id="part" role="tabpanel">
+                    It has survived not only five centuries, but also the leap into electronic typesetting, remaining
+                    essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets
+                    containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus
+                    PageMaker including versions of Lorem Ipsum.
+                </div>
+                <div class="tab-pane" id="statistik" role="tabpanel">
+                    <div id="stat-list"></div>
+                </div>
+                <div class="tab-pane" id="exam" role="tabpanel">
+                    <div id="exam-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+{% endblock content %}
+{% block scripts %}
+    <script>
+        $('#excel').attr('href', '/bcs/export/' + window.location.search);
+
+        document.body.addEventListener("msg", function (e) {
+            toastr.success(e.detail.msg);
+        })
+        document.body.addEventListener("htmx:pushedIntoHistory", function (event) {
+            $('#excel').attr('href', '/bcs/export/' + window.location.search);
+        });
+    </script>
+{% endblock scripts %}

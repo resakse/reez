@@ -1,0 +1,15 @@
+<li id="wad-{{ w.id }}" hx-target="this" hx-swap="outerHTML" class="list-group-item">
+{% load crispy_forms_tags %}
+    <form hx-post="{{ request.path }}"  class="form col-sm-12 d-flex ">
+        {% csrf_token %}
+        <div class="col-sm-8">{% crispy form %}</div>
+        <div class="col-sm-4">
+            <div class="button-group  float-right">
+            <button type="button" class="btn btn-secondary btn-sm" hx-get="{% url 'wad:wad-list' %}"
+                    hx-target="#ward" hx-swap="innerHTML"><i class="fas fa-times"></i>
+            </button>
+            <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-check"></i></button>
+            </div>
+        </div>
+    </form>
+</li>

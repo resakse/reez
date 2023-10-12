@@ -1,0 +1,34 @@
+{% extends 'index.html' %}
+{% block title %}{{ tajuk }}{% endblock %}
+{% block breadcrumbs %}
+    <a href="{% url 'bcs:bcs-list' %}"
+       class="kt-subheader__breadcrumbs-link">Business Continuity Service</a>
+{% endblock breadcrumbs %}
+{% block breadcrumbs2 %}
+{{ tajuk}}
+{% endblock breadcrumbs2 %}
+{% load crispy_forms_tags %}
+{% block style %}
+    .table th, .table td {
+    vertical-align: middle !important;
+    }
+{% endblock style %}
+{% block content %}
+    {% include 'exam/bcs_tambah-partia.html' %}
+{% endblock content %}
+{% block scripts %}
+    <script>
+        document.body.addEventListener("htmxSuccess", function (e) {
+            console.log('success')
+            toastr.success(e.detail.value);
+        });
+        document.body.addEventListener("msg", function (e) {
+            console.log('ada msg')
+            toastr.success(e.detail.merged);
+        });
+        document.body.addEventListener("pesakitada", function(e){
+            $('#id_nama').val(e.detail.nama);
+            $('#id_nric').val(e.detail.nric);
+        });
+    </script>
+{% endblock scripts %}

@@ -1,0 +1,64 @@
+{% extends 'index.html' %}
+{% load static %}{% load slippers %}
+{% block title %}Wad{% endblock title %}
+{% block breadcrumbs2 %}Wad{% endblock breadcrumbs2 %}
+{% block content %}
+
+<div class="alert alert-custom alert-outline-danger  fade show mb-5" role="alert">
+    <div class="alert-icon"><i class="flaticon-warning"></i></div>
+    <div class="alert-text text-center font-weight-bold">Sorry! Modul ini memerlukan Windows 7 dan ke atas.!</div>
+    <div class="alert-close">
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+            <span aria-hidden="true"><i class="ki ki-close"></i></span>
+        </button>
+    </div>
+</div>
+    <div class="row d-flex">
+        <div class="col-sm-6">
+            {% #card tajuk="Disiplin <button class='btn btn-outline-danger btn-sm float-right' hx-target='#disiplin'  hx-get='/wad/disiplin/tambah'><i class='fa fa-plus'></i>Tambah</button>" kelas="py-3 bg-success" %}
+            <div class="col-sm-12 p-0">
+                            <ul id="disiplin" class="list-group" >
+                {% include 'wad/disp-list.html' %}
+                </ul>
+                </div>
+            {% /card %}
+
+
+        </div>
+        <div class="col-sm-6 ">
+            {% #card tajuk="Senarai Wad <button class='btn btn-outline-danger btn-sm float-right' hx-target='#ward'  hx-get='tambah/'><i class='fa fa-plus'></i>Tambah</button>" kelas="py-3 bg-danger" %}
+                <div  class="col-sm-12  p-0 ">
+                    {% include 'wad/war-partial.html' %}
+                </div>
+            {% /card %}
+        </div>
+    </div>
+
+<div class="modal fade" id="exampleModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div  id="borang" class="modal-content"></div>
+  </div>
+</div>
+{% endblock content %}
+
+{% block scripts %}
+    <script src="{% static 'js/_hyperscript.js' %}"></script>
+{#    <script src="https://unpkg.com/hyperscript.org@0.9.7"></script>#}
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script>
+$(document).ready(function () {
+    htmx.on("showMessage", (e) => {
+        toastr.success(e.detail.value);
+        $("#exampleModal").modal('hide');
+      })
+    htmx.on("disip", (e) => {
+        $(".disp-list").removeClass('bg-warning text-white');
+        $("#dis-"+e.detail.value).addClass("bg-warning text-white");
+      })
+
+
+});
+</script>
+{% endblock scripts %}

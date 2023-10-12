@@ -1,0 +1,9 @@
+<li id="wad-{{ w.id }}" class="list-group-item d-flex"><span class="pt-2 flex-grow-1">{{ w.wad }}</span>
+    <button type="button" class="btn btn-sm btn-icon btn-outline-success" hx-target='#wad-{{ w.id }}' hx-swap="outerHTML"
+            hx-get="{% url 'wad:wad-kemaskini' w.id %}"><i class="fas fa-pencil-alt"></i></button>
+    <button type="button" class="btn btn-sm btn-icon btn-outline-danger"  hx-target='#wad-{{ w.id }}' hx-swap="outerHTML" hx-trigger="confirmed"
+            hx-delete="{% url 'wad:wad-padam' w.id %}"
+            _="on click call Swal.fire({title: 'Padam Disiplin', text:'Padam Disiplin ini?', showCancelButton: true,confirmButtonColor: '#d33', cancelButtonText: 'Kembali', confirmButtonText: 'Padam' })
+             if result.isConfirmed trigger confirmed"
+    ><i class="fas fa-trash-alt"></i></button>
+</li>
