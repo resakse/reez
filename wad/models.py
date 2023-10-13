@@ -1,6 +1,7 @@
 from django.db import models
 from django.utils.translation import gettext as _
 from django.urls import reverse
+import auto_prefetch
 
 
 # Create your models here.
@@ -19,12 +20,12 @@ class Disiplin(models.Model):
         return reverse("Disiplin_detail", kwargs={"pk": self.pk})
 
 
-class Ward(models.Model):
+class Ward(auto_prefetch.Model):
     wad = models.CharField(_("Wad"), max_length=50, blank=False, unique=True)
-    disiplin = models.ForeignKey("Disiplin", verbose_name=_("Disiplin"), on_delete=models.SET_NULL, blank=True,
+    disiplin = auto_prefetch.ForeignKey("Disiplin", verbose_name=_("Disiplin"), on_delete=models.SET_NULL, blank=True,
                                  null=True)
 
-    class Meta:
+    class Meta(auto_prefetch.Model.Meta):
         verbose_name = _("Ward")
         verbose_name_plural = _("Wards")
 

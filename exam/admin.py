@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Bcs, Exam, Modaliti, Daftar, Part, Region
+from .models import Pemeriksaan, Exam, Modaliti, Daftar, Part, Region
 from ordered_model.admin import (
     OrderedModelAdmin,
     OrderedTabularInline,
@@ -14,13 +14,13 @@ class ExamInline(admin.TabularInline):
 
 
 class RegisterInline(admin.TabularInline):
-    model = Daftar
+    model = Pemeriksaan
     extra = 0
 
 
-@admin.register(Bcs)
+@admin.register(Daftar)
 class BcsAdmin(admin.ModelAdmin):
-    model = Bcs
+    model = Daftar
     inlines = [
         RegisterInline,
     ]
@@ -35,6 +35,7 @@ class ModalitiAdmin(admin.ModelAdmin):
 @admin.register(Region)
 class RegionAdmin(OrderedModelAdmin):
     list_display = ("jenis", "bahagian", "move_up_down_links")
+
 
 admin.site.register(Part)
 admin.site.register(Exam)

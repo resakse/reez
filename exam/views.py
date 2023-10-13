@@ -9,10 +9,9 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 from django_htmx.http import trigger_client_event, push_url
 
-from digi.models import Digitize
-from exam.models import Bcs, Daftar, Exam, Modaliti, Region
-from statistik.models import Statistik
-from .filters import DaftarFilter
+from exam.models import Pemeriksaan, Daftar, Exam, Modaliti, Region
+from pesakit.models import Pesakit
+# from .filters import DaftarFilter
 from .forms import BcsForm, DaftarForm, RegionForm, ExamForm
 
 
@@ -21,14 +20,15 @@ from .forms import BcsForm, DaftarForm, RegionForm, ExamForm
 def senarai_bcs(request):
     param = request.GET.copy()
     parameter = param.pop("page", True) and param.urlencode()  # buang page dari url
-    daftar = DaftarFilter(
-        request.GET,
-        queryset=Daftar.objects.all()
-        .select_related("bcs__ward", "exam__modaliti")
-        .order_by("-bcs__tarikh"),
-    )
+    # daftar = DaftarFilter(
+    #     request.GET,
+    #     queryset=Pemeriksaan.objects.all()
+    #     .select_related("daftar__rujukan", "exam__modaliti")
+    #     .order_by("-tarikh"),
+    # )
+    daftar = Pemeriksaan.objects.all()
     page = request.GET.get("page", 1)
-    paginator = Paginator(daftar.qs, 10)  # Show 25 contacts per page.
+    paginator = Paginator(daftar, 10)  # Show 25 contacts per page.
     try:
         page_obj = paginator.page(page)
     except PageNotAnInteger:
@@ -103,10 +103,10 @@ def tambah_bcs(request):
 
 @login_required
 def edit_bcs(request, pk=None):
-    bcs = Bcs.objects.get(pk=pk)
+    bcs = Daftar.objects.get(pk=pk)
     tajuk = f'Kemaskini BCS - {bcs.nama}'
     form = BcsForm(request.POST or None, instance=bcs)
-    exams = Daftar.objects.filter(bcs=pk)
+    exams = Pemeriksaan.objects.filter(bcs=pk)
     hantar_url = reverse("bcs:bcs-edit", args=[bcs.pk])
     data = {
         'tajuk': tajuk,
@@ -165,7 +165,7 @@ def del_exam(request, pk=None):
 @login_required
 def tambah_exam(request, pk=None):
     examform = DaftarForm(request.POST or None)
-    bcs = Bcs.objects.get(pk=pk)
+    bcs = Daftar.objects.get(pk=pk)
     if request.method == "POST":
         print('tambah exam', request.POST)
         if examform.is_valid():
@@ -278,24 +278,11 @@ def checkAM(request):
     nama = None
     nric = None
     rekod = None
-    pesakit = Bcs.objects.filter(mrn=am.upper()).first()
+    pesakit = Pesakit.objects.filter(mrn=am.upper()).first()
     if pesakit:
         nama = pesakit.nama
         nric = pesakit.nric
         rekod = f"[BCS {pesakit.tarikh}]"
-    else:
-        pesakit = Digitize.objects.filter(mrn=am.upper()).first()
-        if pesakit:
-            nama = pesakit.pesakit
-            rekod = f"[Digitize/Hardcopy {pesakit.t_terima}]"
-        else:
-            print('bcs takde')
-            pesakit = Statistik.objects.filter(mrn=am.upper()).first()
-            if pesakit:
-                nama = pesakit.nama
-                rekod = f"[Statistik {pesakit.start}]"
-            else:
-                pesakit = None
     if not pesakit:
         return HttpResponse(f'<span id="pesakitada" data-mrn="tiada" class="alert alert-primary">Pesakit baru</span>')
 

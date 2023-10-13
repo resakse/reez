@@ -46,8 +46,12 @@ INSTALLED_APPS = [
     'crispy_forms',
     'crispy_bootstrap5',
     'ordered_model',
+    'fontawesomefree',
 
     'staff',
+    'wad',
+    'pesakit',
+    'exam'
 
 ]
 AUTH_USER_MODEL = 'staff.Staff'
@@ -71,11 +75,11 @@ INTERNAL_IPS = [
 ]
 
 ROOT_URLCONF = 'reez.urls'
-
+import os
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [os.path.join(BASE_DIR,'templates')],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [

@@ -3,11 +3,11 @@ from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 from wad.models import Ward
-
+from pesakit.models import Pesakit
 from reez import settings
 from custom.katanama import titlecase
 from ordered_model.models import OrderedModel
-
+import auto_prefetch
 User = settings.AUTH_USER_MODEL
 
 
@@ -74,26 +74,26 @@ class Region(OrderedModel):
         return f"{self.jenis} - {self.bahagian}"
 
 
-class Exam(models.Model):
+class Exam(auto_prefetch.Model):
     status_choices = (
         ("ENABLE", "Enable"),
         ("DISABLE", "Disable"),
     )
     exam = models.CharField(max_length=50)
     exam_code = models.CharField(max_length=15, blank=True, null=True)
-    part = models.ForeignKey(Part, on_delete=models.SET_NULL, null=True, blank=True)
-    modaliti = models.ForeignKey(Modaliti, on_delete=models.CASCADE)
+    part = auto_prefetch.ForeignKey(Part, on_delete=models.SET_NULL, null=True, blank=True)
+    modaliti = auto_prefetch.ForeignKey(Modaliti, on_delete=models.CASCADE)
     catatan = models.CharField(max_length=200, blank=True, null=True)
     short_desc = models.CharField(max_length=50, blank=True, null=True)
     contrast = models.BooleanField(default=False)
-    statistik = models.ForeignKey(
+    statistik = auto_prefetch.ForeignKey(
         Region, on_delete=models.SET_NULL, null=True, blank=True
     )
     status_ca = models.CharField(
         max_length=10, choices=status_choices, default="ENABLE"
     )
 
-    class Meta:
+    class Meta(auto_prefetch.Model.Meta):
         verbose_name_plural = "Pemeriksaan"
         unique_together = ["exam", "part", "modaliti"]
         ordering = ["modaliti", "part", "exam"]
@@ -103,67 +103,13 @@ class Exam(models.Model):
         return self.exam
 
 
-class Bcs(models.Model):
-    tarikh = models.DateTimeField(default=timezone.now)
-    mrn = models.CharField(verbose_name="MRN", max_length=15, blank=True, null=True)
-    nric = models.CharField(
-        verbose_name="NRIC",
-        help_text="NRIC / Passport Jika Tiada AM",
-        max_length=25,
-        blank=True,
-        null=True,
-    )
-    nama = models.CharField(max_length=30, null=True, blank=False)
-    ward = models.ForeignKey(Ward, on_delete=models.SET_NULL, null=True, blank=True)
-    pemohon = models.CharField(max_length=30, null=True, blank=True)
-
-    mo = models.CharField(
-        verbose_name="MO",
-        max_length=30,
-        help_text="MO Radiologi",
-        blank=True,
-        null=True,
-    )
-    radiologist = models.CharField(max_length=30, blank=True, null=True)
-
-    catatan = models.TextField(blank=True, null=True)
-
-    jxr = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=False)
-    created = models.DateTimeField(auto_now_add=True)
-    modified = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        verbose_name_plural = "BCS"
-        ordering = ["-tarikh"]
-        unique_together = ["tarikh", "mrn", "nric"]
-
-    def __str__(self):
-        if self.mrn:
-            info = self.mrn
-        else:
-            info = self.nric
-
-        return f"{self.tarikh} - {info}"
-
-    def save(self, *args, **kwargs):
-        self.nama = titlecase(self.nama)
-        self.mrn = self.mrn.upper()
-        if self.mo:
-            self.mo = titlecase(self.mo)
-        if self.pemohon:
-            self.pemohon = titlecase(self.pemohon)
-        if self.radiologist:
-            self.radiologist = titlecase(self.radiologist)
-        super(Bcs, self).save(*args, **kwargs)
-
-
 lateral_choices = (
-    ("Left", "Left"),
-    ("Right", "Right"),
+    ("Kiri", "Kiri"),
+    ("Kanan", "Kanan"),
 )
 
 
-def noxray(nombor=None):
+def kiraxray(nombor=None):
     tahun = timezone.now().year
     print(nombor)
     if nombor is not None:
@@ -171,17 +117,17 @@ def noxray(nombor=None):
         return nombor
     try:
         lnombor = (
-            Daftar.objects.filter(bcs__tarikh__year=tahun).order_by("-nobcs").first()
+            Pemeriksaan.objects.filter(daftar__tarikh__year=tahun).order_by("-no_xray").first()
         )
         if lnombor is None:
             print("takde nombor")
             latest = "1"
         else:
-            print("ada nombor ({})..tambah nombor baru".format(lnombor.nobcs))
-            latest = int(lnombor.nobcs[-4:])  # amik last 6 numbor
+            print("ada nombor ({})..tambah nombor baru".format(lnombor.no_xray))
+            latest = int(lnombor.no_xray[-4:])  # amik last 6 numbor
             latest = latest + 1
             print("nombor baru : ", latest)
-    except Bcs.DoesNotExist:
+    except Pemeriksaan.DoesNotExist:
         print("takde case..set nombor = 1")
         latest = "1"
 
@@ -193,45 +139,74 @@ def noxray(nombor=None):
     return nombornya
 
 
-class Daftar(models.Model):
-    nobcs = models.CharField(
-        verbose_name="No. X-Ray", blank=True, null=True, max_length=20
-    )
-    bcs = models.ForeignKey(Bcs, on_delete=models.CASCADE)
-    exam = models.ForeignKey(Exam, on_delete=models.CASCADE)
-    laterality = models.CharField(
-        choices=lateral_choices, blank=True, null=True, max_length=10
-    )
-    merged = models.BooleanField(default=False)
-    jxr = models.ForeignKey(
-        User, on_delete=models.SET_NULL, null=True, blank=True, related_name="bcs_jxr"
-    )
+ambulatori_choice = [
+    ('Berjalan', 'Berjalan'),
+    ('Kerusi Roda', 'Kerusi Roda'),
+    ('Troli', 'Troli')
+]
+
+
+class Daftar(auto_prefetch.Model):
+    tarikh = models.DateTimeField(default=timezone.now)
+
+    pesakit = auto_prefetch.ForeignKey(Pesakit, on_delete=models.CASCADE)
+    no_resit = models.CharField(max_length=50, blank=True, null=True)
+    lmp = models.DateField(verbose_name='LMP',blank=True, null=True)
+    rujukan = auto_prefetch.ForeignKey(Ward, on_delete=models.SET_NULL, null=True, blank=True)
+    ambulatori = models.CharField(max_length=15, choices=ambulatori_choice, default='Berjalan Kaki')
+
+    pemohon = models.CharField(max_length=30, null=True, blank=True)
+
+    filem = models.PositiveSmallIntegerField(default=0)
+    cd = models.PositiveSmallIntegerField(verbose_name='CD',default=0)
     dcatatan = models.CharField(
         verbose_name="Catatan", blank=True, null=True, max_length=20
     )
-    merge_by = models.ForeignKey(
-        User, on_delete=models.SET_NULL, null=True, blank=True, related_name="bcs_merge"
+    jxr = auto_prefetch.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name="bcs_jxr"
     )
     created = models.DateTimeField(auto_now_add=True)
     modified = models.DateTimeField(auto_now=True)
 
-    class Meta:
-        verbose_name_plural = "Pendaftaran BCS"
+    class Meta(auto_prefetch.Model.Meta):
+        verbose_name_plural = "Pendaftaran Radiologi"
         ordering = [
-            "nobcs",
+            "tarikh",'pesakit'
         ]
 
-    def save(self, *args, **kwargs):
-        nombor = noxray(self.nobcs)
-        print(nombor)
-        self.nobcs = nombor
-        super(Daftar, self).save(*args, **kwargs)
+
 
     def __str__(self):
-        return "{} - {}".format(self.nobcs, self.exam)
+        return "{} - {}".format(self.no_xray, self.exam)
 
     def get_absolute_url(self):
         return reverse("bcs:exam-detail", args=[self.pk])
 
     def get_komen_url(self):
         return reverse("bcs:exam-komen", args=[self.pk])
+
+
+class Pemeriksaan(auto_prefetch.Model):
+    daftar = auto_prefetch.ForeignKey(Daftar, on_delete=models.CASCADE)
+    no_xray = models.CharField(
+        verbose_name="No. X-Ray", blank=True, null=True, max_length=20
+    )
+    exam = auto_prefetch.ForeignKey(Exam, on_delete=models.CASCADE)
+    laterality = models.CharField(
+        choices=lateral_choices, blank=True, null=True, max_length=10
+    )
+    jxr = auto_prefetch.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name="exam_jxr"
+    )
+    created = models.DateTimeField(auto_now_add=True)
+    modified = models.DateTimeField(auto_now=True)
+
+    class Meta(auto_prefetch.Model.Meta):
+        verbose_name_plural = 'Pemeriksaan'
+        ordering = ['daftar','no_xray']
+
+    def save(self, *args, **kwargs):
+        nombor = kiraxray(self.no_xray)
+        print(nombor)
+        self.no_xray = nombor
+        super(Pemeriksaan, self).save(*args, **kwargs)

@@ -7,22 +7,18 @@ from crispy_forms.layout import (
 )
 from django import forms
 
-from .models import Bcs, Daftar, Region, Exam
+from .models import Pemeriksaan, Daftar, Region, Exam
 
 
 class BcsForm(forms.ModelForm):
     class Meta:
-        model = Bcs
+        model = Daftar
         fields = (
             "tarikh",
-            "mrn",
-            "nric",
-            "nama",
-            "ward",
+            "pesakit",
+            "rujukan",
             "pemohon",
-            "mo",
-            "radiologist",
-            "catatan",
+            "dcatatan",
         )
 
     def __init__(self, *args, **kwargs):
@@ -75,8 +71,8 @@ class DaftarForm(forms.ModelForm):
     # exam = forms.ModelChoiceField(label="Pemeriksaan", queryset=Exam.objects.all(), widget=forms.CharField())
 
     class Meta:
-        model = Daftar
-        fields = ("nobcs", "exam", "laterality", "dcatatan")
+        model = Pemeriksaan
+        fields = ("no_xray", "exam", "laterality")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
