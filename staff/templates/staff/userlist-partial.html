@@ -1,0 +1,42 @@
+{% if single %}
+    <tr>
+        <td>{{ item.username }}</td>
+        <td>{{ item.nama }}</td>
+        <td>{{ item.jawatan }}</td>
+        <td>{{ item.klinik }}</td>
+        <td>{{ item.last_login|timesince }}</td>
+        <td>
+            <div class="custom-control custom-switch">
+                <input type="checkbox" class="custom-control-input" id="check-{{ item.id }}"
+                       {% if item.is_active %}checked{% endif %} hx-post="{% url 'staff:staff-aktif' item.id %}"
+                       hx-target="this">
+                <label class="custom-control-label" for="check-{{ item.id }}"></label>
+                <button class="btn btn-xs" hx-get="{% url 'staff:staff-edit' item.id %}" hx-target="#modal-dialog"><i
+                        class="fas fa-pencil-alt text-danger"></i></button>
+                <button class="btn btn-xs" hx-get="{% url 'staff:staff-pass' item.id %}" hx-target="#modal-dialog"><i
+                        class="fas fa-key text-warning"></i></button>
+            </div>
+        </td>
+    </tr>
+{% else %}
+    {% for item in staff %}
+        <tr>
+            <td>{{ item.username }}</td>
+            <td>{{ item.nama }}</td>
+            <td>{{ item.jawatan }}</td>
+            <td>{{ item.klinik }}</td>
+            <td>{{ item.last_login|timesince }}</td>
+            <td>
+                <div class="custom-control custom-switch">
+                    <input type="checkbox" class="custom-control-input" id="check-{{ item.id }}"
+                           {% if item.is_active %}checked{% endif %} hx-post="{% url 'staff:staff-aktif' item.id %}"
+                           hx-target="this">
+                    <label class="custom-control-label" for="check-{{ item.id }}"></label>
+                    <button class="btn btn-xs" hx-get="{% url 'staff:staff-edit' item.id %}" hx-target="#modal-dialog">
+                        <i class="fas fa-pencil-alt text-danger"></i></button>
+                    <button class="btn btn-xs" hx-get="{% url 'staff:staff-pass' item.id %}" hx-target="#modal-dialog">
+                        <i class="fas fa-key text-warning"></i></button>
+                </div>
+        </tr>
+    {% endfor %}
+{% endif %}

@@ -63,6 +63,7 @@ def disiplin_tambah(request):
         if form.is_valid():
             newdisp = form.save(commit=False)
             newdisp.disiplin = newdisp.disiplin.upper()
+            newdisp.save()
             disp = Disiplin.objects.all()
 
             data = {

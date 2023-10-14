@@ -13,6 +13,7 @@ KLINIK = 'Klinik Kesihatan Puchong Batu 14'
 KLINIKSHORT = 'KKP'
 
 from pathlib import Path
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -46,7 +47,7 @@ INSTALLED_APPS = [
     'crispy_forms',
     'crispy_bootstrap5',
     'ordered_model',
-    'fontawesomefree',
+    'slippers',
 
     'staff',
     'wad',
@@ -75,7 +76,6 @@ INTERNAL_IPS = [
 ]
 
 ROOT_URLCONF = 'reez.urls'
-import os
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -88,6 +88,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
             ],
+            "builtins": ["slippers.templatetags.slippers"],
         },
     },
 ]
@@ -141,7 +142,9 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
 STATIC_URL = 'static/'
-
+STATICFILES_DIRS = [
+    BASE_DIR / "static",
+]
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
@@ -150,3 +153,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 
 CRISPY_TEMPLATE_PACK = "bootstrap5"
+
+LOGIN_URL = '/login/'
+LOGOUT_REDIRECT_URL = '/'

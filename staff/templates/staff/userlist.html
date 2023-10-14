@@ -1,0 +1,57 @@
+{% extends 'index.html' %}
+{% load static %}
+{% block title %}
+{{ tajuk }}
+{% endblock %}
+{% block content %}
+<div class="card p-0">
+<div class="card-header">
+    <h3 class="card-title">Senarai Staf</h3>
+
+    <div class="card-tools">
+        <button class='btn btn-outline-success btn-sm' hx-target='#modal-dialog'  hx-get='{% url 'staff:staff-tambah' %}'><i class='fa fa-plus'></i>Tambah</button>
+        <button type="button" class="btn btn-tool" data-card-widget="collapse">
+            <i class="fas fa-minus"></i>
+        </button>
+        <button type="button" class="btn btn-tool" data-card-widget="remove">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+</div>
+<!-- /.card-header -->
+<div class="card-body p-0">
+    <div class="container-fluid">
+<div class="table-responsive table-striped">
+                <div id="indicator" class="htmx-indicator p-3 text-center">
+                Dalam Proses.. <span class="kt-spinner kt-spinner-md kt-spinner--success"></span>
+            </div>
+
+  <table class="table">
+  <thead>
+    <tr>
+      <th scope="col">Username</th>
+      <th scope="col">Nama</th>
+      <th scope="col">Jawatan</th>
+      <th scope="col">Klinik</th>
+      <th scope="col">Online</th>
+      <th scope="col">Aktif</th>
+    </tr>
+  </thead>
+  <tbody  hx-trigger="tableChanged from:body"
+                           hx-indicator=".htmx-indicator"
+                           hx-get="{% url 'staff:staff-list' %}"
+                           hx-target="this">
+  {% include 'staff/userlist-partial.html' %}
+  </tbody>
+  </table>
+</div>
+        </div>
+</div>
+<!-- /.card-body -->
+{#<div class="card-footer text-center">#}
+{#    <a href="javascript:void(0)" class="uppercase">View All Products</a>#}
+{#</div>#}
+<!-- /.card-footer -->
+</div>
+
+{% endblock %}

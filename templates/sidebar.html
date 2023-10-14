@@ -1,0 +1,107 @@
+{% load static %}
+<!-- Brand Logo -->
+<a href="index3.html" class="brand-link">
+    <img src="{% static 'dist/img/AdminLTELogo.png' %}" alt="AdminLTE Logo" class="brand-image img-circle elevation-3"
+         style="opacity: .8">
+    <span class="brand-text font-weight-light">Reez 1.0</span>
+</a>
+
+<!-- Sidebar -->
+<div class="sidebar">
+    <!-- Sidebar user panel (optional) -->
+    <div class="user-panel mt-3 pb-3 mb-3 d-flex">
+        <div class="image">
+            <img src="{% static 'dist/img/user2-160x160.jpg' %}" class="img-circle elevation-2" alt="User Image">
+        </div>
+        <div class="info">
+            <a href="#" class="d-block">{{ request.user.username }}</a>
+        </div>
+    </div>
+
+    <!-- SidebarSearch Form -->
+    <div class="form-inline">
+        <div class="input-group" data-widget="sidebar-search">
+            <input class="form-control form-control-sidebar" type="search" placeholder="Search" aria-label="Search">
+            <div class="input-group-append">
+                <button class="btn btn-sidebar">
+                    <i class="fas fa-search fa-fw"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar Menu -->
+    <nav class="mt-2">
+        <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu" data-accordion="false">
+            <li class="nav-item">
+                <a href="#" class="nav-link active">
+                    <i class="nav-icon fas fa-tachometer-alt"></i>
+                    <p>
+                        Dashboard
+                    </p>
+                </a>
+            </li>
+            <li class="nav-header">DATA</li>
+            <li class="nav-item">
+                <a href="pages/calendar.html" class="nav-link">
+                    <i class="nav-icon fas fa-radiation-alt text-yellow"></i>
+                    <p>
+                        Pemeriksaan
+                        {#                <span class="badge badge-info right">2</span>#}
+                    </p>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="pages/calendar.html" class="nav-link">
+                    <i class="nav-icon fas fa-wheelchair text-pink"></i>
+                    <p>
+                        Pesakit
+                        {#                <span class="badge badge-info right">2</span>#}
+                    </p>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="#" class="nav-link">
+                    <i class="nav-icon fas fa-chart-line text-cyan"></i>
+                    <p>
+                        Reten
+                    </p>
+                </a>
+            </li>
+            <li class="nav-header">ADMIN</li>
+            <li class="nav-item">
+                <a href="{% url 'wad:wad-list' %}" class="nav-link">
+                    <i class="nav-icon fas fa-ambulance text-success"></i>
+                    <p class="text">Rujukan</p>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="#" class="nav-link">
+                    <i class="nav-icon fas fa-clipboard-list text-warning"></i>
+                    <p>Pemeriksaan</p>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'staff:staff-list' %}" class="nav-link">
+                    <i class="nav-icon fas fa-user-nurse text-info"></i>
+                    <p>Staff</p>
+                </a>
+            </li>
+            <li class="nav-header">WEB</li>
+            <li class="nav-item" hx-get="{% url 'staff:staff-tukar' %}" hx-target="#modal-dialog">
+                <span class="nav-link" style="cursor: pointer;">
+                    <i class="nav-icon fas fa-key text-warning"></i>
+                    <p>Tukar Kata Laluan</p>
+                </span>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'staff:staff-logout' %}" class="nav-link">
+                    <i class="nav-icon fas fa-power-off text-danger"></i>
+                    <p>Log Keluar</p>
+                </a>
+            </li>
+        </ul>
+    </nav>
+    <!-- /.sidebar-menu -->
+</div>
+<!-- /.sidebar -->
