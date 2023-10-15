@@ -144,7 +144,11 @@ ambulatori_choice = [
     ('Kerusi Roda', 'Kerusi Roda'),
     ('Troli', 'Troli')
 ]
-
+status_chocies = [
+    ('Registered', 'Registered'),
+    ('Performed', 'Performed'),
+    ('Completed', 'Completed')
+]
 
 class Daftar(auto_prefetch.Model):
     tarikh = models.DateTimeField(default=timezone.now)
@@ -156,6 +160,7 @@ class Daftar(auto_prefetch.Model):
     ambulatori = models.CharField(max_length=15, choices=ambulatori_choice, default='Berjalan Kaki')
 
     pemohon = models.CharField(max_length=30, null=True, blank=True)
+    status = models.CharField(max_length=15, default='Performed')
 
     filem = models.PositiveSmallIntegerField(default=0)
     cd = models.PositiveSmallIntegerField(verbose_name='CD',default=0)
@@ -167,6 +172,7 @@ class Daftar(auto_prefetch.Model):
     )
     created = models.DateTimeField(auto_now_add=True)
     modified = models.DateTimeField(auto_now=True)
+    performed = models.DateTimeField(blank=True,null=True)
 
     class Meta(auto_prefetch.Model.Meta):
         verbose_name_plural = "Pendaftaran Radiologi"
@@ -174,15 +180,19 @@ class Daftar(auto_prefetch.Model):
             "tarikh",'pesakit'
         ]
 
-
-
     def __str__(self):
-        return "{} - {}".format(self.no_xray, self.exam)
+        return "{} - {}".format(self.tarikh, self.pesakit.nama)
+
+    def save(self, *args, **kwargs):
+        self.pemohon = titlecase(self.pemohon)
+        super(Daftar, self).save(*args, **kwargs)
 
     def get_absolute_url(self):
+        return ''
         return reverse("bcs:exam-detail", args=[self.pk])
 
     def get_komen_url(self):
+        return ''
         return reverse("bcs:exam-komen", args=[self.pk])
 
 

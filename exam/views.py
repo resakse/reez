@@ -26,7 +26,7 @@ def senarai_bcs(request):
     #     .select_related("daftar__rujukan", "exam__modaliti")
     #     .order_by("-tarikh"),
     # )
-    daftar = Pemeriksaan.objects.all()
+    daftar = Daftar.objects.all()
     page = request.GET.get("page", 1)
     paginator = Paginator(daftar, 10)  # Show 25 contacts per page.
     try:
