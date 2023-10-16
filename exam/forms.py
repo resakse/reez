@@ -23,7 +23,6 @@ class BcsForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # self.fields['t_terima'].widget.attrs.update({'class': 'datepicker-input col','data-target':"#id_mula",'data-toggle':"datetimepicker"})
         self.helper = FormHelper()
         self.helper.layout = Layout(
             Row(

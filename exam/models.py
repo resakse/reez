@@ -102,6 +102,10 @@ class Exam(auto_prefetch.Model):
         # return '{} - {}'.format(self.modaliti,self.exam)
         return self.exam
 
+    def save(self, *args, **kwargs):
+        self.exam = titlecase(self.exam)
+        self.short_desc = self.short_desc.upper()
+        super(Exam, self).save(*args, **kwargs)
 
 lateral_choices = (
     ("Kiri", "Kiri"),
@@ -156,10 +160,10 @@ class Daftar(auto_prefetch.Model):
     pesakit = auto_prefetch.ForeignKey(Pesakit, on_delete=models.CASCADE)
     no_resit = models.CharField(max_length=50, blank=True, null=True)
     lmp = models.DateField(verbose_name='LMP',blank=True, null=True)
-    rujukan = auto_prefetch.ForeignKey(Ward, on_delete=models.SET_NULL, null=True, blank=True)
+    rujukan = auto_prefetch.ForeignKey(Ward, on_delete=models.SET_NULL, null=True)
     ambulatori = models.CharField(max_length=15, choices=ambulatori_choice, default='Berjalan Kaki')
 
-    pemohon = models.CharField(max_length=30, null=True, blank=True)
+    pemohon = models.CharField(max_length=30, blank=False, null=True)
     status = models.CharField(max_length=15, default='Performed')
 
     filem = models.PositiveSmallIntegerField(default=0)
