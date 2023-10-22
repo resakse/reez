@@ -1,31 +1,29 @@
-{% load crispy_forms_tags %}
+{% load static crispy_forms_tags %}
 <div id="bcs">
     <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
         <div class="card shadow-sm rounded">
-            <div class="card-body">
-                <h5 class="card-title btn">Tambah BCS</h5>
-            <div id="mrnstatus" class="mt-3"><span id="pesakitada" data-mrn="tiada"></span></div>
-                {% crispy form %}
-                {% if bcs_id %}
-                <div id="tmpthantar" class="card">
-                    <div class="card-body">
-                        <div class="button-group pull-right">
-                            <button type="submit" onclick="$('.editing').remove()" hx-post="{{ hantar_url }}"
-                                    hx-include=".form-control" hx-target="#bcs" hx-swap="outerHTML"
-                                    class="btn btn-outline-primary btn-sm rounded">Hantar
-                            </button>
-                            <a class="btn btn-outline-danger btn-sm rounded"
-                            href="{% url 'bcs:bcs-list' %}">Kembali</a>
-                        </div>
+                <h5 class="card-header">{{ tajuk }}</h5>
+                <div class="card-body">
+                    <div id="tmpthantar">
+                        <div id="mrnstatus" class="m-3 text-center"><span id="pesakitada" data-mrn="tiada"></span></div>
+                        {% crispy form %}
+                        {% if bcs_id %}
+                            <div class="button-group pull-right">
+                                <button type="submit" onclick="$('.editing').remove()" hx-post="{{ hantar_url }}"
+                                        hx-include=".form-control" hx-target="#bcs" hx-swap="outerHTML"
+                                        class="btn btn-outline-primary btn-sm rounded">Hantar
+                                </button>
+                                <a class="btn btn-outline-danger btn-sm rounded"
+                                   href="{% url 'bcs:bcs-list' %}">Kembali</a>
+                            </div>
+                        {% endif %}
                     </div>
                 </div>
-                {% endif %}
-            </div>
         </div>
         <div class="mt-5 card shadow-sm rounded">
+                <h5 class="card-header">Pemeriksaan</h5>
             <div class="card-body">
-                <h5 class="card-title">Pemeriksaan</h5>
                 <div class="mt-5 table-responsive">
 
                     <table id="exam" class="table">
@@ -34,8 +32,6 @@
                             <th scope="col">No. BCS</th>
                             <th scope="col">Pemeriksaan</th>
                             <th scope="col">Lateraliti</th>
-                            <th scope="col" class="text-center">Merged</th>
-                            <th scope="col">Catatan</th>
                             <th scope="col"></th>
                         </tr>
                         </thead>
@@ -51,7 +47,7 @@
                             <label class="mt-3">
                                 <input id="merged" type="checkbox" {% if item.merged %}checked{% endif %}
                                        name="merged" hx-post="{% url 'bcs:bcs-merge' item.pk %}" hx-swap="outerHTML"
-                                       hx-target="this" />
+                                       hx-target="this"/>
                                 <span></span>
                             </label>
                         </span>
@@ -79,7 +75,7 @@
                         {% if bcs_id %}
                             <tr id="texam">
                                 <td colspan="6">
-                                    <button class="btn btn-sm btn-outline-success"
+                                    <button class="btn btn-sm btn-primary"
                                             hx-get="{% url 'bcs:exam-tambah' bcs_id %}"
                                             hx-swap="outerHTML" hx-target="#texam"
                                             onclick="if ($('.editing').length>=1){htmx.trigger('.editing','cancel')}">
@@ -92,21 +88,23 @@
                     </table>
                 </div>
             </div>
-        {% if not bcs_id %}
-                        <div id="tmpthantar" class="card">
+            {% if not bcs_id %}
+                <div id="tmpthantar" class="card">
                     <div class="card-body">
-                        <div class="button-group pull-right">
+                                                    <a class="btn btn-danger btn-sm rounded"
+                               href="{% url 'bcs:bcs-list' %}">Kembali</a>
+                        <div class="float-right">
                             <button type="submit" onclick="$('.editing').remove()" hx-post="{{ hantar_url }}"
                                     hx-include=".form-control" hx-target="#bcs" hx-swap="outerHTML"
-                                    class="btn btn-outline-primary btn-sm rounded">Hantar
+                                    class="btn btn-primary btn-sm rounded">Hantar
                             </button>
-                            <a class="btn btn-outline-danger btn-sm rounded"
-                                    href="{% url 'bcs:bcs-list' %}">Kembali</a>
+
                         </div>
                     </div>
                 </div>
-        {% endif %}
+            {% endif %}
         </div>
 
     </form>
+
 </div>

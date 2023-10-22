@@ -164,19 +164,18 @@ class Daftar(auto_prefetch.Model):
     ambulatori = models.CharField(max_length=15, choices=ambulatori_choice, default='Berjalan Kaki')
 
     pemohon = models.CharField(max_length=30, blank=False, null=True)
-    status = models.CharField(max_length=15, default='Performed')
+    status = models.CharField(max_length=15, choices=status_chocies, default='Performed')
 
     filem = models.PositiveSmallIntegerField(default=0)
     cd = models.PositiveSmallIntegerField(verbose_name='CD',default=0)
     dcatatan = models.CharField(
         verbose_name="Catatan", blank=True, null=True, max_length=20
     )
-    jxr = auto_prefetch.ForeignKey(
-        User, on_delete=models.SET_NULL, null=True, blank=True, related_name="bcs_jxr"
+    jxr = auto_prefetch.ForeignKey(User,verbose_name='Juru X-Ray', on_delete=models.SET_NULL, null=True, blank=True, related_name="bcs_jxr"
     )
     created = models.DateTimeField(auto_now_add=True)
     modified = models.DateTimeField(auto_now=True)
-    performed = models.DateTimeField(blank=True,null=True)
+    performed = models.DateTimeField(default=timezone.now,blank=True,null=True)
 
     class Meta(auto_prefetch.Model.Meta):
         verbose_name_plural = "Pendaftaran Radiologi"
@@ -188,7 +187,8 @@ class Daftar(auto_prefetch.Model):
         return "{} - {}".format(self.tarikh, self.pesakit.nama)
 
     def save(self, *args, **kwargs):
-        self.pemohon = titlecase(self.pemohon)
+        if self.pemohon:
+            self.pemohon = titlecase(self.pemohon)
         super(Daftar, self).save(*args, **kwargs)
 
     def get_absolute_url(self):

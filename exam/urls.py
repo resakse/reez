@@ -7,7 +7,7 @@ app_name = "bcs"
 
 urlpatterns = [
     path("", views.senarai_bcs, name="bcs-list"),
-    # path("tambah", views.tambah_bcs, name="bcs-tambah"),
+    path("tambah", views.tambah_bcs, name="bcs-tambah"),
     # path("<int:pk>/kemaskini", views.edit_bcs, name="bcs-edit"),
     # path("<int:pk>/exam/senarai", views.list_exam, name="exam-senarai"),
     # path("<int:pk>/exam/tambah", views.tambah_exam, name="exam-tambah"),

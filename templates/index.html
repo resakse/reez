@@ -17,6 +17,7 @@
     <link rel="stylesheet" href="{% static 'plugins/sweetalert2-theme-bootstrap-4/bootstrap-4.min.css' %}">
     <link rel="stylesheet" href="{% static 'plugins/select2/css/select2.min.css' %}">
     <link rel="stylesheet" href="{% static 'plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css' %}">    <!-- Theme style -->
+    <link rel="stylesheet" href="{% static 'plugins/icheck-bootstrap/icheck-bootstrap.min.css' %}">    <!-- Theme style -->
     <link rel="stylesheet" href="{% static 'dist/css/adminlte.min.css' %}">
     <link href="{% static 'js/flatpickr/flatpickr.min.css' %}" rel="stylesheet" type="text/css"/>
     <link href="{% static 'js/flatpickr/dark.css' %}" rel="stylesheet" type="text/css"/>
@@ -28,6 +29,15 @@
         .select2 {
             width: 100% !important;
         }
+        .select2-selection__rendered {
+    line-height: 35px !important;
+}
+.select2-container .select2-selection--single {
+    height: 38px !important;
+}
+.select2-selection__arrow {
+    height: 34px !important;
+}
 .card-header {
 	border-bottom: 1px solid rgba(211, 203, 203, 0.6) !important;
 }
@@ -92,7 +102,7 @@
         <!-- Main content -->
         <section class="content">
             <div id="konten" class="container-fluid">
-            <div class="body-content">
+            <div id="body-content">
                 {% block content %}{% endblock %}
             </div>
             </div><!--/. container-fluid -->

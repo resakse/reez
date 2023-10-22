@@ -18,22 +18,19 @@ typing-extensions = {version = ">=4", markers = "python_version < \"3.11\""}
 tests = ["mypy (>=0.800)", "pytest", "pytest-asyncio"]
 
 [[package]]
-name = "crispy-bootstrap5"
-version = "0.7"
-description = "Bootstrap5 template pack for django-crispy-forms"
+name = "crispy-bootstrap4"
+version = "2023.1"
+description = "Bootstrap4 template pack for django-crispy-forms"
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 files = [
-    {file = "crispy-bootstrap5-0.7.tar.gz", hash = "sha256:0745a67199619149b7feca87dab7a45664876ed50fb582b38fd2aeb3f8a8d869"},
-    {file = "crispy_bootstrap5-0.7-py3-none-any.whl", hash = "sha256:f3ff1ef5cb379fe80b1b02e245008f276444098a4bdb8d855bed84c623798a85"},
+    {file = "crispy-bootstrap4-2023.1.tar.gz", hash = "sha256:d60e93eb6d82886c009eb174f2a4c78fdac602a1efadf0305471c84815bd973a"},
+    {file = "crispy_bootstrap4-2023.1-py3-none-any.whl", hash = "sha256:1a88e74f8d36d2dedeb40a66f246994f3ce5cd855017785d0291e741d3e7d7c2"},
 ]
 
 [package.dependencies]
-django = ">=3.2"
-django-crispy-forms = ">=1.13.0"
-
-[package.extras]
-test = ["pytest", "pytest-django"]
+django = ">=4.2"
+django-crispy-forms = ">=2.0"
 
 [[package]]
 name = "django"
@@ -308,4 +305,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "b32d102606502a296ed7fd466aca78c87da6dd3b874e21f4feafee5a97972fee"
+content-hash = "75c2eeb8578b052c7955d3951789129da4a466dad1c45f40a5e26e841e904543"

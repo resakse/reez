@@ -1,8 +1,11 @@
+from datetime import datetime, date
 from django.db import models
 from django.urls import reverse
 from reez import settings
 from custom.katanama import titlecase
 User = settings.AUTH_USER_MODEL
+harini = datetime.now()
+
 
 bangsa_list = [
     ('Melayu', 'Melayu'),
@@ -11,7 +14,10 @@ bangsa_list = [
     ('Lain-Lain', 'Lain-Lain'),
     ('Warga Asing', 'Warga Asing')
 ]
-
+jantina_list = [
+    ('L','Lelaki'),
+    ('P','Perempuan')
+]
 
 # Create your models here.
 class Pesakit(models.Model):
@@ -25,7 +31,8 @@ class Pesakit(models.Model):
     )
     nama = models.CharField(max_length=50, null=True, blank=False)
     bangsa = models.CharField(max_length=15, choices=bangsa_list, default='Melayu')
-
+    jantina = models.CharField(max_length=2, choices=jantina_list, default='L')
+    umur = models.CharField(max_length=10, blank=True, null=True)
     catatan = models.TextField(blank=True, null=True)
 
     jxr = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=False)
@@ -53,3 +60,29 @@ class Pesakit(models.Model):
             self.nric = self.nric.upper()
 
         super(Pesakit, self).save(*args, **kwargs)
+
+    @property
+    def ic(self):
+        ic = self.nric
+        return ic.replace("-", "")
+
+    @property
+    def t_lahir(self):
+        tlahir = self.nric[:6]
+        lahir = datetime.strptime(tlahir, "%y%m%d").date()
+        return lahir
+
+    @property
+    def kira_umur(self):
+        lahir = self.t_lahir
+        today = date.today()
+        return today.year - lahir.year - ((today.month,
+                                           today.day) < (lahir.month,
+                                                         lahir.day))
+
+    @property
+    def jantina(self):
+        lastic = self.nric[-1]
+        if (int(lastic) % 2) == 0:
+            return 'Perempuan'
+        return 'Lelaki'

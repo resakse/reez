@@ -45,8 +45,8 @@ def senarai_bcs(request):
 
 @login_required
 def tambah_bcs(request):
-    tajuk = 'Tambah BCS'
-    form = BcsForm(request.POST or None)
+    tajuk = 'Daftar Pemeriksaan'
+    form = BcsForm(request.POST or None, initial={'jxr': request.user})
     examform = DaftarForm(request.POST or None)
     hantar_url = reverse("bcs:bcs-tambah")
     data = {
@@ -273,21 +273,29 @@ def edit_comment(request, pk=None):
 
 @login_required
 def checkAM(request):
-    am = request.GET['mrn']
+    am = request.GET.get('mrn')
+    nric = request.GET.get('nric')
+    print(f'am = {am} - nric = {nric}')
     pesakit = None
     nama = None
-    nric = None
     rekod = None
-    pesakit = Pesakit.objects.filter(mrn=am.upper()).first()
+    if am:
+        print('cek am')
+        pesakit = Pesakit.objects.filter(mrn=am.upper()).first()
+    if nric:
+        print('cek pesakit')
+        pesakit = Pesakit.objects.filter(nric=nric.upper()).first()
+
     if pesakit:
         nama = pesakit.nama
         nric = pesakit.nric
-        rekod = f"[BCS {pesakit.tarikh}]"
+        bangsa = pesakit.bangsa
+        jantina = pesakit.jantina
     if not pesakit:
         return HttpResponse(f'<span id="pesakitada" data-mrn="tiada" class="alert alert-primary">Pesakit baru</span>')
 
-    response = HttpResponse(f'<span id="pesakitada" class="alert alert-success">Rekod Pesakit Wujud {rekod}</span>')
-    return trigger_client_event(response, "pesakitada", {"nama": nama, "nric": nric})
+    response = HttpResponse(f'<span id="pesakitada" class="alert alert-success">Rekod Pesakit {nama} telah wujud</span>')
+    return trigger_client_event(response, "pesakitada", {"nama": nama, "nric": nric, "bangsa": bangsa,'umur': umur,'jantina': jantina})
 
 
 def configList(request):
