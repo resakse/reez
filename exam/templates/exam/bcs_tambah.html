@@ -18,7 +18,6 @@
     {% include 'exam/bcs_tambah-partia.html' %}
 {% endblock content %}
 {% block scripts %}
-    <script src="{% static 'js/dayjs.min.js' %}"></script>
     <script>
 
         document.body.addEventListener("htmxSuccess", function (e) {
@@ -29,55 +28,6 @@
             console.log('ada msg')
             toastr.success(e.detail.merged);
         });
-        document.body.addEventListener("pesakitada", function (e) {
-            $('#id_nama').val(e.detail.nama);
-            $('#id_nric').val(e.detail.nric);
-            $("input[name=jantina][value=" + e.detail.jantina + "]").prop("checked", true);
-            $("input[name=bangsa][value=" + e.detail.bangsa + "]").prop("checked", true);
 
-        });
-        $("#id_nric").on("change", function () {
-            let bangsa = $("input[name=bangsa]").val();
-            let ic = $(this).val();
-            if (bangsa !== 'Warga Asing') {
-                if (ic % 2 == 0) { // awek
-                    $("input[name=jantina][value='P']").prop("checked", true);
-                } else {
-                    $("input[name=jantina][value='L']").prop("checked", true);
-                }
-                let dob_t = ic.substr(0, 2);
-                let dob_b = ic.substr(2, 2);
-                let dob_d = ic.substr(4, 2);
-                console.log('bukan foreigner')
-                let now = new Date().getFullYear().toString();
-                let decade = now.substr(0, 2);
-                if (now.substr(2, 2) > dob_t) {
-                    dob_t = parseInt(decade.concat(dob_t.toString()), 10);
-                }
-                let lahir = new Date(dob_t, (dob_b - 1), dob_d, 0, 0, 0, 0);
-                let umur_t = dayjs().diff(lahir, 'year')
-                let umur_b = dayjs().diff(lahir, 'month')
-                let umur_h = dayjs().diff(lahir, 'day')
-                let umur = ''
-
-                if (umur_t<100){
-                    console.log(umur_t)
-                    if (parseInt(umur_t)===0){
-                    umur = umur_b+' bulan '
-                    }else {
-                        umur=umur_t+' tahun '+umur_b+' bulan'
-                    }
-                } else {
-                    lahir = dayjs(lahir).add(100, 'year');
-                    umur_b = dayjs().diff(lahir, 'month')
-                    umur_h = dayjs().diff(lahir, 'day')
-                    umur = umur_b+' bulan '+umur_h+' hari'
-                    if (umur_b<1){
-                        umur = umur_h+' hari';
-                    }
-                }
-                $('#id_umur').val(umur);
-            }
-        })
     </script>
 {% endblock scripts %}

@@ -39,7 +39,7 @@
                             <td>
                                 <div class="btn-group align-middle" role="group" aria-label="Detail Exam">
                                     <button class="btn btn-icon btn-sm rounded btn-outline-hover-info"
-                                            hx-get="" hx-target="#bcs-full"
+                                            hx-get="{% url 'bcs:bcs-edit' item.id %}" hx-target="#bcs-full"
                                             hx-swap="outerHTML" hx-push-url="true"><i class="fa fa-edit text-danger"
                                                                                       aria-hidden="true"></i>
                                     </button>

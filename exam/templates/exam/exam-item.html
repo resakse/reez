@@ -1,19 +1,7 @@
 <tr>
-    <th scope="row" class="align-middle">{{ item.nobcs }}</th>
+    <th scope="row" class="align-middle">{{ item.no_xray }}</th>
     <td class="align-middle">{{ item.exam }}</td>
     <td class="align-middle">{{ item.laterality|default:"" }}</td>
-    <td class="text-center align-middle">
-        <span class="align-middle kt-switch kt-switch--outline kt-switch--icon kt-switch--sm kt-switch--success"
-              tabindex="0" data-toggle='tooltip' data-placement='top' title='Merge di PACS'>
-    <label class="mt-3">
-        <input id="merged" type="checkbox" {% if item.merged %}checked{% endif %}
-               name="merged" hx-post="{% url 'bcs:bcs-merge' item.pk %}" hx-swap="outerHTML"
-               hx-target="this" />
-        <span></span>
-    </label>
-    </span>
-    </td>
-    <td>{{ item.dcatatan|default:"" }}</td>
     <td class="text-center align-middle">
         <button id="edit-{{ item.id }}" class="btn btn-icon btn-sm rounded btn-hover-dark"
                 hx-get="{% url 'bcs:exam-edit' item.pk %}" hx-target="closest tr" hx-swap="outerHTML" hx-trigger="edit"

@@ -15,8 +15,8 @@ htmx.on("hidden.bs.modal", () => {
             <tr>
                 <td class="font-weight-bold">Tarikh</td>
                 <td>{{ exam.bcs.tarikh|date:'d/m/Y g:i A' }}</td>
-                <td class="font-weight-bold">No BSC</td>
-                <td>{{ exam.nobcs }}</td>
+                <td class="font-weight-bold">No X-Ray</td>
+                <td>{{ exam.no_xray }}</td>
             </tr>
             <tr>
                 <td class="font-weight-bold">Modaliti</td>
@@ -35,12 +35,6 @@ htmx.on("hidden.bs.modal", () => {
                 <td class="font-weight-bold">Catatan</td>
                 <td colspan="2">{{ exam.dcatatan }}</td>
                 </tr>
-            {% endif %}
-            {% if exam.merged %}
-            <tr>
-                <td class="font-weight-bold">Merge</td>
-                <td colspan="2">{{ exam.merge_by }}</td>
-            </tr>
             {% endif %}
             <tr>
                 <td class="font-weight-bold">Kemaskini</td>

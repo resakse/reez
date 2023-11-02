@@ -81,7 +81,7 @@ class Pesakit(models.Model):
                                                          lahir.day))
 
     @property
-    def jantina(self):
+    def cek_jantina(self):
         lastic = self.nric[-1]
         if (int(lastic) % 2) == 0:
             return 'Perempuan'

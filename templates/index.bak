@@ -1,0 +1,175 @@
+{% load static django_htmx %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Unit Radiologi | {% block title %}{% endblock %}</title>
+
+    <!-- Google Font: Source Sans Pro -->
+    <link rel="stylesheet"
+          href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400i,700&display=fallback">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="{% static 'plugins/fontawesome-free/css/all.min.css' %}">
+    <!-- overlayScrollbars -->
+    <link rel="stylesheet" href="{% static 'plugins/overlayScrollbars/css/OverlayScrollbars.min.css' %}">
+    <link rel="stylesheet" href="{% static 'plugins/toastr/toastr.min.css' %}">
+    <link rel="stylesheet" href="{% static 'plugins/sweetalert2-theme-bootstrap-4/bootstrap-4.min.css' %}">
+    <link rel="stylesheet" href="{% static 'plugins/select2/css/select2.min.css' %}">
+    <link rel="stylesheet" href="{% static 'plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css' %}">    <!-- Theme style -->
+    <link rel="stylesheet" href="{% static 'dist/css/adminlte.min.css' %}">
+    <link href="{% static 'js/flatpickr/flatpickr.min.css' %}" rel="stylesheet" type="text/css"/>
+    <link href="{% static 'js/flatpickr/dark.css' %}" rel="stylesheet" type="text/css"/>
+
+<script src="{% static 'plugins/jquery/jquery.min.js' %}"></script>
+<script src="{% static 'js/htmx.min.js' %}" defer></script>
+
+    <style>
+        .select2 {
+            width: 100% !important;
+        }
+.card-header {
+	border-bottom: 1px solid rgba(211, 203, 203, 0.6) !important;
+}
+    </style>
+</head>
+<body class="hold-transition text-sm dark-mode sidebar-mini layout-fixed layout-navbar-fixed layout-footer-fixed" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+<div class="wrapper">
+
+    <!-- Preloader -->
+    <div class="preloader flex-column justify-content-center align-items-center">
+        <img class="animation__wobble" src="{% static 'dist/img/AdminLTELogo.png' %}" alt="AdminLTELogo" height="60"
+             width="60">
+    </div>
+
+    <!-- Navbar -->
+    <nav class="main-header navbar navbar-expand navbar-dark">
+        <!-- Left navbar links -->
+        <ul class="navbar-nav">
+            <li class="nav-item">
+                <a class="nav-link" data-widget="pushmenu" href="#" role="button"><i class="fas fa-bars"></i></a>
+            </li>
+            {#      <li class="nav-item d-none d-sm-inline-block">#}
+            {#        <a href="index3.html" class="nav-link">Home</a>#}
+            {#      </li>#}
+            {#      <li class="nav-item d-none d-sm-inline-block">#}
+            {#        <a href="#" class="nav-link">Contact</a>#}
+            {#      </li>#}
+        </ul>
+
+        <!-- Right navbar links -->
+        <ul class="navbar-nav ml-auto">{% include 'right-nav.html' %}</ul>
+    </nav>
+    <!-- /.navbar -->
+
+    <!-- Main Sidebar Container -->
+    <aside class="main-sidebar sidebar-dark-primary elevation-4">
+        {% include 'sidebar.html' %}
+    </aside>
+
+    <!-- Content Wrapper. Contains page content -->
+    <div class="content-wrapper">
+        <!-- Content Header (Page header) -->
+        <div class="content-header">
+            <div class="container-fluid">
+                <div class="row mb-2">
+                    <div class="col-sm-6">
+                        <h1 class="m-0">{{ tajuk }}</h1>
+                    </div><!-- /.col -->
+                    <div class="col-sm-6">
+                        <ol class="breadcrumb float-sm-right">
+                            {% block breadcrumb %}
+                                <li class="breadcrumb-item"><a href="#">Home</a></li>
+                                <li class="breadcrumb-item active">Dashboard v2</li>
+                            {% endblock %}
+                        </ol>
+                    </div><!-- /.col -->
+                </div><!-- /.row -->
+            </div><!-- /.container-fluid -->
+        </div>
+        <!-- /.content-header -->
+
+        <!-- Main content -->
+        <section class="content">
+            <div id="konten" class="container-fluid">
+            <div class="body-content">
+                {% block content %}{% endblock %}
+            </div>
+            </div><!--/. container-fluid -->
+        </section>
+        <!-- /.content -->
+    </div>
+    <!-- /.content-wrapper -->
+
+    <!-- Control Sidebar -->
+    <aside class="control-sidebar control-sidebar-dark">
+        <!-- Control sidebar content goes here -->
+    </aside>
+    <!-- /.control-sidebar -->
+        <div class="modal fade" tabindex="-1" id="modal-exam">
+            <div id="modal-dialog" class="modal-dialog modal-dialog-scrollable"></div>
+        </div>
+    <!-- Main Footer -->
+    <footer class="main-footer">
+        <strong>Copyright &copy; 2020-{% now "Y" %} <a href="https://www.resakse.com">www.Resakse.com</a>.</strong>
+        All rights reserved.
+        <div class="float-right d-none d-sm-inline-block">
+            <b>Version</b> 3.2.0
+        </div>
+    </footer>
+</div>
+<!-- ./wrapper -->
+
+<!-- REQUIRED SCRIPTS -->
+<!-- jQuery -->
+<script src="{% static 'plugins/jquery/jquery.min.js' %}"></script>
+{% django_htmx_script %}
+<!-- Bootstrap -->
+<script src="{% static 'plugins/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
+<!-- overlayScrollbars -->
+<script src="{% static 'plugins/overlayScrollbars/js/jquery.overlayScrollbars.min.js' %}"></script>
+<!-- AdminLTE App -->
+<script src="{% static 'dist/js/adminlte.js' %}"></script>
+
+<!-- PAGE PLUGINS -->
+<!-- jQuery Mapael -->
+<script src="{% static 'plugins/toastr/toastr.min.js' %}"></script>
+<script src="{% static 'plugins/sweetalert2/sweetalert2.all.min.js' %}"></script>
+<script src="{% static 'plugins/select2/js/select2.full.min.js' %}"></script>
+<script src="{% static 'plugins/select2/js/i18n/ms.js' %}"></script>
+<script src="{% static 'js/flatpickr/flatpickr.min.js' %}"></script>
+<script src="{% static 'js/flatpickr/ms.js' %}"></script>
+<script>
+$(document).ready(function () {
+    $(".select").select2({
+            width: 'element',
+        });
+  htmx.on("tableChanged", (e) => {
+          $('#modal-exam').modal('hide');
+          if (e.detail.msg) {
+              let msg = e.detail.msg;
+              let kelas = e.detail.kelas;
+              toastr[kelas](msg);
+          }
+  });
+    htmx.on("notis", (e) => {
+            $('#modal-exam').modal('hide');
+        if (e.detail.msg) {
+              let msg = e.detail.msg;
+              let kelas = e.detail.kelas;
+              toastr[kelas](msg);
+          }
+  });
+
+        flatpickr('.dateinput', {
+        dateFormat: "d/m/Y",
+        locale: 'ms',
+
+    });
+    });
+
+</script>
+{% block scripts %}{% endblock %}
+
+</body>
+</html>

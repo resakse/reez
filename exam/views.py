@@ -9,7 +9,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 from django_htmx.http import trigger_client_event, push_url
 
-from exam.models import Pemeriksaan, Daftar, Exam, Modaliti, Region
+from exam.models import Pemeriksaan, Daftar, Exam, Modaliti, Region, kiraxray
 from pesakit.models import Pesakit
 # from .filters import DaftarFilter
 from .forms import BcsForm, DaftarForm, RegionForm, ExamForm
@@ -47,7 +47,8 @@ def senarai_bcs(request):
 def tambah_bcs(request):
     tajuk = 'Daftar Pemeriksaan'
     form = BcsForm(request.POST or None, initial={'jxr': request.user})
-    examform = DaftarForm(request.POST or None)
+    noxraybaru = kiraxray()
+    examform = DaftarForm(request.POST or None, initial={'no_xray': noxraybaru})
     hantar_url = reverse("bcs:bcs-tambah")
     data = {
         'tajuk': tajuk,
@@ -62,20 +63,30 @@ def tambah_bcs(request):
     response = render(request, template, data)
 
     if request.method == "POST":
-        print(request.POST)
+
         if form.is_valid() and examform.is_valid():
-            bcs = form.save(commit=False)
-            bcs.jxr = request.user
-            bcs.save()
-            form = BcsForm(instance=bcs)
+            print('form valid')
+            nric = form.cleaned_data['nric']
+            mrn = form.cleaned_data['mrn']
+            nama = form.cleaned_data['nama']
+            umur = form.cleaned_data['umur']
+            bangsa = form.cleaned_data['bangsa']
+            jantina = form.cleaned_data['jantina']
+            print(f'nama : {nama}, nric : {nric}')
+            pesakit, _ = Pesakit.objects.get_or_create(nric=nric, mrn=mrn,nama=nama,umur=umur,bangsa=bangsa,jantina=jantina)
+            daftar = form.save(commit=False)
+            daftar.jxr = request.user
+            daftar.pesakit = pesakit
+            daftar.save()
+            form = BcsForm(instance=daftar)
             if examform.is_valid():
                 exam = examform.save(commit=False)
-                exam.bcs = bcs
+                exam.daftar = daftar
                 exam.jxr = request.user
                 exam.save()
-                exams = Daftar.objects.filter(bcs=bcs)
+                exams = Daftar.objects.filter(pesakit=pesakit)
                 examform = DaftarForm(None)
-                hantar_url = reverse("bcs:bcs-edit", args=[bcs.pk])
+                hantar_url = reverse("bcs:bcs-edit", args=[exam.pk])
 
                 data = {
                     'tajuk': tajuk,
@@ -83,11 +94,11 @@ def tambah_bcs(request):
                     "examform": examform,
                     "exams": exams,
                     "hantar_url": hantar_url,
-                    "bcs_id": bcs.pk,
+                    "bcs_id": daftar.pk,
                 }
                 temp_response = render(request, template, data)
                 response = push_url(
-                    temp_response, reverse("bcs:bcs-edit", args=[bcs.pk])
+                    temp_response, reverse("bcs:bcs-edit", args=[daftar.pk])
                 )
                 response["HX-Trigger"] = json.dumps(
                     {
@@ -97,6 +108,8 @@ def tambah_bcs(request):
 
             else:
                 print("form tak valid")
+        else:
+            print("form tak valid")
 
     return response
 
@@ -104,9 +117,10 @@ def tambah_bcs(request):
 @login_required
 def edit_bcs(request, pk=None):
     bcs = Daftar.objects.get(pk=pk)
-    tajuk = f'Kemaskini BCS - {bcs.nama}'
-    form = BcsForm(request.POST or None, instance=bcs)
-    exams = Pemeriksaan.objects.filter(bcs=pk)
+    pesakit = bcs.pesakit
+    tajuk = f'Kemaskini BCS - {bcs.pesakit.nama}'
+    form = BcsForm(request.POST or None, instance=bcs, initial={'nama': pesakit.nama,'nric': pesakit.nric,'mrn': pesakit.mrn,'jantina': pesakit.jantina,'umur': pesakit.umur})
+    exams = Pemeriksaan.objects.filter(daftar=pk)
     hantar_url = reverse("bcs:bcs-edit", args=[bcs.pk])
     data = {
         'tajuk': tajuk,
@@ -147,17 +161,17 @@ def edit_bcs(request, pk=None):
 
 @login_required
 def list_exam(request, pk=None):
-    exam = Daftar.objects.filter(bcs_id=pk)
+    exam = Pemeriksaan.objects.filter(daftar_id=pk)
     data = {"exams": exam, "bcs_id": pk}
     return render(request, "exam/bcs_item-partial.html", data)
 
 
 @login_required
 def del_exam(request, pk=None):
-    exam = get_object_or_404(Daftar, pk=pk)
-    bcs = exam.bcs
+    exam = get_object_or_404(Pemeriksaan, pk=pk)
+    bcs = exam.daftar
     exam.delete()
-    exams = Daftar.objects.filter(bcs=bcs)
+    exams = Pemeriksaan.objects.filter(daftar=bcs)
     data = {"exams": exams, "bcs_id": bcs.id}
     return render(request, "exam/bcs_item-partial.html", data)
 
@@ -171,14 +185,14 @@ def tambah_exam(request, pk=None):
         if examform.is_valid():
             print('exam valid')
             exam = examform.save(commit=False)
-            exam.bcs = bcs
+            exam.daftar = bcs
             exam.jxr = request.user
             exam.save()
-            exams = Daftar.objects.filter(bcs_id=pk)
+            exams = Pemeriksaan.objects.filter(daftar=pk)
             return render(
                 request,
                 "exam/bcs_item-partial.html",
-                context={"exams": exams, "bcs_id": exam.bcs_id},
+                context={"exams": exams, "bcs_id": exam.id  },
             )
         print('exam not valid')
     data = {"examform": examform, "bcs_id": pk}
@@ -187,7 +201,7 @@ def tambah_exam(request, pk=None):
 
 @login_required
 def edit_exam(request, pk=None):
-    exam = get_object_or_404(Daftar, pk=pk)
+    exam = get_object_or_404(Pemeriksaan, pk=pk)
     examform = DaftarForm(request.POST or None, instance=exam)
     data = {"examform": examform, "exam": exam}
     if request.method == "POST":
@@ -207,10 +221,10 @@ def edit_exam(request, pk=None):
 
 @login_required
 def get_exam(request, pk=None):
-    exam = get_object_or_404(Daftar, pk=pk)
+    exam = get_object_or_404(Pemeriksaan, pk=pk)
 
     return render(
-        request, "exam/exam-item.html", context={"item": exam, "bcs_id": exam.bcs_id}
+        request, "exam/exam-item.html", context={"item": exam, "bcs_id": exam.daftar.id}
     )
 
 
@@ -292,10 +306,10 @@ def checkAM(request):
         bangsa = pesakit.bangsa
         jantina = pesakit.jantina
     if not pesakit:
-        return HttpResponse(f'<span id="pesakitada" data-mrn="tiada" class="alert alert-primary">Pesakit baru</span>')
+        return HttpResponse(f'<div id="pesakitada" data-mrn="tiada" class="alert alert-primary w-100">Pesakit baru</div>')
 
-    response = HttpResponse(f'<span id="pesakitada" class="alert alert-success">Rekod Pesakit {nama} telah wujud</span>')
-    return trigger_client_event(response, "pesakitada", {"nama": nama, "nric": nric, "bangsa": bangsa,'umur': umur,'jantina': jantina})
+    response = HttpResponse(f'<div id="pesakitada" class="alert alert-success w-100">Rekod Pesakit {nama} telah wujud</div>')
+    return trigger_client_event(response, "pesakitada", {"nama": nama, "nric": nric, "bangsa": bangsa,'jantina': jantina})
 
 
 def configList(request):
@@ -341,7 +355,7 @@ def examList(request):
 
 
 def examUpdate(request, pk=None):
-    exam = get_object_or_404(Exam, id=pk)
+    exam = get_object_or_404(Pemeriksaan, id=pk)
     examform = ExamForm(request.POST or None, instance=exam)
     formurl = reverse('bcs:config-exam-update', args=[pk])
     examform.helper.attrs = {'hx-post': formurl, 'hx-target': '#exam-list', 'hx-swap': 'outerHTML'}
@@ -364,10 +378,10 @@ def examUpdate(request, pk=None):
 
 
 def examDelete(request, pk=None):
-    exam = get_object_or_404(Exam, id=pk)
+    exam = get_object_or_404(Pemeriksaan, id=pk)
     exam.delete()
 
-    all_exam = Exam.objects.all()
+    all_exam = Pemeriksaan.objects.all()
     examform = ExamForm()
     data = {
         'exam': all_exam,
