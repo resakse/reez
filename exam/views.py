@@ -2,6 +2,7 @@ import json
 
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
+from django.db.models import Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.shortcuts import render
@@ -73,18 +74,21 @@ def tambah_bcs(request):
             bangsa = form.cleaned_data['bangsa']
             jantina = form.cleaned_data['jantina']
             print(f'nama : {nama}, nric : {nric}')
-            pesakit, _ = Pesakit.objects.get_or_create(nric=nric, mrn=mrn,nama=nama,umur=umur,bangsa=bangsa,jantina=jantina)
+            pesakit, _ = Pesakit.objects.get_or_create(Q(nric=nric) | Q(mrn=mrn),nama=nama,umur=umur,bangsa=bangsa,jantina=jantina)
             daftar = form.save(commit=False)
+            pesakit.mrn = mrn
+            pesakit.nric = nric
+            pesakit.save()
             daftar.jxr = request.user
             daftar.pesakit = pesakit
             daftar.save()
-            form = BcsForm(instance=daftar)
+            form = BcsForm(request.POST, instance=daftar)
             if examform.is_valid():
                 exam = examform.save(commit=False)
                 exam.daftar = daftar
                 exam.jxr = request.user
                 exam.save()
-                exams = Daftar.objects.filter(pesakit=pesakit)
+                exams = Pemeriksaan.objects.filter(daftar=daftar)
                 examform = DaftarForm(None)
                 hantar_url = reverse("bcs:bcs-edit", args=[exam.pk])
 
@@ -102,7 +106,7 @@ def tambah_bcs(request):
                 )
                 response["HX-Trigger"] = json.dumps(
                     {
-                        "htmxSuccess": f"BCS Berjaya di tambah.",
+                        "htmxSuccess": f"Pemeriksaan {exam.exam} Berjaya di tambah.",
                     }
                 )
 
@@ -137,8 +141,16 @@ def edit_bcs(request, pk=None):
 
     if request.method == "POST":
         if form.is_valid():
+            nric = form.cleaned_data['nric']
+            mrn = form.cleaned_data['mrn']
+            nama = form.cleaned_data['nama']
+            umur = form.cleaned_data['umur']
+            bangsa = form.cleaned_data['bangsa']
+            jantina = form.cleaned_data['jantina']
             bcs = form.save(commit=False)
             bcs.jxr = request.user
+            pesakit = bcs.pesakit
+            Pesakit.objects.filter(pk=pesakit.id).update(mrn=mrn,nama=nama,umur=umur,bangsa=bangsa,jantina=jantina,nric=nric)
             bcs.save()
             data = {
                 'tajuk': tajuk,
@@ -150,7 +162,7 @@ def edit_bcs(request, pk=None):
             response = render(request, template, data)
             response["HX-Trigger"] = json.dumps(
                 {
-                    "htmxSuccess": f"BCS Berjaya di Kemaskini.",
+                    "htmxSuccess": f"Pemeriksaan Berjaya di Kemaskini.",
                 }
             )
         else:
@@ -193,10 +205,10 @@ def tambah_exam(request, pk=None):
             return render(
                 request,
                 "exam/bcs_item-partial.html",
-                context={"exams": exams, "bcs_id": exam.id  },
+                context={"exams": exams, "bcs_id": bcs.id  },
             )
         print('exam not valid')
-    data = {"examform": examform, "bcs_id": pk}
+    data = {"examform": examform, "bcs_id": bcs.id}
     return render(request, "exam/exam-tambah.html", data)
 
 

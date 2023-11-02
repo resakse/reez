@@ -2,6 +2,8 @@
     <th scope="row" class="align-middle">{{ item.no_xray }}</th>
     <td class="align-middle">{{ item.exam }}</td>
     <td class="align-middle">{{ item.laterality|default:"" }}</td>
+    <td class="align-middle">{{ item.kv|default:"" }}</td>
+    <td class="align-middle">{{ item.mas|default:"" }}</td>
     <td class="text-center align-middle">
         <button id="edit-{{ item.id }}" class="btn btn-icon btn-sm rounded btn-hover-dark"
                 hx-get="{% url 'bcs:exam-edit' item.pk %}" hx-target="closest tr" hx-swap="outerHTML" hx-trigger="edit"

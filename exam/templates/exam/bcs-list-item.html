@@ -1,4 +1,4 @@
-<tr id="item-{{ item.id }}">
+<tr id="item-{{ item.id }}" {% if item.hamil %}class="text-pink" {% endif %}>
     <td>{{ item.bcs.tarikh|date:'d/m/Y g:i A' }}</td>
     <td>{{ item.no_xray }}</td>
     <td>{% if item.bcs.mrn %}{{ item.bcs.mrn }}{% else %}{{ item.bcs.nric }} {% endif %}</td>

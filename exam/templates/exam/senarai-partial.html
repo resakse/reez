@@ -28,7 +28,7 @@
                     </thead>
                     <tbody>
                     {% for item in page_obj %}
-                        <tr id="item-{{ item.id }}">
+                        <tr id="item-{{ item.id }}" {% if item.hamil %}class="text-pink" {% endif %}>
                             <td>{{ item.tarikh|date:'d/m/Y g:i A' }}</td>
                             <td>{{ item.pesakit.mrn|default:'' }}</td>
                             <td>{{ item.pesakit.nric|default:'' }}</td>

@@ -207,6 +207,8 @@ class Pemeriksaan(auto_prefetch.Model):
     laterality = models.CharField(
         choices=lateral_choices, blank=True, null=True, max_length=10
     )
+    kv = models.PositiveSmallIntegerField(verbose_name='kVp', blank=True, null=True)
+    mas = models.PositiveSmallIntegerField(verbose_name='mAs', blank=True, null=True)
     jxr = auto_prefetch.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True, related_name="exam_jxr"
     )

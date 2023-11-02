@@ -4,15 +4,19 @@
         <th scope="col">No. X-Ray</th>
         <th scope="col">Pemeriksaan</th>
         <th scope="col">Lateraliti</th>
+        <th scope="col">kVp</th>
+        <th scope="col">mAs</th>
         <th scope="col"></th>
     </tr>
     </thead>
     <tbody>
     {% for item in exams %}
-        <tr  id="item-{{ item.id }}">
+        <tr  id="item-{{ item.id }}" {% if item.hamil %}class="text-pink" {% endif %}>
             <th scope="row">{{ item.no_xray }}</th>
             <td>{{ item.exam }}</td>
             <td>{{ item.laterality|default:"" }}</td>
+     <td class="align-middle">{{ item.kv|default:"" }}</td>
+    <td class="align-middle">{{ item.mas|default:"" }}</td>
             <td class="text-center">
                 <button id="edit-{{ item.id }}" class="btn btn-icon btn-sm rounded btn-hover-dark"
                         hx-get="{% url 'bcs:exam-edit' item.pk %}" hx-target="closest tr" hx-swap="outerHTML"

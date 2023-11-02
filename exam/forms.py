@@ -75,8 +75,8 @@ class BcsForm(forms.ModelForm):
                 css_class="form-row",
             ),
             Row(
-                Column("ambulatori", css_class="form-group col-md-4 mb-0"),
                 Column("pemohon", css_class="form-group col-md-4 mb-0"),
+                Column("rujukan", css_class="form-group col-md-4 mb-0"),
                 Column("hamil", css_class="form-group col-md-4 mb-0"),
                 css_class="form-row",
             ),
@@ -85,7 +85,7 @@ class BcsForm(forms.ModelForm):
             Row(
                 Column(
                     Row(
-                        Column("rujukan", css_class="form-group col-md-6 mb-0"),
+                        Column("ambulatori", css_class="form-group col-md-6 mb-0"),
                         Column("status", css_class="form-group col-md-6 mb-0"),
                     ),
                     Row(
@@ -125,16 +125,18 @@ class DaftarForm(forms.ModelForm):
 
     class Meta:
         model = Pemeriksaan
-        fields = ("no_xray", "exam", "laterality")
+        fields = ("no_xray", "exam", "laterality",'kv','mas')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
         self.helper.layout = Layout(
             Row(
-                Column("no_xray", css_class="form-group col-md-4 mb-0"),
-                Column("exam", css_class="form-group col-md-4 mb-0"),
-                Column("laterality", css_class="form-group col-md-4 mb-0"),
+                Column("no_xray", css_class="form-group col-md-3 mb-0"),
+                Column("exam", css_class="form-group col-md-3 mb-0"),
+                Column("laterality", css_class="form-group col-md-3 mb-0"),
+                Column("kv", css_class="form-group col-md-1 mb-0"),
+                Column("mas", css_class="form-group col-md-1 mb-0"),
 
             ),
             #         HTML(
