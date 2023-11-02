@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from reez.settings import KLINIK
+from custom.katanama import titlecase
 # Create your models here.
 
 jawatan_choices = [
@@ -24,3 +25,11 @@ class Staff(AbstractUser):
 
     def nama(self):
         return f'{self.first_name} {self.last_name}'
+
+    def save(self, *args, **kwargs):
+        if self.first_name:
+            self.first_name = titlecase(self.first_name)
+        if self.last_name:
+            self.last_name = titlecase(self.last_name)
+
+        super(Staff, self).save(*args, **kwargs)

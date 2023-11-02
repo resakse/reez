@@ -74,6 +74,7 @@ def staff_edit(request, pk=None):
             staff.kemaskini = request.user.username
             staff.save()
             data['item'] = staff
+            data['single'] = True
             response = render(request, 'staff/userlist-partial.html', context=data)
             response["HX-Trigger"] = json.dumps(
                 {
@@ -83,7 +84,9 @@ def staff_edit(request, pk=None):
                     },
                 }
             )
-            return retarget(response, "closest tr")
+            response["HX-Retarget"] = f"#item-{staff.id}"
+            return response
+            # return retarget(response, f"#item-{staff.id}")
         else:
             print('form tak valid')
     return render(request, 'staff/tambahstaff.html', context=data)

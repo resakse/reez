@@ -1,5 +1,4 @@
 {% if single %}
-    <tr>
         <td>{{ item.username }}</td>
         <td>{{ item.nama }}</td>
         <td>{{ item.jawatan }}</td>
@@ -17,10 +16,9 @@
                         class="fas fa-key text-warning"></i></button>
             </div>
         </td>
-    </tr>
 {% else %}
     {% for item in staff %}
-        <tr>
+        <tr id="item-{{ item.id }}">
             <td>{{ item.username }}</td>
             <td>{{ item.nama }}</td>
             <td>{{ item.jawatan }}</td>
