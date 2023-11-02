@@ -178,7 +178,8 @@ def del_exam(request, pk=None):
 
 @login_required
 def tambah_exam(request, pk=None):
-    examform = DaftarForm(request.POST or None)
+    noxraybaru = kiraxray()
+    examform = DaftarForm(request.POST or None, initial={'no_xray': noxraybaru})
     bcs = Daftar.objects.get(pk=pk)
     if request.method == "POST":
         print('tambah exam', request.POST)
