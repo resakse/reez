@@ -14,8 +14,12 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+from django.conf import settings
+from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
+from django.views.generic import RedirectView
+
 from staff.views import login_user, logout_view
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -27,3 +31,11 @@ urlpatterns = [
     path('', include("exam.urls"))
 
 ]
+if settings.DEBUG:
+    from django.contrib.staticfiles.urls import staticfiles_urlpatterns
+
+    urlpatterns += staticfiles_urlpatterns() # tell gunicorn where static files are in dev mode
+    urlpatterns += static(settings.MEDIA_URL + 'images/', document_root=os.path.join(settings.MEDIA_ROOT, 'images'))
+    urlpatterns += [
+        path('favicon.ico', RedirectView.as_view(url=settings.STATIC_URL + 'favicon.ico'))
+    ]
