@@ -1,4 +1,4 @@
-from crispy_forms.bootstrap import Tab, TabHolder, InlineRadios
+from crispy_forms.bootstrap import InlineRadios
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import (
     Layout,
@@ -8,7 +8,6 @@ from crispy_forms.layout import (
 )
 from django import forms
 from django.urls import reverse
-from django.utils import timezone
 
 from pesakit.models import jantina_list, bangsa_list
 from .models import Pemeriksaan, Daftar, Region, Exam
@@ -37,8 +36,7 @@ class BcsForm(forms.ModelForm):
             'no_resit',
             'lmp',
             'ambulatori',
-            'filem',
-            'cd',
+            'hamil',
             'status',
             'performed',
             'jxr'
@@ -47,6 +45,7 @@ class BcsForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
+        self.fields['dcatatan'].widget = forms.Textarea(attrs={'rows':4})
         self.helper.layout = Layout(
             Row(
                 Column("tarikh", css_class="form-group col-md-4 mb-0"),
@@ -71,48 +70,54 @@ class BcsForm(forms.ModelForm):
                 Column("umur", css_class="form-group col-md-4 mb-0"),
                 Column("lmp", css_class="form-group col-md-4 mb-0"),
                 Column(InlineRadios("jantina"),
-                css_class="form-group col-md-4 mb-0",
-        ),
-        css_class = "form-row",
-        ),
-        Row(
-            Column("ambulatori", css_class="form-group col-md-4 mb-0"),
-            Column("pemohon", css_class="form-group col-md-4 mb-0"),
-            Column("rujukan", css_class="form-group col-md-4 mb-0"),
-            css_class="form-row",
-        ),
+                       css_class="form-group col-md-4 mb-0",
+                       ),
+                css_class="form-row",
+            ),
+            Row(
+                Column("ambulatori", css_class="form-group col-md-4 mb-0"),
+                Column("pemohon", css_class="form-group col-md-4 mb-0"),
+                Column("hamil", css_class="form-group col-md-4 mb-0"),
+                css_class="form-row",
+            ),
 
-    HTML('<hr>'),
-    Row(
-        Column("filem", css_class="form-group col-md-4 mb-0"),
-        Column("cd", css_class="form-group col-md-4 mb-0"),
-        Column("status", css_class="form-group col-md-4 mb-0"),
-        css_class="form-row",
-    ),
-    Row(
-        Column("jxr", css_class="form-group col-md-4 mb-0"),
-        Column("performed", css_class="form-group col-md-4 mb-0"),
-        Column("dcatatan", css_class="form-group col-md-4 mb-0"),
-        css_class="form-row",
-    ),
+            HTML('<hr>'),
+            Row(
+                Column(
+                    Row(
+                        Column("rujukan", css_class="form-group col-md-6 mb-0"),
+                        Column("status", css_class="form-group col-md-6 mb-0"),
+                    ),
+                    Row(
+                        Column("jxr", css_class="form-group col-md-6 mb-0"),
+                        Column("performed", css_class="form-group col-md-6 mb-0"),
+                    ), css_class='col-md-8',
+                ),
+                Column(
+                    Column("dcatatan", css_class="form-group col-md-12 mb-0"),
+                    css_class="col-md-4",
+                ),
+            ),
 
+            HTML(
 
-HTML(
-    "<script>$(function(){$('#id_rujukan').select2();$('#id_tarikh').flatpickr({enableTime: true,dateFormat: 'Y-m-d H:i',locale: 'ms'});});</script>"
-),
-# $('#id_mrn').inputmask('\\\AM99999999');
-# FormActions(
-#     Button("submit", "Hantar", css_class="btn btn-outline-primary rounded"),
-#     Button(
-#         "cancel",
-#         "Kembali",
-#         css_class="btn btn-outline-secondary rounded",
-#         css_id="kensel",
-#     ),
-#     css_class="modal-footer",
-# ),
-)
-# self.fields['mrn'].attrs.update('hx_get="/bcs/checkam" hx_include="[name=\"mrn\"]"')
+                "<script>$(function(){$('#id_rujukan').select2();$('#id_tarikh').flatpickr({enableTime: true,dateFormat: 'Y-m-d H:i',locale: 'ms'});$('#id_lmp').flatpickr({dateFormat: 'Y-m-d',locale: 'ms'});});</script>"
+            ),
+        )
+
+    # $('#id_mrn').inputmask('\\\AM99999999');
+    # FormActions(
+    #     Button("submit", "Hantar", css_class="btn btn-outline-primary rounded"),
+    #     Button(
+    #         "cancel",
+    #         "Kembali",
+    #         css_class="btn btn-outline-secondary rounded",
+    #         css_id="kensel",
+    #     ),
+    #     css_class="modal-footer",
+    # ),
+
+    # self.fields['mrn'].attrs.update('hx_get="/bcs/checkam" hx_include="[name=\"mrn\"]"')
 
 
 class DaftarForm(forms.ModelForm):

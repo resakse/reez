@@ -101,6 +101,7 @@
             document.body.addEventListener("pesakitada", function (e) {
             $('#id_nama').val(e.detail.nama);
             $('#id_nric').val(e.detail.nric);
+            $('#id_mrn').val(e.detail.mrn);
             $("input[name=jantina][value=" + e.detail.jantina + "]").prop("checked", true);
             $("input[name=bangsa][value=" + e.detail.bangsa + "]").prop("checked", true);
         });
@@ -116,6 +117,13 @@
                 console.log('bukan warga asing, kita kira ic')
                 kiraic(ic);
             }
+        })
+        $("#id_lmp").on("change", function(){
+            let lmp = $(this).val();
+            lmp = dayjs(lmp).format('YYYY-MM-DD')
+            let berapahari = dayjs().diff(lmp,'days')
+            $('#id_dcatatan').val($('#id_dcatatan').val()+ " LMP : "+berapahari+" hari.")
+            if (berapahari>28){alert('LMP Lebih dari 28 Hari, Sila isi keputusan UPT di bahagian catatan.')}
         })
         function kiraic(ic){
               let dob_t = ic.substr(0, 2);

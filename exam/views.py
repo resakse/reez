@@ -304,13 +304,14 @@ def checkAM(request):
     if pesakit:
         nama = pesakit.nama
         nric = pesakit.nric
+        mrn = pesakit.mrn
         bangsa = pesakit.bangsa
         jantina = pesakit.jantina
     if not pesakit:
         return HttpResponse(f'<div id="pesakitada" data-mrn="tiada" class="alert alert-primary w-100">Pesakit baru</div>')
 
     response = HttpResponse(f'<div id="pesakitada" class="alert alert-success w-100">Rekod Pesakit {nama} telah wujud</div>')
-    return trigger_client_event(response, "pesakitada", {"nama": nama, "nric": nric, "bangsa": bangsa,'jantina': jantina})
+    return trigger_client_event(response, "pesakitada", {"nama": nama, "nric": nric, "bangsa": bangsa,'jantina': jantina, 'mrn': mrn})
 
 
 def configList(request):

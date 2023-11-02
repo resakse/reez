@@ -165,9 +165,7 @@ class Daftar(auto_prefetch.Model):
 
     pemohon = models.CharField(max_length=30, blank=False, null=True)
     status = models.CharField(max_length=15, choices=status_chocies, default='Performed')
-
-    filem = models.PositiveSmallIntegerField(default=0)
-    cd = models.PositiveSmallIntegerField(verbose_name='CD',default=0)
+    hamil = models.BooleanField(default=False)
     dcatatan = models.CharField(
         verbose_name="Catatan", blank=True, null=True, max_length=20
     )
