@@ -32,6 +32,7 @@ urlpatterns = [
 
 ]
 if settings.DEBUG:
+    import os
     from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 
     urlpatterns += staticfiles_urlpatterns() # tell gunicorn where static files are in dev mode
