@@ -12,7 +12,7 @@ from django_htmx.http import trigger_client_event, push_url
 
 from exam.models import Pemeriksaan, Daftar, Exam, Modaliti, Region, kiraxray
 from pesakit.models import Pesakit
-# from .filters import DaftarFilter
+from .filters import DaftarFilter
 from .forms import BcsForm, DaftarForm, RegionForm, ExamForm
 
 
@@ -21,15 +21,17 @@ from .forms import BcsForm, DaftarForm, RegionForm, ExamForm
 def senarai_bcs(request):
     param = request.GET.copy()
     parameter = param.pop("page", True) and param.urlencode()  # buang page dari url
-    # daftar = DaftarFilter(
-    #     request.GET,
-    #     queryset=Pemeriksaan.objects.all()
-    #     .select_related("daftar__rujukan", "exam__modaliti")
-    #     .order_by("-tarikh"),
-    # )
-    daftar = Daftar.objects.all()
+    daftar = DaftarFilter(
+        request.GET,
+        queryset=Daftar.objects.all()
+        .select_related("pesakit",'rujukan')
+        .order_by("-tarikh"),
+    )
+    print(request.GET)
+    # daftar = Daftar.objects.all()
     page = request.GET.get("page", 1)
-    paginator = Paginator(daftar, 10)  # Show 25 contacts per page.
+    paginator = Paginator(daftar.qs, 10)  # Show 25 contacts per page.
+    print(f'jumlah rekod = {paginator.count}')
     try:
         page_obj = paginator.page(page)
     except PageNotAnInteger:
@@ -37,7 +39,7 @@ def senarai_bcs(request):
     except EmptyPage:
         page_obj = paginator.page(paginator.num_pages)
 
-    data = {"daftar": daftar, "page_obj": page_obj, "param": parameter}
+    data = {"daftar": daftar, "page_obj": page_obj, "param": parameter, 'paginator': paginator}
     template = "exam/senarai.html"
     if request.htmx:
         template = "exam/senarai-partial.html"

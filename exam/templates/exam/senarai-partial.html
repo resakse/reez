@@ -14,6 +14,7 @@
       </div>
             <div id="table-item" class="mt-5 table-responsive">
                 <table class="table table-striped table-sm table-hover">
+                  <caption class="text-green"> Rekod {{ page_obj.start_index }} - {{ page_obj.end_index }} daripada {{ paginator.count }} rekod</caption>
                     <thead>
                     <tr>
                         <th scope="col">Tarikh</th>
@@ -113,7 +114,7 @@
                 $('.modaliti').select2({
                     allowClear: true,
                     ajax: {
-                        url: '/bcs/api/modaliti',
+                        url: '{% url "bcs:api-rujukan" %}',
                         dataType: 'json'
                     }
                 });

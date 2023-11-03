@@ -4,6 +4,8 @@ from django.http import JsonResponse
 from exam.models import Modaliti, Exam
 from itertools import groupby
 
+from wad.models import Ward
+
 
 @login_required
 def modalitiApi(request):
@@ -31,3 +33,16 @@ def examlistApi(request):
         tlist.append({'text': k, 'children': list({'id': int(i[0]), 'text': i[1]} for i in list(v))})
     return JsonResponse({'results': tlist}, safe=False)
 
+
+@login_required
+def rujukanApi(request):
+    try:
+        search = request.GET['q']
+        modal = Ward.objects.filter(nama__icontains=search).values('id','wad')
+    except:
+        modal = Ward.objects.all().values('id', 'wad')
+    senarai = []
+    senarai.append({'id':'','text': 'Semua Rujukan'})
+    for a in modal:
+        senarai.append({'id': a['id'], 'text': a['wad']})
+    return JsonResponse({'results': senarai}, safe=False)

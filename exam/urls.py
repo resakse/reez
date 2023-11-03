@@ -33,4 +33,5 @@ urlpatterns = [
     # api
     path("api/modaliti", api.modalitiApi, name="api-modaliti"),
     path("api/exam", api.examlistApi, name="api-exam"),
+    path("api/rujukan", api.rujukanApi, name="api-rujukan"),
 ]
