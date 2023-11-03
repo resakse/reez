@@ -122,7 +122,7 @@ def tambah_bcs(request):
 def edit_bcs(request, pk=None):
     bcs = Daftar.objects.get(pk=pk)
     pesakit = bcs.pesakit
-    tajuk = f'Kemaskini BCS - {bcs.pesakit.nama}'
+    tajuk = f'Kemaskini Pendaftaran - {bcs.pesakit.nama}'
     form = BcsForm(request.POST or None, instance=bcs, initial={'nama': pesakit.nama,'nric': pesakit.nric,'mrn': pesakit.mrn,'jantina': pesakit.jantina,'umur': pesakit.umur})
     exams = Pemeriksaan.objects.filter(daftar=pk)
     hantar_url = reverse("bcs:bcs-edit", args=[bcs.pk])

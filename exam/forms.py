@@ -125,24 +125,26 @@ class DaftarForm(forms.ModelForm):
 
     class Meta:
         model = Pemeriksaan
-        fields = ("no_xray", "exam", "laterality",'kv','mas')
+        fields = ("no_xray", "exam", "laterality",'kv','mas','mgy')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
         self.helper.layout = Layout(
             Row(
-                Column("no_xray", css_class="form-group col-md-3 mb-0"),
-                Column("exam", css_class="form-group col-md-3 mb-0"),
-                Column("laterality", css_class="form-group col-md-3 mb-0"),
+                Column("no_xray", css_class="form-group col-md-2 mb-0"),
+                Column("exam", css_class="form-group col-md-5 mb-0"),
+                Column("laterality", css_class="form-group col-md-2 mb-0"),
                 Column("kv", css_class="form-group col-md-1 mb-0"),
                 Column("mas", css_class="form-group col-md-1 mb-0"),
+                Column("mgy", css_class="form-group col-md-1 mb-0"),
 
             ),
             #         HTML(
             #             "<script>$('#id_exam').select2({minimumInputLength: 3,ajax: {url: '/bcs/api/exam',dataType: 'json'}});</script>")
         )
         self.fields["no_xray"].disabled = True
+        self.helper.form_show_labels = False
 
 
 class KomenForm(forms.ModelForm):

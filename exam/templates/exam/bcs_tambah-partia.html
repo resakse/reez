@@ -34,6 +34,7 @@
                             <th scope="col">Lateraliti</th>
                             <th scope="col">kVp</th>
                             <th scope="col">mAs</th>
+                            <th scope="col">mGy</th>
                             <th scope="col"></th>
                         </tr>
                         </thead>
@@ -45,6 +46,7 @@
                                 <td>{{ item.laterality|default:"" }}</td>
                                 <td>{{ item.kv|default:"" }}</td>
                                 <td>{{ item.mas|default:"" }}</td>
+                                <td>{{ item.mgy|default:"" }}</td>
                                 <td class="text-center">
                                     <button id="edit-{{ item.id }}" class="btn btn-icon btn-sm rounded btn-hover-dark"
                                             hx-get="{% url 'bcs:exam-edit' item.pk %}" hx-target="closest tr"

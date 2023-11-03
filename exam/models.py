@@ -209,6 +209,7 @@ class Pemeriksaan(auto_prefetch.Model):
     )
     kv = models.PositiveSmallIntegerField(verbose_name='kVp', blank=True, null=True)
     mas = models.PositiveSmallIntegerField(verbose_name='mAs', blank=True, null=True)
+    mgy = models.PositiveSmallIntegerField(verbose_name='mGy', blank=True, null=True)
     jxr = auto_prefetch.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True, related_name="exam_jxr"
     )
