@@ -19,5 +19,7 @@ class DaftarFilter(django_filters.FilterSet):
             Q(pesakit__mrn__icontains=value)
             | Q(pesakit__nric__icontains=value)
             | Q(pesakit__nama__icontains=value)
-            # | Q(nobcs__icontains=value)
+            # | Q(pemohon__icontains=value)
         )
+
+    

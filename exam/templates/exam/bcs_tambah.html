@@ -28,6 +28,14 @@
             console.log('ada msg')
             toastr.success(e.detail.merged);
         });
+        document.body.addEventListener("htmx:afterSwap", function (e) {
+          $('#id_exam').select2({minimumInputLength: 3,  width: 'resolve', ajax: {url: '/api/exam', dataType: 'json'}});
+        });
+        $(document).ready(function () {
+         $('#id_exam').select2({minimumInputLength: 3,  width: '50%', ajax: {url: '/api/exam', dataType: 'json'}});
 
+        });
+        {#console.log('swap')#}
+        // })
     </script>
 {% endblock scripts %}

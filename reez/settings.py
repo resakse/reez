@@ -64,11 +64,17 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'login_required.middleware.LoginRequiredMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     "django_htmx.middleware.HtmxMiddleware",
 ]
-
+LOGIN_REQUIRED_IGNORE_PATHS = [
+    r'/logint/',
+    r'/logout/',
+    r'/admin/$',
+    r'/about/$'
+]
 
 INTERNAL_IPS = [
     # ...

@@ -37,5 +37,9 @@ class RegionAdmin(OrderedModelAdmin):
     list_display = ("jenis", "bahagian", "move_up_down_links")
 
 
+@admin.register(Exam)
+class ExamAdmin(admin.ModelAdmin):
+    model = Exam
+    list_display = ['exam','part','modaliti','statistik']
+
 admin.site.register(Part)
-admin.site.register(Exam)

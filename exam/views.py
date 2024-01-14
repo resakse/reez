@@ -75,9 +75,13 @@ def tambah_bcs(request):
             umur = form.cleaned_data['umur']
             bangsa = form.cleaned_data['bangsa']
             jantina = form.cleaned_data['jantina']
-            print(f'nama : {nama}, nric : {nric}')
-            pesakit, _ = Pesakit.objects.get_or_create(Q(nric=nric) | Q(mrn=mrn),nama=nama,umur=umur,bangsa=bangsa,jantina=jantina)
+            print(f'nama : {nama}, nric : {nric}, mrn : {mrn}')
+            try:
+                pesakit = Pesakit.objects.get(Q(nric=nric) | Q(mrn=mrn))
+            except Pesakit.DoesNotExist:
+                pesakit = Pesakit.objects.create(nric=nric,mrn=mrn,nama=nama,umur=umur,bangsa=bangsa,jantina=jantina)
             daftar = form.save(commit=False)
+            print(pesakit)
             pesakit.mrn = mrn
             pesakit.nric = nric
             pesakit.save()
