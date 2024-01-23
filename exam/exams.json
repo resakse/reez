@@ -1,0 +1,7299 @@
+[
+{
+  "model": "exam.modaliti",
+  "pk": 1,
+  "fields": {
+    "nama": "CT-Scan",
+    "singkatan": "CT",
+    "detail": null
+  }
+},
+{
+  "model": "exam.modaliti",
+  "pk": 2,
+  "fields": {
+    "nama": "General X-Ray",
+    "singkatan": "XR",
+    "detail": null
+  }
+},
+{
+  "model": "exam.modaliti",
+  "pk": 3,
+  "fields": {
+    "nama": "MRI",
+    "singkatan": "MR",
+    "detail": null
+  }
+},
+{
+  "model": "exam.modaliti",
+  "pk": 4,
+  "fields": {
+    "nama": "Fluoroscopy",
+    "singkatan": "FL",
+    "detail": null
+  }
+},
+{
+  "model": "exam.modaliti",
+  "pk": 5,
+  "fields": {
+    "nama": "Ultrasound",
+    "singkatan": "US",
+    "detail": null
+  }
+},
+{
+  "model": "exam.modaliti",
+  "pk": 6,
+  "fields": {
+    "nama": "Angiography",
+    "singkatan": "AG",
+    "detail": null
+  }
+},
+{
+  "model": "exam.modaliti",
+  "pk": 7,
+  "fields": {
+    "nama": "Mobile X-Ray",
+    "singkatan": "MX",
+    "detail": null
+  }
+},
+{
+  "model": "exam.modaliti",
+  "pk": 8,
+  "fields": {
+    "nama": "OT",
+    "singkatan": "OT",
+    "detail": "Mobile Fluoro/OT/ERCP"
+  }
+},
+{
+  "model": "exam.modaliti",
+  "pk": 9,
+  "fields": {
+    "nama": "ERCP",
+    "singkatan": "ER",
+    "detail": "Mobile Fluoro/OT/ERCP"
+  }
+},
+{
+  "model": "exam.modaliti",
+  "pk": 10,
+  "fields": {
+    "nama": "Hardcopy",
+    "singkatan": "HC",
+    "detail": null
+  }
+},
+{
+  "model": "exam.modaliti",
+  "pk": 11,
+  "fields": {
+    "nama": "Digitize",
+    "singkatan": "DG",
+    "detail": null
+  }
+},
+{
+  "model": "exam.modaliti",
+  "pk": 12,
+  "fields": {
+    "nama": "Mammography",
+    "singkatan": "MG",
+    "detail": null
+  }
+},
+{
+  "model": "exam.modaliti",
+  "pk": 13,
+  "fields": {
+    "nama": "Ref Consult",
+    "singkatan": "RF",
+    "detail": null
+  }
+},
+{
+  "model": "exam.modaliti",
+  "pk": 14,
+  "fields": {
+    "nama": "Rad Resources",
+    "singkatan": "RD",
+    "detail": null
+  }
+},
+{
+  "model": "exam.part",
+  "pk": 1,
+  "fields": {
+    "part": "ABDOMEN"
+  }
+},
+{
+  "model": "exam.region",
+  "pk": 1,
+  "fields": {
+    "order": 1,
+    "jenis": null,
+    "bahagian": null
+  }
+},
+{
+  "model": "exam.region",
+  "pk": 2,
+  "fields": {
+    "order": 1,
+    "jenis": null,
+    "bahagian": null
+  }
+},
+{
+  "model": "exam.region",
+  "pk": 3,
+  "fields": {
+    "order": 1,
+    "jenis": null,
+    "bahagian": null
+  }
+},
+{
+  "model": "exam.region",
+  "pk": 4,
+  "fields": {
+    "order": 1,
+    "jenis": null,
+    "bahagian": null
+  }
+},
+{
+  "model": "exam.region",
+  "pk": 5,
+  "fields": {
+    "order": 1,
+    "jenis": null,
+    "bahagian": null
+  }
+},
+{
+  "model": "exam.region",
+  "pk": 6,
+  "fields": {
+    "order": 1,
+    "jenis": null,
+    "bahagian": null
+  }
+},
+{
+  "model": "exam.region",
+  "pk": 7,
+  "fields": {
+    "order": 1,
+    "jenis": null,
+    "bahagian": null
+  }
+},
+{
+  "model": "exam.region",
+  "pk": 8,
+  "fields": {
+    "order": 1,
+    "jenis": null,
+    "bahagian": null
+  }
+},
+{
+  "model": "exam.region",
+  "pk": 9,
+  "fields": {
+    "order": 1,
+    "jenis": null,
+    "bahagian": null
+  }
+},
+{
+  "model": "exam.region",
+  "pk": 10,
+  "fields": {
+    "order": 1,
+    "jenis": null,
+    "bahagian": null
+  }
+},
+{
+  "model": "exam.region",
+  "pk": 11,
+  "fields": {
+    "order": 1,
+    "jenis": null,
+    "bahagian": null
+  }
+},
+{
+  "model": "exam.region",
+  "pk": 12,
+  "fields": {
+    "order": 1,
+    "jenis": null,
+    "bahagian": null
+  }
+},
+{
+  "model": "exam.region",
+  "pk": 13,
+  "fields": {
+    "order": 1,
+    "jenis": null,
+    "bahagian": null
+  }
+},
+{
+  "model": "exam.region",
+  "pk": 14,
+  "fields": {
+    "order": 1,
+    "jenis": null,
+    "bahagian": null
+  }
+},
+{
+  "model": "exam.region",
+  "pk": 15,
+  "fields": {
+    "order": 1,
+    "jenis": null,
+    "bahagian": null
+  }
+},
+{
+  "model": "exam.region",
+  "pk": 16,
+  "fields": {
+    "order": 1,
+    "jenis": null,
+    "bahagian": null
+  }
+},
+{
+  "model": "exam.region",
+  "pk": 17,
+  "fields": {
+    "order": 1,
+    "jenis": null,
+    "bahagian": null
+  }
+},
+{
+  "model": "exam.region",
+  "pk": 18,
+  "fields": {
+    "order": 1,
+    "jenis": null,
+    "bahagian": null
+  }
+},
+{
+  "model": "exam.region",
+  "pk": 19,
+  "fields": {
+    "order": 1,
+    "jenis": null,
+    "bahagian": null
+  }
+},
+{
+  "model": "exam.region",
+  "pk": 20,
+  "fields": {
+    "order": 1,
+    "jenis": null,
+    "bahagian": null
+  }
+},
+{
+  "model": "exam.region",
+  "pk": 21,
+  "fields": {
+    "order": 1,
+    "jenis": null,
+    "bahagian": null
+  }
+},
+{
+  "model": "exam.region",
+  "pk": 22,
+  "fields": {
+    "order": 1,
+    "jenis": null,
+    "bahagian": null
+  }
+},
+{
+  "model": "exam.region",
+  "pk": 23,
+  "fields": {
+    "order": 1,
+    "jenis": null,
+    "bahagian": null
+  }
+},
+{
+  "model": "exam.region",
+  "pk": 24,
+  "fields": {
+    "order": 1,
+    "jenis": null,
+    "bahagian": null
+  }
+},
+{
+  "model": "exam.region",
+  "pk": 25,
+  "fields": {
+    "order": 1,
+    "jenis": null,
+    "bahagian": null
+  }
+},
+{
+  "model": "exam.region",
+  "pk": 26,
+  "fields": {
+    "order": 1,
+    "jenis": null,
+    "bahagian": null
+  }
+},
+{
+  "model": "exam.region",
+  "pk": 27,
+  "fields": {
+    "order": 1,
+    "jenis": null,
+    "bahagian": null
+  }
+},
+{
+  "model": "exam.region",
+  "pk": 28,
+  "fields": {
+    "order": 1,
+    "jenis": null,
+    "bahagian": null
+  }
+},
+{
+  "model": "exam.region",
+  "pk": 29,
+  "fields": {
+    "order": 1,
+    "jenis": null,
+    "bahagian": null
+  }
+},
+{
+  "model": "exam.region",
+  "pk": 30,
+  "fields": {
+    "order": 1,
+    "jenis": null,
+    "bahagian": null
+  }
+},
+{
+  "model": "exam.region",
+  "pk": 31,
+  "fields": {
+    "order": 1,
+    "jenis": null,
+    "bahagian": null
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 4,
+  "fields": {
+    "exam": "CT Adrenal",
+    "exam_code": "BG2210ZZ",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 5,
+  "fields": {
+    "exam": "CT Angiography Abdominal Aorta",
+    "exam_code": "BW20104Z",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 6,
+  "fields": {
+    "exam": "CT Angiography Carotids",
+    "exam_code": "B3251Z4Z",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 7,
+  "fields": {
+    "exam": "CT Angiography Cerebral",
+    "exam_code": "B3281Z4Z",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 8,
+  "fields": {
+    "exam": "CT Angiography Coeliac",
+    "exam_code": "532ACZZ",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 9,
+  "fields": {
+    "exam": "CT Angiography Hepatobilliary",
+    "exam_code": "BF2C194Z",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 10,
+  "fields": {
+    "exam": "CT Angiography Lower Extremities",
+    "exam_code": "5Q2RZZZ",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 11,
+  "fields": {
+    "exam": "CT Angiography Mesenteric",
+    "exam_code": "52MESEN",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 12,
+  "fields": {
+    "exam": "CT Angiography Others (Specify)",
+    "exam_code": "5P2ZZZZ",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 13,
+  "fields": {
+    "exam": "CT Angiography Pulmonary",
+    "exam_code": "B52S104Z",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 14,
+  "fields": {
+    "exam": "CT Angiography Renal",
+    "exam_code": "B4281Z4Z",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 15,
+  "fields": {
+    "exam": "CT Angiography Thoracic",
+    "exam_code": "5R27174",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 16,
+  "fields": {
+    "exam": "CT Angiography Thorax",
+    "exam_code": "CTANGIOTHO",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 17,
+  "fields": {
+    "exam": "CT Angiography Upper Extremities",
+    "exam_code": "5P2TZZZ",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 18,
+  "fields": {
+    "exam": "CT Ankle Joint",
+    "exam_code": "5Q2GZZZ",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 19,
+  "fields": {
+    "exam": "CT Base Of Skull",
+    "exam_code": "5N2FZZ4",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 20,
+  "fields": {
+    "exam": "CT Base Of Skull (HRCT)",
+    "exam_code": "52BSKULL",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 21,
+  "fields": {
+    "exam": "CT Brain",
+    "exam_code": "B02010ZZ",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 22,
+  "fields": {
+    "exam": "CT Dental",
+    "exam_code": "BN261Z4Z",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 23,
+  "fields": {
+    "exam": "CT Elbow Joint",
+    "exam_code": "5P2GZZZ",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 24,
+  "fields": {
+    "exam": "CT Guided Aspiration & Drainage",
+    "exam_code": "5CTASPDR",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 25,
+  "fields": {
+    "exam": "CT Guided Biopsy",
+    "exam_code": "5CTGUIBI",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 26,
+  "fields": {
+    "exam": "CT Haematology 1",
+    "exam_code": "5X251Z1",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 27,
+  "fields": {
+    "exam": "CT Haematology 1 - CT Staging 2",
+    "exam_code": "H001",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 28,
+  "fields": {
+    "exam": "CT Haematology 2",
+    "exam_code": "5X251ZZ",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 29,
+  "fields": {
+    "exam": "CT Haematology 2 - CT Staging 1",
+    "exam_code": "H002",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 30,
+  "fields": {
+    "exam": "CT Hepatobiliary",
+    "exam_code": "BF2C10ZZ",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 31,
+  "fields": {
+    "exam": "CT Hip Joint",
+    "exam_code": "5Q20ZZZ",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 32,
+  "fields": {
+    "exam": "CT Internal Auditory Meatus (IAM)",
+    "exam_code": "BN201Z4Z",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 33,
+  "fields": {
+    "exam": "CT Kidneys",
+    "exam_code": "BT2310ZZ",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 34,
+  "fields": {
+    "exam": "CT Knee Joint",
+    "exam_code": "5Q27XZZ",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 35,
+  "fields": {
+    "exam": "CT Lower Limbs",
+    "exam_code": "5Q25ZZZ",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 36,
+  "fields": {
+    "exam": "CT Lungs (HRCT)",
+    "exam_code": "BB24ZZ1Z",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 37,
+  "fields": {
+    "exam": "CT Mandible",
+    "exam_code": "BN26ZZ5Z",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 38,
+  "fields": {
+    "exam": "CT Maxilla",
+    "exam_code": "BN27ZZ5Z",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 39,
+  "fields": {
+    "exam": "CT Myelogram Cervical",
+    "exam_code": "BR20174Z",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 40,
+  "fields": {
+    "exam": "CT Myelogram Lumbar",
+    "exam_code": "BR29174Z",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 41,
+  "fields": {
+    "exam": "CT Myelogram Thoracic",
+    "exam_code": "BR27174Z",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 42,
+  "fields": {
+    "exam": "CT Neck",
+    "exam_code": "BW2F104Z",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 43,
+  "fields": {
+    "exam": "CT O & G",
+    "exam_code": "5X211ZZ",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 44,
+  "fields": {
+    "exam": "CT O & G",
+    "exam_code": "RDCTOG",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 45,
+  "fields": {
+    "exam": "CT Orbits",
+    "exam_code": "BN231Z4Z",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 46,
+  "fields": {
+    "exam": "CT Osteo-Meatal Complex (OMC)",
+    "exam_code": "B922ZZ4Z",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 47,
+  "fields": {
+    "exam": "CT Pancreas",
+    "exam_code": "BF2710ZZ",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 48,
+  "fields": {
+    "exam": "CT Paranasal Sinuses",
+    "exam_code": "B922104Z",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 49,
+  "fields": {
+    "exam": "CT Pelvis",
+    "exam_code": "BV2G104Z",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 50,
+  "fields": {
+    "exam": "CT Petrous Bone (HRCT)",
+    "exam_code": "BN2FZZ4Z",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 51,
+  "fields": {
+    "exam": "CT Pituitary Fossa",
+    "exam_code": "B029104Z",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 52,
+  "fields": {
+    "exam": "CT Respiratory",
+    "exam_code": "5X241ZZ",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 53,
+  "fields": {
+    "exam": "CT Shoulder Joint",
+    "exam_code": "5P28ZZZ",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 54,
+  "fields": {
+    "exam": "CT Spine Cervical",
+    "exam_code": "BR20144Z",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 55,
+  "fields": {
+    "exam": "CT Spine Cisternogram",
+    "exam_code": "B027174Z",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 56,
+  "fields": {
+    "exam": "CT Spine Lumbar",
+    "exam_code": "BR29144Z",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 57,
+  "fields": {
+    "exam": "CT Spine Sacrum Coccyx",
+    "exam_code": "BR2F144Z",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 58,
+  "fields": {
+    "exam": "CT SpineThoracic",
+    "exam_code": "BR27144Z",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 59,
+  "fields": {
+    "exam": "CT Staging",
+    "exam_code": "RDCTRS",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 60,
+  "fields": {
+    "exam": "CT Temporo-Mandibular Joints (TMJ)",
+    "exam_code": "BN29ZZ41",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 61,
+  "fields": {
+    "exam": "CT Thorax",
+    "exam_code": "BB24104Z",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 62,
+  "fields": {
+    "exam": "CT Upper Limbs",
+    "exam_code": "5P2EZZZ",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 63,
+  "fields": {
+    "exam": "CT Urography",
+    "exam_code": "5T24ZZ4",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 64,
+  "fields": {
+    "exam": "CT Wrist Joint",
+    "exam_code": "5P2LXZZ",
+    "part": null,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 65,
+  "fields": {
+    "exam": "Digitized Bone Densitometry",
+    "exam_code": "5SAZZZZ",
+    "part": null,
+    "modaliti": 11,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 66,
+  "fields": {
+    "exam": "Digitized CT Scan",
+    "exam_code": "5S2ZZZZ",
+    "part": null,
+    "modaliti": 11,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 67,
+  "fields": {
+    "exam": "Digitized Cath Angiogram",
+    "exam_code": "5SBZZZZ",
+    "part": null,
+    "modaliti": 11,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 68,
+  "fields": {
+    "exam": "Digitized Fluoroscopy",
+    "exam_code": "5S1ZZZZ",
+    "part": null,
+    "modaliti": 11,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 69,
+  "fields": {
+    "exam": "Digitized General Radiography",
+    "exam_code": "5S5ZZZZ",
+    "part": null,
+    "modaliti": 11,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 70,
+  "fields": {
+    "exam": "Digitized Interventional Radiology",
+    "exam_code": "5S6ZZZZ",
+    "part": null,
+    "modaliti": 11,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 71,
+  "fields": {
+    "exam": "Digitized Intravenous Urography",
+    "exam_code": "5S7ZZZZ",
+    "part": null,
+    "modaliti": 11,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 72,
+  "fields": {
+    "exam": "Digitized MRI",
+    "exam_code": "5S3ZZZZ",
+    "part": null,
+    "modaliti": 11,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 73,
+  "fields": {
+    "exam": "Digitized Mammogram",
+    "exam_code": "5S8ZZZZ",
+    "part": null,
+    "modaliti": 11,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 74,
+  "fields": {
+    "exam": "Digitized Nuclear Medicine",
+    "exam_code": "5S9ZZZZ",
+    "part": null,
+    "modaliti": 11,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 75,
+  "fields": {
+    "exam": "Digitized Ultrasound",
+    "exam_code": "5S4ZZZZ",
+    "part": null,
+    "modaliti": 11,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 76,
+  "fields": {
+    "exam": "Fluoro APG",
+    "exam_code": "5T1DZZZ",
+    "part": null,
+    "modaliti": 4,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 77,
+  "fields": {
+    "exam": "Fluoro Arthrogram Ankle Joint",
+    "exam_code": "5Q1GZZZ",
+    "part": null,
+    "modaliti": 4,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 78,
+  "fields": {
+    "exam": "Fluoro Arthrogram Elbow Joint",
+    "exam_code": "5P1GZZZ",
+    "part": null,
+    "modaliti": 4,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 79,
+  "fields": {
+    "exam": "Fluoro Arthrogram Hip Joint",
+    "exam_code": "5Q10ZZZ",
+    "part": null,
+    "modaliti": 4,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 80,
+  "fields": {
+    "exam": "Fluoro Arthrogram Knee joint",
+    "exam_code": "5Q17ZZZ",
+    "part": null,
+    "modaliti": 4,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 81,
+  "fields": {
+    "exam": "Fluoro Arthrogram Shoulder Joint",
+    "exam_code": "5P18ZZZ",
+    "part": null,
+    "modaliti": 4,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 82,
+  "fields": {
+    "exam": "Fluoro Arthrogram Wrist Joint",
+    "exam_code": "5P1LZZZ",
+    "part": null,
+    "modaliti": 4,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 83,
+  "fields": {
+    "exam": "Fluoro Barium Enema Large Bowel Study",
+    "exam_code": "BD1469RZ",
+    "part": null,
+    "modaliti": 4,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 84,
+  "fields": {
+    "exam": "Fluoro Barium Enema Small Bowel Study",
+    "exam_code": "BD1369RZ",
+    "part": null,
+    "modaliti": 4,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 85,
+  "fields": {
+    "exam": "Fluoro Barium Meal Follow Through Study",
+    "exam_code": "BD166DRZ",
+    "part": null,
+    "modaliti": 4,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 86,
+  "fields": {
+    "exam": "Fluoro Barium Meal Study",
+    "exam_code": "BD156DRZ",
+    "part": null,
+    "modaliti": 4,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 87,
+  "fields": {
+    "exam": "Fluoro Barium Swallow",
+    "exam_code": "BD116DRZ",
+    "part": null,
+    "modaliti": 4,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 88,
+  "fields": {
+    "exam": "Fluoro Cervical Spine Myelogram",
+    "exam_code": "BR101ZZZ",
+    "part": null,
+    "modaliti": 4,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 89,
+  "fields": {
+    "exam": "Fluoro Cystogram",
+    "exam_code": "BT101CZZ",
+    "part": null,
+    "modaliti": 4,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 90,
+  "fields": {
+    "exam": "Fluoro Dacrocystography",
+    "exam_code": "5N10ZZZ",
+    "part": null,
+    "modaliti": 4,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 91,
+  "fields": {
+    "exam": "Fluoro Distal Loopogram",
+    "exam_code": "5AMPZZZ",
+    "part": null,
+    "modaliti": 4,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 92,
+  "fields": {
+    "exam": "Fluoro Fistulogram",
+    "exam_code": "5X11ZZZ",
+    "part": null,
+    "modaliti": 4,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 93,
+  "fields": {
+    "exam": "Fluoro Genitogram",
+    "exam_code": "BW121ZZZ",
+    "part": null,
+    "modaliti": 4,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 94,
+  "fields": {
+    "exam": "Fluoro Guided Aspiration & Drainage",
+    "exam_code": "5FLGUIAD",
+    "part": null,
+    "modaliti": 4,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 95,
+  "fields": {
+    "exam": "Fluoro Guided Biopsy",
+    "exam_code": "5FLGUIBI",
+    "part": null,
+    "modaliti": 4,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 96,
+  "fields": {
+    "exam": "Fluoro HSG (Hysterosalpingogram)",
+    "exam_code": "BU181ZZZ",
+    "part": null,
+    "modaliti": 4,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 97,
+  "fields": {
+    "exam": "Fluoro Intussussception Reduction",
+    "exam_code": "5FLUINR",
+    "part": null,
+    "modaliti": 4,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 98,
+  "fields": {
+    "exam": "Fluoro Lower GI Water Soluble Contrast",
+    "exam_code": "5D153DR",
+    "part": null,
+    "modaliti": 4,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 99,
+  "fields": {
+    "exam": "Fluoro Lumbar Spine Myelogram",
+    "exam_code": "BR191ZZZ",
+    "part": null,
+    "modaliti": 4,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 100,
+  "fields": {
+    "exam": "Fluoro Micturating CystoUrethrogram(MCU)",
+    "exam_code": "BT1B1CZZ",
+    "part": null,
+    "modaliti": 4,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 101,
+  "fields": {
+    "exam": "Fluoro Parotid Sialogram",
+    "exam_code": "5914ZZZ",
+    "part": null,
+    "modaliti": 4,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 102,
+  "fields": {
+    "exam": "Fluoro Pericathetourethrogram",
+    "exam_code": "2T151ZZ",
+    "part": null,
+    "modaliti": 4,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 103,
+  "fields": {
+    "exam": "Fluoro Proctogram Study",
+    "exam_code": "BD143WPZ",
+    "part": null,
+    "modaliti": 4,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 104,
+  "fields": {
+    "exam": "Fluoro RPG",
+    "exam_code": "5T1FZZZ",
+    "part": null,
+    "modaliti": 4,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 105,
+  "fields": {
+    "exam": "Fluoro Sinogram",
+    "exam_code": "5X19ZZZ",
+    "part": null,
+    "modaliti": 4,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 106,
+  "fields": {
+    "exam": "Fluoro Submandibular Sialogram",
+    "exam_code": "5917ZZZ",
+    "part": null,
+    "modaliti": 4,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 107,
+  "fields": {
+    "exam": "Fluoro Swallow Water Soluble Contrast",
+    "exam_code": "BD114DRZ",
+    "part": null,
+    "modaliti": 4,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 108,
+  "fields": {
+    "exam": "Fluoro Thoracic Spine Myelogram",
+    "exam_code": "BR171ZZZ",
+    "part": null,
+    "modaliti": 4,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 109,
+  "fields": {
+    "exam": "Fluoro Tubogram",
+    "exam_code": "BF101HXZ",
+    "part": null,
+    "modaliti": 4,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 110,
+  "fields": {
+    "exam": "Fluoro Upp GI Water Soluble Contr.",
+    "exam_code": "BD154DRZ",
+    "part": null,
+    "modaliti": 4,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 111,
+  "fields": {
+    "exam": "Fluoro Urethrogram",
+    "exam_code": "BT151CZZ",
+    "part": null,
+    "modaliti": 4,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 112,
+  "fields": {
+    "exam": "Hardcopy Angiography",
+    "exam_code": "5C5ZZZZ",
+    "part": null,
+    "modaliti": 10,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 113,
+  "fields": {
+    "exam": "Hardcopy CT Scan",
+    "exam_code": "5C2ZZZZ",
+    "part": null,
+    "modaliti": 10,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 114,
+  "fields": {
+    "exam": "Hardcopy Cardiac Angio",
+    "exam_code": "5C9ZZZZ",
+    "part": null,
+    "modaliti": 10,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 115,
+  "fields": {
+    "exam": "Hardcopy Fluoroscopy",
+    "exam_code": "5C1ZZZZ",
+    "part": null,
+    "modaliti": 10,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 116,
+  "fields": {
+    "exam": "Hardcopy General Radiography",
+    "exam_code": "5C0ZZZZ",
+    "part": null,
+    "modaliti": 10,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 117,
+  "fields": {
+    "exam": "Hardcopy Interventional",
+    "exam_code": "5C6ZZZZ",
+    "part": null,
+    "modaliti": 10,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 118,
+  "fields": {
+    "exam": "Hardcopy Intravenous Urography",
+    "exam_code": "5C7ZZZZ",
+    "part": null,
+    "modaliti": 10,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 119,
+  "fields": {
+    "exam": "Hardcopy MRI",
+    "exam_code": "5C3ZZZZ",
+    "part": null,
+    "modaliti": 10,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 120,
+  "fields": {
+    "exam": "Hardcopy Mammogram",
+    "exam_code": "5C8ZZZZ",
+    "part": null,
+    "modaliti": 10,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 121,
+  "fields": {
+    "exam": "Hardcopy Ultrasound",
+    "exam_code": "5C4ZZZZ",
+    "part": null,
+    "modaliti": 10,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 122,
+  "fields": {
+    "exam": "C-Arm Medical/Cardiac",
+    "exam_code": "B216XZXZ",
+    "part": null,
+    "modaliti": 8,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 123,
+  "fields": {
+    "exam": "C-Arm Orthopaedic",
+    "exam_code": "BX1LZZXZ",
+    "part": null,
+    "modaliti": 8,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 124,
+  "fields": {
+    "exam": "C-Arm Surgical",
+    "exam_code": "BX1KZZXZ",
+    "part": null,
+    "modaliti": 8,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 125,
+  "fields": {
+    "exam": "C-Arm Urology",
+    "exam_code": "BT141CXZ",
+    "part": null,
+    "modaliti": 8,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 126,
+  "fields": {
+    "exam": "ERCP (Endo Retrograde Cholangio-Pancreat",
+    "exam_code": "BF141FYZ",
+    "part": null,
+    "modaliti": 8,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 127,
+  "fields": {
+    "exam": "Mammogram Diagnostic",
+    "exam_code": "5H0DZZZ",
+    "part": null,
+    "modaliti": 12,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 128,
+  "fields": {
+    "exam": "Mammogram Ductogram",
+    "exam_code": "5H0DUZZ",
+    "part": null,
+    "modaliti": 12,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 129,
+  "fields": {
+    "exam": "Mammogram Screening",
+    "exam_code": "BH02ZZLZ",
+    "part": null,
+    "modaliti": 12,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 130,
+  "fields": {
+    "exam": "Mammogram Specific Views",
+    "exam_code": "5H00ZZZ",
+    "part": null,
+    "modaliti": 12,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 131,
+  "fields": {
+    "exam": "Mammogram Specimen",
+    "exam_code": "5H01ZZZ",
+    "part": null,
+    "modaliti": 12,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 132,
+  "fields": {
+    "exam": "Mammotome Biopsy",
+    "exam_code": "5H0PZZZ",
+    "part": null,
+    "modaliti": 12,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 133,
+  "fields": {
+    "exam": "Stereo Localization",
+    "exam_code": "5H01ZZE",
+    "part": null,
+    "modaliti": 12,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 134,
+  "fields": {
+    "exam": "Stereo Localization",
+    "exam_code": "RDSLOC",
+    "part": null,
+    "modaliti": 12,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 135,
+  "fields": {
+    "exam": "Stereotactic Biopsy",
+    "exam_code": "5H0BZZZ",
+    "part": null,
+    "modaliti": 12,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 136,
+  "fields": {
+    "exam": "Ultrasonomammography",
+    "exam_code": "5UTSONM",
+    "part": null,
+    "modaliti": 12,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 137,
+  "fields": {
+    "exam": "MR Angiogram Abdomen",
+    "exam_code": "B430X05Z",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 138,
+  "fields": {
+    "exam": "MR Angiogram Carotids",
+    "exam_code": "B335X05Z",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 139,
+  "fields": {
+    "exam": "MR Angiogram Cerebral",
+    "exam_code": "B338X05Z",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 140,
+  "fields": {
+    "exam": "MR Angiogram Hepatobilliary",
+    "exam_code": "B431X05Z",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 141,
+  "fields": {
+    "exam": "MR Angiogram Lower Extremities",
+    "exam_code": "B43HX05Z",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 142,
+  "fields": {
+    "exam": "MR Angiogram Renal",
+    "exam_code": "B438X05Z",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 143,
+  "fields": {
+    "exam": "MR Angiogram Thoracic Aorta",
+    "exam_code": "5330X05",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 144,
+  "fields": {
+    "exam": "MR Angiogram Upper Extremities",
+    "exam_code": "533HZZZ",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 145,
+  "fields": {
+    "exam": "MR Proctography",
+    "exam_code": "553PROC",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 146,
+  "fields": {
+    "exam": "MR Spectroscopy Brain",
+    "exam_code": "B030XZSZ",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 147,
+  "fields": {
+    "exam": "MR Venography Abdomen",
+    "exam_code": "553ABDO",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 148,
+  "fields": {
+    "exam": "MR Venography Cerebral",
+    "exam_code": "5531ZZZ",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 149,
+  "fields": {
+    "exam": "MR Venography Dialysis Fistula",
+    "exam_code": "553DFZZ",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 150,
+  "fields": {
+    "exam": "MR Venography Hepatic Vein",
+    "exam_code": "553HVZZ",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 151,
+  "fields": {
+    "exam": "MR Venography Lower Extremities",
+    "exam_code": "B53DX05Z",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 152,
+  "fields": {
+    "exam": "MR Venography Neck",
+    "exam_code": "553NECK",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 153,
+  "fields": {
+    "exam": "MR Venography Porto-Splenic",
+    "exam_code": "553TZZZ",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 154,
+  "fields": {
+    "exam": "MR Venography Renal",
+    "exam_code": "553JZZZ",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 155,
+  "fields": {
+    "exam": "MR Venography Thoracic",
+    "exam_code": "553QZZZ",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 156,
+  "fields": {
+    "exam": "MR Venography Upper Extremities",
+    "exam_code": "553MZZZ",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 157,
+  "fields": {
+    "exam": "MRI Abdomen",
+    "exam_code": "BW30X0ZZ",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 158,
+  "fields": {
+    "exam": "MRI Adrenal",
+    "exam_code": "BG32X05Z",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 159,
+  "fields": {
+    "exam": "MRI Ankle Joint",
+    "exam_code": "5Q3GZZZ",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 160,
+  "fields": {
+    "exam": "MRI Arthrogram Ankle Joint",
+    "exam_code": "5Q3HZZZ",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 161,
+  "fields": {
+    "exam": "MRI Arthrogram Elbow Joint",
+    "exam_code": "5P3HZZZ",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 162,
+  "fields": {
+    "exam": "MRI Arthrogram Hip Joint",
+    "exam_code": "5Q31ZZZ",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 163,
+  "fields": {
+    "exam": "MRI Arthrogram Knee Joint",
+    "exam_code": "5Q38ZZZ",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 164,
+  "fields": {
+    "exam": "MRI Arthrogram Shoulder Joint",
+    "exam_code": "5P39ZZZ",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 165,
+  "fields": {
+    "exam": "MRI Arthrogram Wrist Joint",
+    "exam_code": "5P3LZZZ",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 166,
+  "fields": {
+    "exam": "MRI Brain",
+    "exam_code": "B030X0ZZ",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 167,
+  "fields": {
+    "exam": "MRI Brain Stem",
+    "exam_code": "B031X0ZZ",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 168,
+  "fields": {
+    "exam": "MRI Breast",
+    "exam_code": "BH32105Z",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 169,
+  "fields": {
+    "exam": "MRI Cardiac",
+    "exam_code": "533MRCARDI",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 170,
+  "fields": {
+    "exam": "MRI Cervical",
+    "exam_code": "5R30X05",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 171,
+  "fields": {
+    "exam": "MRI Cholangio - Pancreatography (MRCP)",
+    "exam_code": "BF36ZZ5Z",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 172,
+  "fields": {
+    "exam": "MRI Cisternogram",
+    "exam_code": "B03JZZZZ",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 173,
+  "fields": {
+    "exam": "MRI Elbow Joint",
+    "exam_code": "5P3GZZZ",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 174,
+  "fields": {
+    "exam": "MRI Fetus",
+    "exam_code": "BY36ZZ5Z",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 175,
+  "fields": {
+    "exam": "MRI HIP Joint",
+    "exam_code": "5Q30ZZZ",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 176,
+  "fields": {
+    "exam": "MRI Hepatobiliary",
+    "exam_code": "BF36X05Z",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 177,
+  "fields": {
+    "exam": "MRI Hysterosalpingogram",
+    "exam_code": "5V38ZZZ",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 178,
+  "fields": {
+    "exam": "MRI Internal Auditory Meatus (IAM)",
+    "exam_code": "B03CX0ZZ",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 179,
+  "fields": {
+    "exam": "MRI Knee Joint",
+    "exam_code": "5Q37ZZZ",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 180,
+  "fields": {
+    "exam": "MRI Lower Limbs",
+    "exam_code": "5Q3LZZZ",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 181,
+  "fields": {
+    "exam": "MRI Lumbar",
+    "exam_code": "5R39X05",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 182,
+  "fields": {
+    "exam": "MRI Lumbo-Sacral",
+    "exam_code": "553LUMS",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 183,
+  "fields": {
+    "exam": "MRI Neck",
+    "exam_code": "BW3FX0ZZ",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 184,
+  "fields": {
+    "exam": "MRI Orbits",
+    "exam_code": "B837X05Z",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 185,
+  "fields": {
+    "exam": "MRI Others",
+    "exam_code": "553ZZZZ",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 186,
+  "fields": {
+    "exam": "MRI Paranasal Sinuses",
+    "exam_code": "B932X05Z",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 187,
+  "fields": {
+    "exam": "MRI Pelvimetry",
+    "exam_code": "5R3CZZP",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 188,
+  "fields": {
+    "exam": "MRI Pelvis",
+    "exam_code": "BW3GX05Z",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 189,
+  "fields": {
+    "exam": "MRI Pituitary Fossa",
+    "exam_code": "B039X0ZZ",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 190,
+  "fields": {
+    "exam": "MRI Prostate",
+    "exam_code": "BV33X05Z",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 191,
+  "fields": {
+    "exam": "MRI Renal",
+    "exam_code": "5T33X05",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 192,
+  "fields": {
+    "exam": "MRI Salivary Glands",
+    "exam_code": "B93DX05Z",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 193,
+  "fields": {
+    "exam": "MRI Shoulder Joint",
+    "exam_code": "5P38ZZZ",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 194,
+  "fields": {
+    "exam": "MRI Spine-Cervical,Thoracic&Lumbar",
+    "exam_code": "5R3DX05",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 195,
+  "fields": {
+    "exam": "MRI Temporal Lobe",
+    "exam_code": "B03KX0ZZ",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 196,
+  "fields": {
+    "exam": "MRI Temporo-Mandibular Joints (TMJ)",
+    "exam_code": "BN39ZZ7Z",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 197,
+  "fields": {
+    "exam": "MRI Thoracic",
+    "exam_code": "5R37X05",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 198,
+  "fields": {
+    "exam": "MRI Thoraco-Lumbar",
+    "exam_code": "553TLUM",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 199,
+  "fields": {
+    "exam": "MRI Thorax",
+    "exam_code": "BW33X05Z",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 200,
+  "fields": {
+    "exam": "MRI Upper Limbs",
+    "exam_code": "5P3EULZ",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 201,
+  "fields": {
+    "exam": "MRI Urography",
+    "exam_code": "5T34ZZ5",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 202,
+  "fields": {
+    "exam": "MRI Whole Spine",
+    "exam_code": "533MRWS",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 203,
+  "fields": {
+    "exam": "MRI Wrist Joint",
+    "exam_code": "5P3LWJZ",
+    "part": null,
+    "modaliti": 3,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 204,
+  "fields": {
+    "exam": "Ref. Consultation Angiography",
+    "exam_code": "5K5ZZZZ",
+    "part": null,
+    "modaliti": 13,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 205,
+  "fields": {
+    "exam": "Ref. Consultation CT Scan",
+    "exam_code": "5K2ZZZZ",
+    "part": null,
+    "modaliti": 13,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 206,
+  "fields": {
+    "exam": "Ref. Consultation Doppler",
+    "exam_code": "5K9ZZZZ",
+    "part": null,
+    "modaliti": 13,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 207,
+  "fields": {
+    "exam": "Ref. Consultation Fluoroscopy",
+    "exam_code": "5K1ZZZZ",
+    "part": null,
+    "modaliti": 13,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 208,
+  "fields": {
+    "exam": "Ref. Consultation General Radiography",
+    "exam_code": "5K0ZZZZ",
+    "part": null,
+    "modaliti": 13,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 209,
+  "fields": {
+    "exam": "Ref. Consultation Interventional Rad",
+    "exam_code": "5K6ZZZZ",
+    "part": null,
+    "modaliti": 13,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 210,
+  "fields": {
+    "exam": "Ref. Consultation Intravenous Urography",
+    "exam_code": "5K7ZZZZ",
+    "part": null,
+    "modaliti": 13,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 211,
+  "fields": {
+    "exam": "Ref. Consultation MRI",
+    "exam_code": "5K3ZZZZ",
+    "part": null,
+    "modaliti": 13,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 212,
+  "fields": {
+    "exam": "Ref. Consultation Mammogram",
+    "exam_code": "5K8ZZZZ",
+    "part": null,
+    "modaliti": 13,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 213,
+  "fields": {
+    "exam": "Ref. Consultation Ultrasound",
+    "exam_code": "5K4ZZZZ",
+    "part": null,
+    "modaliti": 13,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 214,
+  "fields": {
+    "exam": "Resource for Radiographer (ICL)",
+    "exam_code": "RAD0001",
+    "part": null,
+    "modaliti": 14,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 215,
+  "fields": {
+    "exam": "Resources for Radiographer (ERCP)",
+    "exam_code": "RAD00002",
+    "part": null,
+    "modaliti": 14,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 216,
+  "fields": {
+    "exam": "US Abdomen",
+    "exam_code": "BW40ZZZZ",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 217,
+  "fields": {
+    "exam": "US Ankle",
+    "exam_code": "5Q4GZZZ",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 218,
+  "fields": {
+    "exam": "US Brain",
+    "exam_code": "B040ZZZZ",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 219,
+  "fields": {
+    "exam": "US Breast",
+    "exam_code": "BH40ZZZZ",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 220,
+  "fields": {
+    "exam": "US Doppler Abdominal Aorta",
+    "exam_code": "B440ZGZZ",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 221,
+  "fields": {
+    "exam": "US Doppler Abdominal Veins",
+    "exam_code": "B54TZGZZ",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 222,
+  "fields": {
+    "exam": "US Doppler Carotid Artery",
+    "exam_code": "B345ZGZZ",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 223,
+  "fields": {
+    "exam": "US Doppler Hepatic Veins",
+    "exam_code": "5F4HEPA",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 224,
+  "fields": {
+    "exam": "US Doppler Inferior Vena Cava",
+    "exam_code": "554DIVC",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 225,
+  "fields": {
+    "exam": "US Doppler Intracranial",
+    "exam_code": "554D1ZZ",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 226,
+  "fields": {
+    "exam": "US Doppler Jugular Vein",
+    "exam_code": "554DJVZ",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 227,
+  "fields": {
+    "exam": "US Doppler Lower Limb",
+    "exam_code": "554FZZZ",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 228,
+  "fields": {
+    "exam": "US Doppler Porto Splenic",
+    "exam_code": "554DPSZ",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 229,
+  "fields": {
+    "exam": "US Doppler Post Transplant",
+    "exam_code": "554DPTZ",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 230,
+  "fields": {
+    "exam": "US Doppler Renal",
+    "exam_code": "B54LZGZZ",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 231,
+  "fields": {
+    "exam": "US Doppler Renal Post Transplant",
+    "exam_code": "554DRPT",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 232,
+  "fields": {
+    "exam": "US Doppler Upper Limb",
+    "exam_code": "534HZZZ",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 233,
+  "fields": {
+    "exam": "US Elbow",
+    "exam_code": "5P4GZZZ",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 234,
+  "fields": {
+    "exam": "US Guided Aspiration & Drainage",
+    "exam_code": "5USGASDR",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 235,
+  "fields": {
+    "exam": "US Guided Biopsy",
+    "exam_code": "5USGUIBI",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 236,
+  "fields": {
+    "exam": "US Guided Breast Localisation",
+    "exam_code": "5UGBRLO",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 237,
+  "fields": {
+    "exam": "US Guided FNAC",
+    "exam_code": "5USGFNAC",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 238,
+  "fields": {
+    "exam": "US Guided IJC",
+    "exam_code": "5USGUIIJC",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 239,
+  "fields": {
+    "exam": "US HIP",
+    "exam_code": "5Q40ZZZ",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 240,
+  "fields": {
+    "exam": "US Hepatobiliary System",
+    "exam_code": "5F4CZZZ",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 241,
+  "fields": {
+    "exam": "US KUB",
+    "exam_code": "5D41ZZ7",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 242,
+  "fields": {
+    "exam": "US Knee",
+    "exam_code": "5Q47ZZZ",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 243,
+  "fields": {
+    "exam": "US Lower Limbs",
+    "exam_code": "BH48ZZZZ",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 244,
+  "fields": {
+    "exam": "US Neck",
+    "exam_code": "5H4NECK",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 245,
+  "fields": {
+    "exam": "US Others (Specify)",
+    "exam_code": "USOTHERS",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 246,
+  "fields": {
+    "exam": "US Parathyroid",
+    "exam_code": "BG43ZZZZ",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 247,
+  "fields": {
+    "exam": "US Pelvis",
+    "exam_code": "BW4GZZZZ",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 248,
+  "fields": {
+    "exam": "US Prostate",
+    "exam_code": "5W49ZZZ",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 249,
+  "fields": {
+    "exam": "US Scrotum/Testes",
+    "exam_code": "BV44ZZZZ",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 250,
+  "fields": {
+    "exam": "US Shoulder",
+    "exam_code": "5P48ZZZ",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 251,
+  "fields": {
+    "exam": "US Spinal Cord",
+    "exam_code": "B04BZZZZ",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 252,
+  "fields": {
+    "exam": "US Thorax",
+    "exam_code": "BB4BZZZZ",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 253,
+  "fields": {
+    "exam": "US Thyroid",
+    "exam_code": "BG44ZZZZ",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 254,
+  "fields": {
+    "exam": "US Upper Limbs",
+    "exam_code": "BH47ZZZZ",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 255,
+  "fields": {
+    "exam": "US Wrist",
+    "exam_code": "5P4LZZZ",
+    "part": null,
+    "modaliti": 5,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 256,
+  "fields": {
+    "exam": "Angio Abdominal Aorta",
+    "exam_code": "B4101ZXZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 257,
+  "fields": {
+    "exam": "Angio Arch",
+    "exam_code": "531Q1ZX",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 258,
+  "fields": {
+    "exam": "Angio Carotids/Vertebral",
+    "exam_code": "531CVZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 259,
+  "fields": {
+    "exam": "Angio Cerebral",
+    "exam_code": "531VZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 260,
+  "fields": {
+    "exam": "Angio Coeliac",
+    "exam_code": "541CZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 261,
+  "fields": {
+    "exam": "Angio Dacryocystography",
+    "exam_code": "5AMPZZA",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 262,
+  "fields": {
+    "exam": "Angio Dialysis Fistulogram",
+    "exam_code": "B51W1ZXZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 263,
+  "fields": {
+    "exam": "Angio Hepatic",
+    "exam_code": "541HZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 264,
+  "fields": {
+    "exam": "Angio Intercostal & Bronchial",
+    "exam_code": "B31L1ZXZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 265,
+  "fields": {
+    "exam": "Angio Kidney Allograft",
+    "exam_code": "B41C1ZXZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 266,
+  "fields": {
+    "exam": "Angio Lower Limbs",
+    "exam_code": "531LZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 267,
+  "fields": {
+    "exam": "Angio Pelvis",
+    "exam_code": "541C1ZX",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 268,
+  "fields": {
+    "exam": "Angio Pulmonary",
+    "exam_code": "B31N1ZXZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 269,
+  "fields": {
+    "exam": "Angio Renal",
+    "exam_code": "5416ZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 270,
+  "fields": {
+    "exam": "Angio Spinal",
+    "exam_code": "B31M1ZXZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 271,
+  "fields": {
+    "exam": "Angio Splenic",
+    "exam_code": "541SZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 272,
+  "fields": {
+    "exam": "Angio TIPPS",
+    "exam_code": "551Z1ZX",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 273,
+  "fields": {
+    "exam": "Angio Thoracic",
+    "exam_code": "B3101ZXZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 274,
+  "fields": {
+    "exam": "Angio Upper Limbs",
+    "exam_code": "541ZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 275,
+  "fields": {
+    "exam": "Angio Visceral",
+    "exam_code": "B41B1ZXZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 276,
+  "fields": {
+    "exam": "Interv. Foreign Body Removal Intestine",
+    "exam_code": "5FBRINT",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 277,
+  "fields": {
+    "exam": "Interv. Foreign Body Removal Oesophagus",
+    "exam_code": "5FBROES",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 278,
+  "fields": {
+    "exam": "Interv. Foreign Body Removal Vein",
+    "exam_code": "551V1ZR",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 279,
+  "fields": {
+    "exam": "Interv. ForeignBody Removal Biliary Tree",
+    "exam_code": "5FBRBIL",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 280,
+  "fields": {
+    "exam": "Interv. ForeignBody Removal UrinaryTract",
+    "exam_code": "5FBRURI",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 281,
+  "fields": {
+    "exam": "Interven. Endo. Brachytherapy Low. Extr.",
+    "exam_code": "B41T1ZBZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 282,
+  "fields": {
+    "exam": "Interven. Endo. Brachytherapy Upp. Extr.",
+    "exam_code": "531T1ZBZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 283,
+  "fields": {
+    "exam": "Intervent. Angioplasty Abdominal Aorta",
+    "exam_code": "B4101ZYZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 284,
+  "fields": {
+    "exam": "Intervent. Angioplasty Carotid",
+    "exam_code": "5313ZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 285,
+  "fields": {
+    "exam": "Intervent. Angioplasty Coeliac",
+    "exam_code": "541IRAC",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 286,
+  "fields": {
+    "exam": "Intervent. Angioplasty Hepatic",
+    "exam_code": "541HEPA",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 287,
+  "fields": {
+    "exam": "Intervent. Angioplasty Iliac",
+    "exam_code": "541L1ZY",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 288,
+  "fields": {
+    "exam": "Intervent. Angioplasty Intracranial",
+    "exam_code": "531IZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 289,
+  "fields": {
+    "exam": "Intervent. Angioplasty Lower Extremities",
+    "exam_code": "541FZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 290,
+  "fields": {
+    "exam": "Intervent. Angioplasty Mesenteric",
+    "exam_code": "541MZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 291,
+  "fields": {
+    "exam": "Intervent. Angioplasty Pelvic",
+    "exam_code": "541APZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 292,
+  "fields": {
+    "exam": "Intervent. Angioplasty Renal",
+    "exam_code": "54161ZY",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 293,
+  "fields": {
+    "exam": "Intervent. Angioplasty Renal Allograft",
+    "exam_code": "B41C1ZYZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 294,
+  "fields": {
+    "exam": "Intervent. Angioplasty Thoracic Aorta",
+    "exam_code": "B31U1ZYZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 295,
+  "fields": {
+    "exam": "Intervent. Angioplasty Upper Extremities",
+    "exam_code": "531HZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 296,
+  "fields": {
+    "exam": "Intervent. Angioplasty Vertebral",
+    "exam_code": "531DZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 297,
+  "fields": {
+    "exam": "Intervent. Artherectomy Abdomen",
+    "exam_code": "B4101ZUZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 298,
+  "fields": {
+    "exam": "Intervent. Artherectomy Carotid (Specify",
+    "exam_code": "541CSZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 299,
+  "fields": {
+    "exam": "Intervent. Artherectomy Cerebal(Specify)",
+    "exam_code": "B31T1ZUZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 300,
+  "fields": {
+    "exam": "Intervent. Artherectomy Low Extrem.",
+    "exam_code": "B41T1ZUZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 301,
+  "fields": {
+    "exam": "Intervent. Artherectomy Thorax (Specify)",
+    "exam_code": "B31U1ZUZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 302,
+  "fields": {
+    "exam": "Intervent. Artherectomy Upp. Extrem.",
+    "exam_code": "541UPZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 303,
+  "fields": {
+    "exam": "Intervent. Artherectomy Vertebral",
+    "exam_code": "541VZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 304,
+  "fields": {
+    "exam": "Intervent. Brachytherapy",
+    "exam_code": "IRBRAC01",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 305,
+  "fields": {
+    "exam": "Intervent. Centr. Line Chemo-Port",
+    "exam_code": "B51V1M5Z",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 306,
+  "fields": {
+    "exam": "Intervent. Centr. Line Non Tunnelled",
+    "exam_code": "B51V1L5Z",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 307,
+  "fields": {
+    "exam": "Intervent. Centr. Line PICC",
+    "exam_code": "B51V1K5Z",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 308,
+  "fields": {
+    "exam": "Intervent. Centr. Line Tunnelled",
+    "exam_code": "B51V1J5Z",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 309,
+  "fields": {
+    "exam": "Intervent. Drainage Abdominal Cavity",
+    "exam_code": "5DABDOC",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 310,
+  "fields": {
+    "exam": "Intervent. Drainage Cholecystectomy",
+    "exam_code": "5DCHOLE",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 311,
+  "fields": {
+    "exam": "Intervent. Drainage Nephrostomy",
+    "exam_code": "5DNEPHR",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 312,
+  "fields": {
+    "exam": "Intervent. Drainage Pelvic Cavity",
+    "exam_code": "5DPELVC",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 313,
+  "fields": {
+    "exam": "Intervent. Drainage Pleural",
+    "exam_code": "5DPLUER",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 314,
+  "fields": {
+    "exam": "Intervent. Drainage Transhepatic Biliary",
+    "exam_code": "5F101GP",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 315,
+  "fields": {
+    "exam": "Intervent. Embo. Bronc.-Pleural Fistula",
+    "exam_code": "531PFZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 316,
+  "fields": {
+    "exam": "Intervent. Embo. Cerebral (Specify)",
+    "exam_code": "531N11E",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 317,
+  "fields": {
+    "exam": "Intervent. Embolisation Base of Skull",
+    "exam_code": "541BSZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 318,
+  "fields": {
+    "exam": "Intervent. Embolisation Bronchiol Artery",
+    "exam_code": "B31L1ZEZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 319,
+  "fields": {
+    "exam": "Intervent. Embolisation Hepatic",
+    "exam_code": "B4121ZEZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 320,
+  "fields": {
+    "exam": "Intervent. Embolisation Iliac",
+    "exam_code": "541LZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 321,
+  "fields": {
+    "exam": "Intervent. Embolisation Liver (Chemo)",
+    "exam_code": "B4121ZCZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 322,
+  "fields": {
+    "exam": "Intervent. Embolisation Lower Extrem.",
+    "exam_code": "531QZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 323,
+  "fields": {
+    "exam": "Intervent. Embolisation Neck (Specify)",
+    "exam_code": "541NZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 324,
+  "fields": {
+    "exam": "Intervent. Embolisation Pelvis",
+    "exam_code": "541EPZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 325,
+  "fields": {
+    "exam": "Intervent. Embolisation Pulmonary Artery",
+    "exam_code": "B2191ZEZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 326,
+  "fields": {
+    "exam": "Intervent. Embolisation Renal",
+    "exam_code": "5416RZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 327,
+  "fields": {
+    "exam": "Intervent. Embolisation Renal Allograft",
+    "exam_code": "B41A1ZEZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 328,
+  "fields": {
+    "exam": "Intervent. Embolisation Spinal",
+    "exam_code": "531MZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 329,
+  "fields": {
+    "exam": "Intervent. Embolisation Splenic",
+    "exam_code": "54131ZE",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 330,
+  "fields": {
+    "exam": "Intervent. Embolisation Thoracic Aorta",
+    "exam_code": "531TAZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 331,
+  "fields": {
+    "exam": "Intervent. Embolisation Upper Extrem.",
+    "exam_code": "531PZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 332,
+  "fields": {
+    "exam": "Intervent. Embolisation Visceral",
+    "exam_code": "541B1ZE",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 333,
+  "fields": {
+    "exam": "Intervent. Embolisation of Ears",
+    "exam_code": "541EZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 334,
+  "fields": {
+    "exam": "Intervent. Embolisation of Face",
+    "exam_code": "541EFZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 335,
+  "fields": {
+    "exam": "Intervent. Fibrin Stripping Low Extrem.",
+    "exam_code": "B41T1ZFZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 336,
+  "fields": {
+    "exam": "Intervent. Fibrin Stripping Upp. Extrem.",
+    "exam_code": "B31T2ZFZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 337,
+  "fields": {
+    "exam": "Intervent. Foreign Body Removal Artery",
+    "exam_code": "B31N1ZRZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 338,
+  "fields": {
+    "exam": "Intervent. Foreign Body Removal Colonic",
+    "exam_code": "5FBRCOL",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 339,
+  "fields": {
+    "exam": "Intervent. PEI Liver",
+    "exam_code": "5PELIVR",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 340,
+  "fields": {
+    "exam": "Intervent. PEI Lung",
+    "exam_code": "5PELUNG",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 341,
+  "fields": {
+    "exam": "Intervent. PEI Others (Specify)",
+    "exam_code": "5PEIZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 342,
+  "fields": {
+    "exam": "Intervent. Stent. Low. Extrem.(Specify)",
+    "exam_code": "541F1ZD",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 343,
+  "fields": {
+    "exam": "Intervent. Stent. Upp. Extrem.(Specify)",
+    "exam_code": "531H1ZD",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 344,
+  "fields": {
+    "exam": "Intervent. Stenting (Others)",
+    "exam_code": "B41J1ZDZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 345,
+  "fields": {
+    "exam": "Intervent. Stenting Abdominal Aorta",
+    "exam_code": "54101ZD",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 346,
+  "fields": {
+    "exam": "Intervent. Stenting Biliary",
+    "exam_code": "5F101GS",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 347,
+  "fields": {
+    "exam": "Intervent. Stenting Bronchiol",
+    "exam_code": "531BZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 348,
+  "fields": {
+    "exam": "Intervent. Stenting Carotids",
+    "exam_code": "53131ZD",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 349,
+  "fields": {
+    "exam": "Intervent. Stenting Colonic",
+    "exam_code": "5SCOLON",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 350,
+  "fields": {
+    "exam": "Intervent. Stenting IVC Filter Insertion",
+    "exam_code": "B5191ZXZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 351,
+  "fields": {
+    "exam": "Intervent. Stenting Iliac",
+    "exam_code": "541KZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 352,
+  "fields": {
+    "exam": "Intervent. Stenting Intestine",
+    "exam_code": "5SINTES",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 353,
+  "fields": {
+    "exam": "Intervent. Stenting Intracranial",
+    "exam_code": "531SIZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 354,
+  "fields": {
+    "exam": "Intervent. Stenting Jugular",
+    "exam_code": "531JZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 355,
+  "fields": {
+    "exam": "Intervent. Stenting Neck (Specify)",
+    "exam_code": "531NZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 356,
+  "fields": {
+    "exam": "Intervent. Stenting Oesophagus",
+    "exam_code": "5SOESOP",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 357,
+  "fields": {
+    "exam": "Intervent. Stenting Pancreatic Duct",
+    "exam_code": "BN12ZZXZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 358,
+  "fields": {
+    "exam": "Intervent. Stenting Renal",
+    "exam_code": "54161ZD",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 359,
+  "fields": {
+    "exam": "Intervent. Stenting Renal Allograft",
+    "exam_code": "B41C1ZDZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 360,
+  "fields": {
+    "exam": "Intervent. Stenting TIPPS",
+    "exam_code": "B51Z1ZXZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 361,
+  "fields": {
+    "exam": "Intervent. Stenting Thoracic Aorta",
+    "exam_code": "B31U1ZDZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 362,
+  "fields": {
+    "exam": "Intervent. Stenting Ureteral",
+    "exam_code": "5SURETE",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 363,
+  "fields": {
+    "exam": "Intervent. Stenting Vertebral",
+    "exam_code": "531D1ZD",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 364,
+  "fields": {
+    "exam": "Intervent. Stone Removal (Specify)",
+    "exam_code": "5SRZZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 365,
+  "fields": {
+    "exam": "Intervent. Stone Removal Biliary Tree",
+    "exam_code": "5SRBILI",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 366,
+  "fields": {
+    "exam": "Intervent. Stone Removal Urinary Tract",
+    "exam_code": "5SRURIT",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 367,
+  "fields": {
+    "exam": "Intervent. Thromboly. Abdominal(Specify)",
+    "exam_code": "541AZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 368,
+  "fields": {
+    "exam": "Intervent. Thromboly. Head (Specify)",
+    "exam_code": "551HZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 369,
+  "fields": {
+    "exam": "Intervent. Thromboly. Low. Extrem. Vein",
+    "exam_code": "551B1ZT",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 370,
+  "fields": {
+    "exam": "Intervent. Thromboly. Neck (Specify)",
+    "exam_code": "551NZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 371,
+  "fields": {
+    "exam": "Intervent. Thrombolysis Intracranial",
+    "exam_code": "541IZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 372,
+  "fields": {
+    "exam": "Intervent. Thrombolysis Low. Extrem Art",
+    "exam_code": "541F1ZT",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 373,
+  "fields": {
+    "exam": "Intervent. Thrombolysis Pelvic (Specify)",
+    "exam_code": "551PZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 374,
+  "fields": {
+    "exam": "Intervent. Thrombolysis Pulmonary Artery",
+    "exam_code": "551S1ZT",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 375,
+  "fields": {
+    "exam": "Intervent. Thrombolysis Upp Extrem. Vein",
+    "exam_code": "551M1ZT",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 376,
+  "fields": {
+    "exam": "Intervent. Tumour Ablation Liver",
+    "exam_code": "5TALIVR",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 377,
+  "fields": {
+    "exam": "Intervent. Tumour Ablation Lung",
+    "exam_code": "5TALUNG",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 378,
+  "fields": {
+    "exam": "Intervent. Tumour Ablation Others",
+    "exam_code": "5TAZZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 379,
+  "fields": {
+    "exam": "Intervent. Venous Sampling (Others)",
+    "exam_code": "551SOZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 380,
+  "fields": {
+    "exam": "Intervent. Venous Sampling Adrenal",
+    "exam_code": "B51A1ZXZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 381,
+  "fields": {
+    "exam": "Intervent. Venous Sampling Petrosal",
+    "exam_code": "B51U1ZXZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 382,
+  "fields": {
+    "exam": "Intervent.Thrombolysis Upp. Extrem. Art.",
+    "exam_code": "531H1ZT",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 383,
+  "fields": {
+    "exam": "Intravenous Urography Limited Series",
+    "exam_code": "BT0414PZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 384,
+  "fields": {
+    "exam": "Intravenous Urography(IVU) Std Series",
+    "exam_code": "BT0414ZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 385,
+  "fields": {
+    "exam": "Readjustment Chemo-Port",
+    "exam_code": "RDAM0002",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 386,
+  "fields": {
+    "exam": "Readjustment Hickman's Line",
+    "exam_code": "RDAM0001",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 387,
+  "fields": {
+    "exam": "Readjustment PICC",
+    "exam_code": "RDAM0003",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 388,
+  "fields": {
+    "exam": "T-Tube Cholangiogram",
+    "exam_code": "BD174ZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 389,
+  "fields": {
+    "exam": "Venography Abdomen",
+    "exam_code": "551ABDO",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 390,
+  "fields": {
+    "exam": "Venography Central/Sup Vena Cava",
+    "exam_code": "B51P1ZXZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 391,
+  "fields": {
+    "exam": "Venography Hepatic",
+    "exam_code": "551VZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 392,
+  "fields": {
+    "exam": "Venography Inferior Vena Cava",
+    "exam_code": "B5191ZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 393,
+  "fields": {
+    "exam": "Venography Jugular Vein",
+    "exam_code": "B5131ZXZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 394,
+  "fields": {
+    "exam": "Venography Lower Extremities",
+    "exam_code": "551LZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 395,
+  "fields": {
+    "exam": "Venography Others (Specify)",
+    "exam_code": "551ZZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 396,
+  "fields": {
+    "exam": "Venography Pelvic",
+    "exam_code": "551FZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 397,
+  "fields": {
+    "exam": "Venography Portal-Splenic",
+    "exam_code": "B51T1ZXZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 398,
+  "fields": {
+    "exam": "Venography Renal",
+    "exam_code": "551JZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 399,
+  "fields": {
+    "exam": "Venography Spinal",
+    "exam_code": "B5101ZXZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 400,
+  "fields": {
+    "exam": "Venography Upper Extremities",
+    "exam_code": "551UZZZ",
+    "part": null,
+    "modaliti": 6,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 401,
+  "fields": {
+    "exam": "X-Ray Abdomen",
+    "exam_code": "5X00ZZZ",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 402,
+  "fields": {
+    "exam": "X-Ray Abdomen - Imperforate Anus",
+    "exam_code": "5X00ZZD",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 403,
+  "fields": {
+    "exam": "X-Ray Acromio-Clavicular Joint",
+    "exam_code": "5P03ZZT",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 404,
+  "fields": {
+    "exam": "X-Ray Ankle Joint",
+    "exam_code": "5Q0GZZZ",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 405,
+  "fields": {
+    "exam": "X-Ray Bone Age",
+    "exam_code": "5X0K1ZZ",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 406,
+  "fields": {
+    "exam": "X-Ray Bone Dysplasia",
+    "exam_code": "XRBDYSP",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 407,
+  "fields": {
+    "exam": "X-Ray Calcaneum",
+    "exam_code": "5Q0JZZZ",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 408,
+  "fields": {
+    "exam": "X-Ray Cervical",
+    "exam_code": "5R00ZZZ",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 409,
+  "fields": {
+    "exam": "X-Ray Chest",
+    "exam_code": "5X03ZZZ",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 410,
+  "fields": {
+    "exam": "X-Ray Clavicle",
+    "exam_code": "5P04ZZT",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 411,
+  "fields": {
+    "exam": "X-Ray Dead Foetus",
+    "exam_code": "5X0K2ZZ",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 412,
+  "fields": {
+    "exam": "X-Ray Elbow Joint",
+    "exam_code": "5P0GZZT",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 413,
+  "fields": {
+    "exam": "X-Ray Facial Bones",
+    "exam_code": "5N05ZZT",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 414,
+  "fields": {
+    "exam": "X-Ray Femur",
+    "exam_code": "5Q03ZZZ",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 415,
+  "fields": {
+    "exam": "X-Ray Fingers",
+    "exam_code": "5P0RZZT",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 416,
+  "fields": {
+    "exam": "X-Ray Foot",
+    "exam_code": "5Q0LZZZ",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 417,
+  "fields": {
+    "exam": "X-Ray For Medical Illness Adult",
+    "exam_code": "5X0K3ZZ",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 418,
+  "fields": {
+    "exam": "X-Ray Hand",
+    "exam_code": "5P0NZZT",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 419,
+  "fields": {
+    "exam": "X-Ray Hip Joint",
+    "exam_code": "5Q00ZZZ",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 420,
+  "fields": {
+    "exam": "X-Ray Humerus",
+    "exam_code": "5P0AZZT",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 421,
+  "fields": {
+    "exam": "X-Ray Internal Auditory Meatus",
+    "exam_code": "5N00ZZZ",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 422,
+  "fields": {
+    "exam": "X-Ray KUB (Kidney, Ureters, Bladder)",
+    "exam_code": "5X01ZZ0",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 423,
+  "fields": {
+    "exam": "X-Ray Knee Joint",
+    "exam_code": "5Q07ZZZ",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 424,
+  "fields": {
+    "exam": "X-Ray Low Limb Both-Paed-Bone Lgth Meas.",
+    "exam_code": "5Q0DZZZ",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 425,
+  "fields": {
+    "exam": "X-Ray Lumbo-sacral",
+    "exam_code": "5R0BZZZ",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 426,
+  "fields": {
+    "exam": "X-Ray Mandible",
+    "exam_code": "5N06ZZZ",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 427,
+  "fields": {
+    "exam": "X-Ray Mastoids",
+    "exam_code": "590HZZZ",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 428,
+  "fields": {
+    "exam": "X-Ray Maxilla",
+    "exam_code": "5N05ZZZ",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 429,
+  "fields": {
+    "exam": "X-Ray Metastasis",
+    "exam_code": "XRMETAS",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 430,
+  "fields": {
+    "exam": "X-Ray Multiple Myeloma",
+    "exam_code": "XRMMYEL",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 431,
+  "fields": {
+    "exam": "X-Ray Nasal Bone",
+    "exam_code": "5N04ZZZ",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 432,
+  "fields": {
+    "exam": "X-Ray Orbits",
+    "exam_code": "5N03ZZZ",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 433,
+  "fields": {
+    "exam": "X-Ray Orthopantomogram (OPG)",
+    "exam_code": "5N0JZZZ",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 434,
+  "fields": {
+    "exam": "X-Ray Paranasal Sinuses",
+    "exam_code": "5902ZZZ",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 435,
+  "fields": {
+    "exam": "X-Ray Pelvimetry",
+    "exam_code": "5R0CZZZ",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 436,
+  "fields": {
+    "exam": "X-Ray Pelvis",
+    "exam_code": "5ROCZZT",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 437,
+  "fields": {
+    "exam": "X-Ray Petrous Temporal Bone",
+    "exam_code": "5N0EZZZ",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 438,
+  "fields": {
+    "exam": "X-Ray Pituitary Fossa",
+    "exam_code": "5N0QZZZ",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 439,
+  "fields": {
+    "exam": "X-Ray Post Nasal Space",
+    "exam_code": "590FZZZ",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 440,
+  "fields": {
+    "exam": "X-Ray Radius/Ulna",
+    "exam_code": "5P0JZZT",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 441,
+  "fields": {
+    "exam": "X-Ray Renal Osteodystrophy",
+    "exam_code": "XROSTEO",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 442,
+  "fields": {
+    "exam": "X-Ray SXR - Lateral Cephalometry",
+    "exam_code": "5N0TZZZ",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 443,
+  "fields": {
+    "exam": "X-Ray Sacro-iliac Joints",
+    "exam_code": "5R0DZZZ",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 444,
+  "fields": {
+    "exam": "X-Ray Sacrum - Coccyx",
+    "exam_code": "5R0FZZZ",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 445,
+  "fields": {
+    "exam": "X-Ray Scaphoid",
+    "exam_code": "5P0MZZT",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 446,
+  "fields": {
+    "exam": "X-Ray Scapula",
+    "exam_code": "5P06ZZT",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 447,
+  "fields": {
+    "exam": "X-Ray Shoulder Joint",
+    "exam_code": "5P08ZZU",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 448,
+  "fields": {
+    "exam": "X-Ray Shoulder Joint (INACTIVE)",
+    "exam_code": "5P08ZZT",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 449,
+  "fields": {
+    "exam": "X-Ray Skeletal Survey",
+    "exam_code": "5X0K4ZZ",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 450,
+  "fields": {
+    "exam": "X-Ray Skull",
+    "exam_code": "5N00ZZT",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 451,
+  "fields": {
+    "exam": "X-Ray Soft Tissue Neck",
+    "exam_code": "5R0SZZZ",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 452,
+  "fields": {
+    "exam": "X-Ray Sterno-Clavicular Joints",
+    "exam_code": "5P02ZZT",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 453,
+  "fields": {
+    "exam": "X-Ray Sternum",
+    "exam_code": "5P0HZZT",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 454,
+  "fields": {
+    "exam": "X-Ray Temporo-Mandibular Jts",
+    "exam_code": "5N09ZZZ",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 455,
+  "fields": {
+    "exam": "X-Ray Thoracic",
+    "exam_code": "5R07ZZZ",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 456,
+  "fields": {
+    "exam": "X-Ray Thoraco-Lumbar",
+    "exam_code": "5R08ZZZ",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 457,
+  "fields": {
+    "exam": "X-Ray Thumb",
+    "exam_code": "5P0RZZZ",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 458,
+  "fields": {
+    "exam": "X-Ray Tibia/Fibula",
+    "exam_code": "5Q0TZZZ",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 459,
+  "fields": {
+    "exam": "X-Ray Up Limbs Both-Paed-Bone Lgth Meas.",
+    "exam_code": "5P0JZZZ",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 460,
+  "fields": {
+    "exam": "X-Ray Whole Spine",
+    "exam_code": "5R0GZZZ",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 461,
+  "fields": {
+    "exam": "X-Ray Wrist Joint",
+    "exam_code": "5P0LZZT",
+    "part": null,
+    "modaliti": 2,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+},
+{
+  "model": "exam.exam",
+  "pk": 462,
+  "fields": {
+    "exam": "CT Abdomen",
+    "exam_code": null,
+    "part": 1,
+    "modaliti": 1,
+    "catatan": null,
+    "short_desc": null,
+    "contrast": false,
+    "statistik": null,
+    "status_ca": "ENABLE"
+  }
+}
+]

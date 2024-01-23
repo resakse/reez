@@ -6,6 +6,7 @@ from django.contrib import messages
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
+from login_required import login_not_required
 
 from reez import settings
 from .models import Staff
@@ -13,7 +14,6 @@ from .forms import StaffForm, StaffEdit, TukarPassForm, StaffTukar
 # Create your views here.
 from django_htmx.http import retarget
 
-@login_required
 def stafflist(request):
     staff = Staff.objects.all()
 
@@ -146,6 +146,7 @@ def staff_passwd(request, pk=None):
     return render(request, 'staff/tukarpass.html', context=data)
 
 
+@login_not_required
 def login_user(request):
     next = request.GET.get('next')
 

@@ -163,7 +163,7 @@ class Daftar(auto_prefetch.Model):
     rujukan = auto_prefetch.ForeignKey(Ward, on_delete=models.SET_NULL, null=True)
     ambulatori = models.CharField(max_length=15, choices=ambulatori_choice, default='Berjalan Kaki')
 
-    pemohon = models.CharField(max_length=30, blank=False, null=True)
+    pemohon = models.CharField(max_length=30, blank=True, null=True)
     status = models.CharField(max_length=15, choices=status_chocies, default='Performed')
     hamil = models.BooleanField(default=False)
     dcatatan = models.CharField(

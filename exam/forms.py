@@ -45,7 +45,7 @@ class BcsForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
-        self.fields['dcatatan'].widget = forms.Textarea(attrs={'rows':4})
+        self.fields['dcatatan'].widget = forms.Textarea(attrs={'rows': 4})
         self.helper.layout = Layout(
             Row(
                 Column("tarikh", css_class="form-group col-md-4 mb-0"),
@@ -122,26 +122,27 @@ class BcsForm(forms.ModelForm):
 
 class DaftarForm(forms.ModelForm):
     # exam = forms.ModelChoiceField(label="Pemeriksaan", queryset=Exam.objects.all(), widget=forms.CharField())
+    # exam = forms.CharField(required=True)
 
     class Meta:
         model = Pemeriksaan
-        fields = ("no_xray", "exam", "laterality",'kv','mas','mgy')
+        fields = ("no_xray", "exam", "laterality", 'kv', 'mas', 'mgy')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
         self.helper.layout = Layout(
             Row(
-                Column("no_xray", css_class="form-group col-md-2 mb-0"),
-                Column("exam", css_class="form-group col-md-5 mb-0"),
-                Column("laterality", css_class="form-group col-md-2 mb-0"),
-                Column("kv", css_class="form-group col-md-1 mb-0"),
-                Column("mas", css_class="form-group col-md-1 mb-0"),
-                Column("mgy", css_class="form-group col-md-1 mb-0"),
+                Column("no_xray", css_class="form-group col-md-2 mb-0 pr-5"),
+                Column(Field("exam", style='width: 50%'), css_class="form-group col-md-3 mb-0 pr-5"),
+                Column("laterality", css_class="form-group col-md-2 mb-0 pr-5"),
+                Column("kv", css_class="form-group col-md-1 ml-4 mr-4 mb-0"),
+                Column("mas", css_class="form-group col-md-1 mb-0 mr-5"),
+                Column("mgy", css_class="form-group col-md-1 mb-0")
 
             ),
-            #         HTML(
-            #             "<script>$('#id_exam').select2({minimumInputLength: 3,ajax: {url: '/bcs/api/exam',dataType: 'json'}});</script>")
+            # HTML(
+            #     "<script>$('#id_exam').select2({minimumInputLength: 3,ajax: {url: '/api/exam',dataType: 'json'}});</script>")
         )
         self.fields["no_xray"].disabled = True
         self.helper.form_show_labels = False
