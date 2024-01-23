@@ -267,7 +267,7 @@ def merged(request, pk=None):
         )
 
     return trigger_client_event(
-        response, "msg", {"merged": f"{exam.nobcs} berjaya di kemaskini"}, after="swap"
+        response, "msg", {"merged": f"{exam.noxray} berjaya di kemaskini"}, after="swap"
     )
 
 
