@@ -410,3 +410,10 @@ def examDelete(request, pk=None):
     response = render(request, 'exam/config/exam_list.html', data)
     return trigger_client_event(response, "msg", {"msg": f'{exam.exam} Berjaya di Padam'})
 
+
+def pemeriksaan_list(request):
+    exam = Pemeriksaan.objects.all()
+    data = {
+        'exam': exam
+    }
+    return render(request, 'exam/pemeriksaan_list.html', context=data)

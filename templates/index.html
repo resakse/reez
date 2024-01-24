@@ -16,34 +16,41 @@
     <link rel="stylesheet" href="{% static 'plugins/toastr/toastr.min.css' %}">
     <link rel="stylesheet" href="{% static 'plugins/sweetalert2-theme-bootstrap-4/bootstrap-4.min.css' %}">
     <link rel="stylesheet" href="{% static 'plugins/select2/css/select2.min.css' %}">
-    <link rel="stylesheet" href="{% static 'plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css' %}">    <!-- Theme style -->
-    <link rel="stylesheet" href="{% static 'plugins/icheck-bootstrap/icheck-bootstrap.min.css' %}">    <!-- Theme style -->
+    <link rel="stylesheet" href="{% static 'plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css' %}">
+    <!-- Theme style -->
+    <link rel="stylesheet" href="{% static 'plugins/icheck-bootstrap/icheck-bootstrap.min.css' %}">
+    <!-- Theme style -->
     <link rel="stylesheet" href="{% static 'dist/css/adminlte.min.css' %}">
     <link href="{% static 'js/flatpickr/flatpickr.min.css' %}" rel="stylesheet" type="text/css"/>
     <link href="{% static 'js/flatpickr/dark.css' %}" rel="stylesheet" type="text/css"/>
 
-<script src="{% static 'plugins/jquery/jquery.min.js' %}"></script>
-<script src="{% static 'js/htmx.min.js' %}" defer></script>
+    <script src="{% static 'plugins/jquery/jquery.min.js' %}"></script>
+    <script src="{% static 'js/htmx.min.js' %}" defer></script>
 
     <style>
         .select2 {
             width: 100% !important;
         }
+
         .select2-selection__rendered {
-    line-height: 35px !important;
-}
-.select2-container .select2-selection--single {
-    height: 38px !important;
-}
-.select2-selection__arrow {
-    height: 34px !important;
-}
-.card-header {
-	border-bottom: 1px solid rgba(211, 203, 203, 0.6) !important;
-}
+            line-height: 35px !important;
+        }
+
+        .select2-container .select2-selection--single {
+            height: 38px !important;
+        }
+
+        .select2-selection__arrow {
+            height: 34px !important;
+        }
+
+        .card-header {
+            border-bottom: 1px solid rgba(211, 203, 203, 0.6) !important;
+        }
     </style>
 </head>
-<body class="hold-transition text-sm dark-mode sidebar-mini layout-fixed layout-navbar-fixed layout-footer-fixed" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+<body class="hold-transition text-sm dark-mode sidebar-mini layout-fixed layout-navbar-fixed layout-footer-fixed"
+      hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
 <div class="wrapper">
 
     <!-- Preloader -->
@@ -102,9 +109,9 @@
         <!-- Main content -->
         <section class="content">
             <div id="konten" class="container-fluid">
-            <div id="body-content">
-                {% block content %}{% endblock %}
-            </div>
+                <div id="body-content">
+                    {% block content %}{% endblock %}
+                </div>
             </div><!--/. container-fluid -->
         </section>
         <!-- /.content -->
@@ -116,9 +123,9 @@
         <!-- Control sidebar content goes here -->
     </aside>
     <!-- /.control-sidebar -->
-        <div class="modal fade" tabindex="-1" id="modal-exam">
-            <div id="modal-dialog" class="modal-dialog modal-dialog-scrollable"></div>
-        </div>
+    <div class="modal fade" tabindex="-1" id="modal-exam">
+        <div id="modal-dialog" class="modal-dialog modal-dialog-scrollable"></div>
+    </div>
     <!-- Main Footer -->
     <footer class="main-footer">
         <strong>Copyright &copy; 2014-2021 <a href="https://adminlte.io">AdminLTE.io</a>.</strong>
@@ -150,32 +157,38 @@
 <script src="{% static 'js/flatpickr/flatpickr.min.js' %}"></script>
 <script src="{% static 'js/flatpickr/ms.js' %}"></script>
 <script>
-$(document).ready(function () {
-    $(".select").select2({
+    $(document).ready(function () {
+        $(".select").select2({
             width: 'element',
         });
-  htmx.on("tableChanged", (e) => {
-          $('#modal-exam').modal('hide');
-          if (e.detail.msg) {
-              let msg = e.detail.msg;
-              let kelas = e.detail.kelas;
-              toastr[kelas](msg);
-          }
-  });
-    htmx.on("notis", (e) => {
+        htmx.on("tableChanged", (e) => {
             $('#modal-exam').modal('hide');
-        if (e.detail.msg) {
-              let msg = e.detail.msg;
-              let kelas = e.detail.kelas;
-              toastr[kelas](msg);
-          }
-  });
+            if (e.detail.msg) {
+                let msg = e.detail.msg;
+                let kelas = e.detail.kelas;
+                toastr[kelas](msg);
+            }
+        });
+        htmx.on("notis", (e) => {
+            $('#modal-exam').modal('hide');
+            if (e.detail.msg) {
+                let msg = e.detail.msg;
+                let kelas = e.detail.kelas;
+                toastr[kelas](msg);
+            }
+        });
 
         flatpickr('.dateinput', {
-        dateFormat: "d/m/Y",
-        locale: 'ms',
+            dateFormat: "d/m/Y",
+            locale: 'ms',
 
-    });
+        });
+        htmx.on('htmx:afterRequest', (evt) => {
+
+            $(".select").select2({
+                width: 'element',
+            });
+        })
     });
 
 </script>
