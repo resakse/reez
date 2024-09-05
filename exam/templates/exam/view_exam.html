@@ -1,0 +1,17 @@
+{% extends 'index.html' %}
+{% block title %}X-Ray{% endblock %}
+
+{% load crispy_forms_tags %}
+{% block style %}
+    .table th, .table td {
+    vertical-align: middle !important;
+    }
+{% endblock style %}
+{% block breadcrumb %}
+{% endblock breadcrumb %}
+
+{% block content %}
+    <div class="embed-responsive embed-responsive-4by3">
+  <iframe class="embed-responsive-item" src="http://localhost:3000/viewer/{{ uid }}" allowfullscreen style="width: 100%; height: 100%; border: none"></iframe>
+</div>
+{% endblock content %}

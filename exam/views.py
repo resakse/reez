@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
@@ -389,11 +390,11 @@ def examUpdate(request, pk=None):
         print(request.POST)
         if examform.is_valid():
             print('form valid')
-            examform.save()
+            examform.save() 
             data['exam'] = Exam.objects.all()
             response = render(request, 'exam/config/exam_list.html', data)
             return trigger_client_event(response, "msg", {"msg": f'{exam.exam} Berjaya di Kemaskini'})
-
+    #
     return response
 
 
@@ -417,3 +418,113 @@ def pemeriksaan_list(request):
         'exam': exam
     }
     return render(request, 'exam/pemeriksaan_list.html', context=data)
+
+def exam_view(request, pk=None):
+    exam = get_object_or_404(Pemeriksaan, id=pk)
+    uid = '1.2.392.200036.9107.307.24301.112430124031509247'
+    data = {
+        'exam': exam,
+        'uid': uid
+    }
+    return render(request, 'exam/view_exam.html', context=data)
+
+
+# import requests
+# from django.core import serializers
+# from .models import Pemeriksaan
+
+# def send_to_orthanc(request):
+#     exam = Pemeriksaan.objects.all()
+    
+#     # Serialize the queryset to JSON data
+#     json_data = serializers.serialize('json', exam)
+
+#     # Define the URL of Orthanc's MWL
+#     url = "http://your-orthanc-url/mwl"
+
+#     # Make a POST request with the JSON data as payload
+#     response = requests.post(url, json=json_data)
+    
+#     if response.status_code == 200:
+#         print('Data sent successfully')
+#     else:
+#         print('Failed to send data', response.text)
+
+orthancurl = "http://172.25.96.1:8043/tools/find"
+orthancurl = "http://192.168.20.172:8042/tools/find"
+viewerurl='http://172.25.96.1:8043/osimis-viewer/app/index.html?study='
+viewerurl='http://localhost:8043/ohif/viewer?url=../studies/'
+import requests
+import json
+def orthanc_list(request):
+    opt = {"Level": "Patient", "Expand": True, "Limit": 100,"Query":{}}
+    # list = requests.get(f'{orthancurl}/studies?expand')
+    list = requests.post(f'{orthancurl}',json=opt)
+    data =list.json()
+    senarai=[]
+    for a in data:
+        study = {
+            'id': a['ID'],
+            'nama': (a['MainDicomTags']['PatientName']).replace('^', ' '),
+            'ptid': a['MainDicomTags']['PatientID'],
+            # 'noxray': a['MainDicomTags']['AccessionNumber'],
+            # 'klinik': a['MainDicomTags']['InstitutionName'],
+        }
+        senarai.append(study)
+    return HttpResponse(json.dumps(senarai))
+
+
+def orthanc_study(request):
+    dari = request.GET.get('dari')
+    hingga = request.GET.get('hingga')
+    patientid = request.GET.get('nric')
+    nama = request.GET.get('nama')
+    syarat = {}
+    if not dari:
+        dari = '01/01/2000'
+        if not hingga:
+            hingga = datetime.today().strftime('%d/%m/%Y')
+    if not hingga:
+        hingga = dari
+    if dari or hingga:
+        dari = datetime.strptime(dari,'%d/%m/%Y').strftime('%Y%m%d')
+        hingga = datetime.strptime(hingga,'%d/%m/%Y').strftime('%Y%m%d')
+        syarat['StudyDate'] = f'{dari}-{hingga}'
+    if patientid:
+        syarat['PatientID']=f'*{patientid}*'
+    if nama:
+        syarat['PatientName']=f'*{nama}*'
+
+    opt = {"Level": "Studies", "Expand": True, "Limit": 25,"Query":syarat}
+    # list = requests.get(f'{orthancurl}/studies?expand')
+    list = requests.post(f'{orthancurl}',json=opt)
+    data =list.json()
+    senarai=[]
+    for a in data:
+        try:
+            examdesc = a['MainDicomTags']['StudyDescription']
+        except KeyError:
+            examdesc = ''
+        texam = f"{a['MainDicomTags']['StudyDate']} {int(float(a['MainDicomTags']['StudyTime']))}"
+        mexam = datetime.strptime(texam,'%Y%m%d %H%M%S')
+        study = {
+            'id': a['ID'],
+            'tarikh': mexam,
+            'nama': (a['PatientMainDicomTags']['PatientName']).replace('^', ' '),
+            'ptid': a['PatientMainDicomTags']['PatientID'],
+            'noxray': a['MainDicomTags']['AccessionNumber'],
+            'exam': examdesc,
+            'klinik': a['MainDicomTags']['InstitutionName'],
+            'jimej': len(a['Series'])
+        }
+
+        senarai.append(study)
+    susun=senarai
+    if senarai:
+        susun = sorted(senarai, key=lambda k: k['tarikh'], reverse=True)
+
+    template = 'exam/dicom/dicom_study-list.html'
+    if request.htmx:
+        template = 'exam/dicom/dicom_study-partial.html'
+    return render(request, template, context={'exam': susun, 'viewerurl': viewerurl})
+# http://localhost:8043/dicom-web/studies?limit=2&includefield=00081030,00080060&00100020=561008065053

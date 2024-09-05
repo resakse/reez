@@ -1,0 +1,83 @@
+{% extends 'index.html' %}
+{% block title %}Senarai Pemeriksaan{% endblock %}
+
+{% load crispy_forms_tags %}
+{% block style %}
+    .table th, .table td {
+    vertical-align: middle !important;
+    }
+{% endblock style %}
+{% block breadcrumbs %}
+    <a href="{% url 'bcs:bcs-list' %}"
+       class="kt-subheader__breadcrumbs-link">Business Continuity Service</a>
+{% endblock breadcrumbs %}
+{% block breadcrumbs2 %}
+    BCS
+{% endblock breadcrumbs2 %}
+{% block subheader_kanan %}
+
+{% endblock subheader_kanan %}
+{% block content %}
+    <div id="bcs-full">
+        <div id="bcs-filter">
+            <div class="card rounded kt-bg-fill-primary shadow-sm">
+                <div id="filterlist" class="card-body" hx-get="."
+                     hx-target="#senarai-bcs" hx-push-url="true" hx-trigger="keyup delay:500ms, change" hx-include=".apifilter"
+                     hx-indicator=".htmx-indicator">
+                    <div class="row">
+                        <div class="form-group col-sm-6 col-md-3 p-3">
+                            <label for="dari-filter">Dari</label>
+                            <input id="dari-filter" class="tarikh-filter apifilter form-control"
+                                   name="dari"></input>
+                        </div>
+                        <div class="form-group col-sm-6 col-md-3  p-3">
+                            <label for="hingga-filter">Hingga</label>
+                            <input id="hingga-filter" class="tarikh-filter apifilter form-control"
+                                   name="hingga"></input>
+                        </div>
+                        <div class="form-group col-sm-6 col-md-3  p-3">
+                            <label for="nric-filter">NRIC</label>
+                                   <input id="nric-filter" class="nric-filter apifilter form-control"
+                                   name="nric"></input>
+                        </div>
+                        <div class="form-group col-sm-6 col-md-3 w-100 p-3">
+                            <label for="nama-filter">Nama</label>
+                                   <input id="nama-filter" class="nama-filter apifilter form-control"
+                                   name="nama"></input>
+                        </div>
+
+                    </div>
+                </div>
+                <div id="indicator" class="htmx-indicator p-3 text-center">Dalam Proses.. <span
+                        class="kt-spinner kt-spinner-md kt-spinner--success"></span></div>
+
+            </div>
+        </div>
+
+        <div id="senarai-bcs" class="card mt-5 shadow-sm">
+            {% include 'exam/dicom/dicom_study-partial.html' %}
+        </div>
+    </div>
+{% endblock content %}
+{% block scripts %}
+    <script>
+                $('#excel').attr('href','/bcs/export/'+window.location.search);
+
+        document.body.addEventListener("htmxSuccess", function (e) {
+            console.log('success')
+            toastr.success(e.detail.value);
+        });
+        document.body.addEventListener("msg", function (e) {
+            console.log('ada msg')
+            toastr.success(e.detail.merged);
+        })
+       document.body.addEventListener("pesakitada", function(e){
+            $('#id_nama').val(e.detail.nama);
+            $('#id_nric').val(e.detail.nric);
+        });
+        document.body.addEventListener("htmx:pushedIntoHistory", function(event) {
+                $('#excel').attr('href','/bcs/export/'+window.location.search);
+        });
+
+    </script>
+{% endblock scripts %}

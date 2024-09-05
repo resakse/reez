@@ -8,6 +8,7 @@ from reez import settings
 from custom.katanama import titlecase
 from ordered_model.models import OrderedModel
 import auto_prefetch
+
 User = settings.AUTH_USER_MODEL
 
 
@@ -107,6 +108,7 @@ class Exam(auto_prefetch.Model):
         self.short_desc = self.short_desc.upper()
         super(Exam, self).save(*args, **kwargs)
 
+
 lateral_choices = (
     ("Kiri", "Kiri"),
     ("Kanan", "Kanan"),
@@ -154,12 +156,13 @@ status_chocies = [
     ('Completed', 'Completed')
 ]
 
+
 class Daftar(auto_prefetch.Model):
     tarikh = models.DateTimeField(default=timezone.now)
 
     pesakit = auto_prefetch.ForeignKey(Pesakit, on_delete=models.CASCADE)
     no_resit = models.CharField(max_length=50, blank=True, null=True)
-    lmp = models.DateField(verbose_name='LMP',blank=True, null=True)
+    lmp = models.DateField(verbose_name='LMP', blank=True, null=True)
     rujukan = auto_prefetch.ForeignKey(Ward, on_delete=models.SET_NULL, null=True)
     ambulatori = models.CharField(max_length=15, choices=ambulatori_choice, default='Berjalan Kaki')
 
@@ -169,16 +172,17 @@ class Daftar(auto_prefetch.Model):
     dcatatan = models.CharField(
         verbose_name="Catatan", blank=True, null=True, max_length=20
     )
-    jxr = auto_prefetch.ForeignKey(User,verbose_name='Juru X-Ray', on_delete=models.SET_NULL, null=True, blank=True, related_name="bcs_jxr"
-    )
+    jxr = auto_prefetch.ForeignKey(User, verbose_name='Juru X-Ray', on_delete=models.SET_NULL, null=True, blank=True,
+                                   related_name="bcs_jxr"
+                                   )
     created = models.DateTimeField(auto_now_add=True)
     modified = models.DateTimeField(auto_now=True)
-    performed = models.DateTimeField(default=timezone.now,blank=True,null=True)
+    performed = models.DateTimeField(default=timezone.now, blank=True, null=True)
 
     class Meta(auto_prefetch.Model.Meta):
         verbose_name_plural = "Pendaftaran Radiologi"
         ordering = [
-            "tarikh",'pesakit'
+            "tarikh", 'pesakit'
         ]
 
     def __str__(self):
@@ -218,10 +222,29 @@ class Pemeriksaan(auto_prefetch.Model):
 
     class Meta(auto_prefetch.Model.Meta):
         verbose_name_plural = 'Pemeriksaan'
-        ordering = ['daftar','no_xray']
+        ordering = ['daftar', 'no_xray']
+
+    def __str__(self):
+        return self.no_xray
 
     def save(self, *args, **kwargs):
         nombor = kiraxray(self.no_xray)
         print(nombor)
         self.no_xray = nombor
         super(Pemeriksaan, self).save(*args, **kwargs)
+
+
+class PacsExam(models.Model):
+    exam = models.OneToOneField(Pemeriksaan, on_delete=models.CASCADE)
+    orthanc_id = models.CharField(max_length=100, blank=True, null=True)
+    study_id = models.CharField(max_length=100, blank=True, null=True)
+    study_instance = models.CharField(max_length=100, blank=True, null=True)
+
+    created = models.DateTimeField(auto_now_add=True)
+    modified = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name_plural = 'Pacs Item'
+
+    def __str__(self):
+        return self.orthanc_id

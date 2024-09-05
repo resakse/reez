@@ -1,0 +1,125 @@
+
+        <div class="card-body">
+<div class="card-header">
+            <h1 class="card-title">Senarai Pemeriksaan</h1>
+                <div class="card-tools">
+{#        <button class="btn btn-outline-success btn-sm rounded float-right" hx-get="{% url 'bcs:bcs-tambah' %}"#}
+{#                hx-target="#body-content" hx-push-url="true"><i class="fas fa-plus"></i>Tambah</button>#}
+      </div>
+</div>
+{#    <div class="card-subtitle mt-5">#}
+{#      <input id="carian-filter" class="carian-filter form-control" type="search"#}
+{#      name="carian" placeholder="Carian.." hx-get="." hx-trigger="keyup changed delay:500ms"#}
+{#      hx-target="#table-item" hx-select="#table-item" hx-swap="outerHTML" hx-push-url="true" hx-indicator=".htmx-indicator"></input>#}
+{#      </div>#}
+            <div id="table-item" class="mt-5 table-responsive">
+                <table class="table table-striped table-sm table-hover">
+{#                  <caption class="text-green"> Rekod {{ page_obj.start_index }} - {{ page_obj.end_index }} daripada {{ paginator.count }} rekod</caption>#}
+                    <thead>
+                    <tr>
+                        <th scope="col">Tarikh</th>
+                        <th scope="col">No. X-Ray</th>
+                        <th scope="col">NRIC</th>
+                        <th scope="col">Nama</th>
+                        <th scope="col">Klinik</th>
+                        <th scope="col">Exam</th>
+                        <th scope="col" class="text-center">Bil. Imej</th>
+                        <th scope="col"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for item in exam %}
+                        <tr id="item-{{ item.id }}" {% if item.hamil %}class="text-pink" {% endif %}>
+                            <td>{{ item.tarikh|date:'d/m/Y H:i:s' }}</td>
+                            <td>{{ item.noxray}}</td>
+                            <td>{{ item.ptid}}</td>
+                            <td>{{ item.nama }}</td>
+                            <td>{{ item.klinik }}</td>
+                            <td>{{ item.exam }}</td>
+                            <td class="text-center">{{ item.jimej }}</td>
+                            <td>
+                                <div class="btn-group align-middle" role="group" aria-label="Detail Exam">
+                                    <a href="{{viewerurl}}{{item.id}}/ohif-dicom-json" target="_blank" class="btn btn-icon btn-sm rounded btn-outline-hover-info"><i class="fa fa-eye text-danger"
+                                                                                      aria-hidden="true"></i>
+                                    </a>
+                                </div>
+
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                <div id="indicator" class="htmx-indicator p-3 text-center">Dalam Proses.. <span
+                    class="kt-spinner kt-spinner-md kt-spinner--success"></span></div>
+
+                {% if page_obj.has_other_pages %}
+                    <nav hx-target="#senarai-bcs" hx-push-url="true" hx-indicator=".htmx-indicator">
+                        <ul class="pagination justify-content-center">
+                            {% if page_obj.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link" hx-get="?{{ param }}&page={{ page_obj.previous_page_number }}" href="?{{ param }}&page={{ page_obj.previous_page_number }}"
+                                       aria-label="Previous">
+                                        <span aria-hidden="true">&laquo;</span>
+                                    </a>
+                                </li>
+                            {% else %}
+                                <li class="page-item disabled">
+                                    <span class="page-link" aria-hidden="true">&laquo;</span>
+                                </li>
+                            {% endif %}
+
+                            {% for p in page_obj.paginator.page_range %}
+                                {% if page_obj.number == p %}
+                                    <li class="page-item"><a class="page-link" style="color: red;" href="#">{{ p }}</a>
+                                    </li>
+                                {% else %}
+                                    <li class="page-item"><a class="page-link" hx-get="?{{ param }}&page={{ p }}" href="?{{ param }}&page={{ p }}">{{ p }}</a></li>
+                                {% endif %}
+                            {% endfor %}
+
+                            {% if page_obj.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" hx-get="?{{ param }}&page={{ page_obj.next_page_number }}" href="?{{ param }}&page={{ page_obj.next_page_number }}" aria-label="Next">
+                                        <span aria-hidden="true">&raquo;</span>
+                                    </a>
+                                </li>
+                            {% else %}
+                                <li class="page-item disabled">
+                                    <span class="page-link" aria-hidden="true">&raquo;</span>
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                {% endif %}
+
+            </div>
+        </div>
+
+
+
+        {% block scripts %}
+        <script>
+            $(document).ready(function () {
+                $('#merge').select2();
+                $('.modaliti').select2({
+                    allowClear: true,
+                    ajax: {
+                        url: '{% url "bcs:api-rujukan" %}',
+                        dataType: 'json'
+                    }
+                });
+                $('select').on('select2:select', function (e) {
+                    htmx.trigger('#filterlist', 'change');
+                });
+                $('.tarikh-filter').flatpickr({
+                    maxDate: "today",
+                    locale: 'ms',
+                    dateFormat: 'd/m/Y',
+    
+                });
+    
+    
+            });
+    
+        </script>
+    {% endblock scripts %}

@@ -6,17 +6,19 @@ app_name = "bcs"
 
 
 urlpatterns = [
-    path("", views.senarai_bcs, name="bcs-list"),
-    path("tambah", views.tambah_bcs, name="bcs-tambah"),
-    path("<int:pk>/kemaskini", views.edit_bcs, name="bcs-edit"),
-    path("<int:pk>/exam/senarai", views.list_exam, name="exam-senarai"),
-    path("<int:pk>/exam/tambah", views.tambah_exam, name="exam-tambah"),
-    path("<int:pk>/exam/edit", views.edit_exam, name="exam-edit"),
-    path("<int:pk>/exam/padam", views.del_exam, name="exam-padam"),
-    path("<int:pk>/exam/get", views.get_exam, name="exam-get"),
-    path("<int:pk>/exam/detail", views.get_detail, name="exam-detail"),
-    path("<int:pk>/exam/komen", views.edit_comment, name="exam-komen"),
-    path("<int:pk>/click", views.get_click, name="bcs-click"),
+    path("", views.orthanc_study, name="orthanc-study"),
+    path("exam/", views.senarai_bcs, name="bcs-list"),
+    path("exam/tambah", views.tambah_bcs, name="bcs-tambah"),
+    path("exam/<int:pk>/kemaskini", views.edit_bcs, name="bcs-edit"),
+    path("exam/<int:pk>/exam/senarai", views.list_exam, name="exam-senarai"),
+    path("exam/<int:pk>/exam/tambah", views.tambah_exam, name="exam-tambah"),
+    path("exam/<int:pk>/exam/edit", views.edit_exam, name="exam-edit"),
+    path("exam/<int:pk>/exam/padam", views.del_exam, name="exam-padam"),
+    path("exam/<int:pk>/exam/view", views.exam_view, name="exam-view"),
+    path("exam/<int:pk>/exam/get", views.get_exam, name="exam-get"),
+    path("exam/<int:pk>/exam/detail", views.get_detail, name="exam-detail"),
+    path("exam/<int:pk>/exam/komen", views.edit_comment, name="exam-komen"),
+    path("exam/<int:pk>/click", views.get_click, name="bcs-click"),
     # path("<int:pk>/merge", views.merged, name="bcs-merge"),
 
     #exam
@@ -34,4 +36,9 @@ urlpatterns = [
     path("api/modaliti", api.modalitiApi, name="api-modaliti"),
     path("api/exam", api.examlistApi, name="api-exam"),
     path("api/rujukan", api.rujukanApi, name="api-rujukan"),
+
+    #orthanc
+    path("senarai/pesakit/", views.orthanc_list, name="orthanc-list"),
+    path("senarai/exam/", views.orthanc_study, name="orthanc-study"),
+
 ]
