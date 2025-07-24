@@ -13,6 +13,20 @@ User = settings.AUTH_USER_MODEL
 
 
 # Create your models here.
+class PacsConfig(models.Model):
+    orthancurl = models.URLField(verbose_name="Orthanc URL", max_length=200)
+    viewrurl = models.URLField(verbose_name="DICOM Viewer URL", max_length=200)
+    created = models.DateTimeField(auto_now_add=True)
+    modified = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "PACS Configuration"
+        verbose_name_plural = "PACS Configurations"
+
+    def __str__(self):
+        return f"PACS Config (Last modified: {self.modified})"
+
+
 class Modaliti(models.Model):
     nama = models.CharField(_("Modaliti"), max_length=150)
     singkatan = models.CharField(_("Singkatan"), max_length=50, blank=True, null=True)

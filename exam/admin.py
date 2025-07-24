@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Pemeriksaan, Exam, Modaliti, Daftar, Part, Region
+from .models import Pemeriksaan, Exam, Modaliti, Daftar, Part, Region, PacsConfig, PacsExam
 from ordered_model.admin import (
     OrderedModelAdmin,
     OrderedTabularInline,
@@ -43,3 +43,10 @@ class ExamAdmin(admin.ModelAdmin):
     list_display = ['exam','part','modaliti','statistik']
 
 admin.site.register(Part)
+admin.site.register(PacsExam)
+
+
+@admin.register(PacsConfig)
+class PacsConfigAdmin(admin.ModelAdmin):
+    list_display = ['orthancurl', 'viewrurl', 'modified']
+    readonly_fields = ['created', 'modified']

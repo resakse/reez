@@ -10,11 +10,31 @@ from django import forms
 from django.urls import reverse
 
 from pesakit.models import jantina_list, bangsa_list
-from .models import Pemeriksaan, Daftar, Region, Exam
+from .models import Pemeriksaan, Daftar, Region, Exam, PacsConfig
 
 
 class iRadio(Field):
     template = 'custom-form/iradio.html'
+
+
+class PacsConfigForm(forms.ModelForm):
+    class Meta:
+        model = PacsConfig
+        fields = ['orthancurl', 'viewrurl']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper()
+        self.helper.layout = Layout(
+            Row(
+                Column("orthancurl", css_class="form-group col-md-12 mb-0"),
+            ),
+            Row(
+                Column("viewrurl", css_class="form-group col-md-12 mb-0"),
+            ),
+        )
+        self.helper.add_input(Submit('submit', 'Save', css_class='rounded pull-right'))
+        self.helper.form_id = 'pacsconfig'
 
 
 class BcsForm(forms.ModelForm):

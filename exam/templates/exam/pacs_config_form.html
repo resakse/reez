@@ -1,0 +1,36 @@
+{% extends 'index.html' %}
+
+{% block content %}
+<div class="content-wrapper">
+    <section class="content">
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card card-primary">
+                        <div class="card-header">
+                            <h3 class="card-title">PACS Configuration Form</h3>
+                        </div>
+                        <form role="form" method="post">
+                            {% csrf_token %}
+                            <div class="card-body">
+                                {% for field in form %}
+                                    <div class="form-group">
+                                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                        {{ field }}
+                                        {% if field.errors %}
+                                            <span class="error">{{ field.errors|striptags }}</span>
+                                        {% endif %}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                            <div class="card-footer">
+                                <button type="submit" class="btn btn-primary">Submit</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}

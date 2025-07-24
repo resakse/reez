@@ -13,8 +13,9 @@ from django_htmx.http import trigger_client_event, push_url
 
 from exam.models import Pemeriksaan, Daftar, Exam, Modaliti, Region, kiraxray
 from pesakit.models import Pesakit
+from exam.models import PacsConfig
 from .filters import DaftarFilter
-from .forms import BcsForm, DaftarForm, RegionForm, ExamForm
+from .forms import BcsForm, DaftarForm, RegionForm, ExamForm, PacsConfigForm
 
 
 # Create your views here.
@@ -419,6 +420,26 @@ def pemeriksaan_list(request):
     }
     return render(request, 'exam/pemeriksaan_list.html', context=data)
 
+@login_required
+def pacs_config(request):
+    try:
+        config = PacsConfig.objects.first()
+    except PacsConfig.DoesNotExist:
+        config = None
+
+    form = PacsConfigForm(request.POST or None, instance=config)
+
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        response = render(request, "exam/orthanc_form.html", {"form": form})
+        response["HX-Trigger"] = json.dumps(
+            {"htmxSuccess": "PACS Configuration saved successfully."}
+        )
+        return response
+
+    return render(request, "exam/orthanc_form.html", {"form": form, 'base_template': 'index.html'})
+
+
 def exam_view(request, pk=None):
     exam = get_object_or_404(Pemeriksaan, id=pk)
     uid = '1.2.392.200036.9107.307.24301.112430124031509247'
@@ -449,18 +470,20 @@ def exam_view(request, pk=None):
 #         print('Data sent successfully')
 #     else:
 #         print('Failed to send data', response.text)
-
-orthancurl = "http://172.25.96.1:8043/tools/find"
-orthancurl = "http://192.168.20.172:8042/tools/find"
-viewerurl='http://172.25.96.1:8043/osimis-viewer/app/index.html?study='
-viewerurl='http://localhost:8043/ohif/viewer?url=../studies/'
+# orthancurl = "http://192.168.20.172:8042/tools/find"
+# viewerurl='http://172.25.96.1:8043/osimis-viewer/app/index.html?study='
+# viewerurl='http://172.25.96.1:8043/tools/find'
+# orthancurl = viewerurl
 import requests
 import json
+
 def orthanc_list(request):
+    config = PacsConfig.objects.first()
+    orthancurl = config.orthancurl if config else "http://localhost:8042"  # Default URL if no config
+    viewerurl = config.viewrurl if config else "http://localhost:8080/viewer" # Default viewer URL if no config
     opt = {"Level": "Patient", "Expand": True, "Limit": 100,"Query":{}}
-    # list = requests.get(f'{orthancurl}/studies?expand')
-    list = requests.post(f'{orthancurl}',json=opt)
-    data =list.json()
+    list = requests.post(f'{orthancurl}/tools/find',json=opt) # Corrected URL path
+    data = list.json()
     senarai=[]
     for a in data:
         study = {
@@ -474,7 +497,12 @@ def orthanc_list(request):
     return HttpResponse(json.dumps(senarai))
 
 
+
 def orthanc_study(request):
+    config = PacsConfig.objects.first()
+    orthancurl = config.orthancurl if config else "http://172.25.96.1:8043" # Default URL if no config
+    viewerurl = config.viewrurl if config else "http://172.25.96.1:8043/ohif/viewer?url=../studies/" # Default viewer URL if no config
+
     dari = request.GET.get('dari')
     hingga = request.GET.get('hingga')
     patientid = request.GET.get('nric')
@@ -496,9 +524,8 @@ def orthanc_study(request):
         syarat['PatientName']=f'*{nama}*'
 
     opt = {"Level": "Studies", "Expand": True, "Limit": 25,"Query":syarat}
-    # list = requests.get(f'{orthancurl}/studies?expand')
-    list = requests.post(f'{orthancurl}',json=opt)
-    data =list.json()
+    list = requests.post(f'{orthancurl}/tools/find',json=opt) # Corrected URL path
+    data = list.json()
     senarai=[]
     for a in data:
         try:

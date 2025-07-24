@@ -1,5 +1,7 @@
 from django.urls import path
 from . import views
+
+app_name = 'exam'
 from . import api
 # from .export import export_xls
 app_name = "bcs"
@@ -27,8 +29,7 @@ urlpatterns = [
     path("config/exam", views.examList, name="config-exam-list"),
     path("config/exam/<int:pk>", views.examUpdate, name="config-exam-update"),
     path("config/exam/<int:pk>/padam", views.examDelete, name="config-exam-padam"),
-
-    #ceking
+    path("config/pacs/", views.pacs_config, name="pacs-config"),
     path("checkam", views.checkAM, name="checkam"),
     # path("export/", export_xls, name="excel"),
 
