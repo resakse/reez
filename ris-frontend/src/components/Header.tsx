@@ -24,10 +24,10 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
   const user = session?.user;
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 w-full bg-sidebar text-white">
       <div className="flex h-14 items-center justify-between px-4">
         <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={onToggleSidebar}>
+            <Button variant="ghost" size="icon" onClick={onToggleSidebar} className="hover:bg-white/10 hover:text-white">
                 <Menu className="h-6 w-6" />
             </Button>
             <Link href="/" className="flex items-center space-x-2">
@@ -41,7 +41,7 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
           <ThemeToggle />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+              <Button variant="ghost" className="relative h-8 w-8 rounded-full hover:bg-white/10 hover:text-white">
                 <Avatar className="h-8 w-8">
                   <AvatarImage src={user?.image ?? ""} alt={user?.name ?? ""} />
                   <AvatarFallback>{user?.name?.[0].toUpperCase()}</AvatarFallback>

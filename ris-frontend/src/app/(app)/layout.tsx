@@ -20,7 +20,7 @@ export default function AppLayout({
       <Header onToggleSidebar={toggleSidebar} />
       <div className="flex flex-1">
         <Sidebar isCollapsed={isSidebarCollapsed} />
-        <main className="flex-1 p-4">{children}</main>
+        <main className="flex-1 p-4 bg-background">{children}</main>
       </div>
     </div>
   );
