@@ -17,21 +17,32 @@ Including another URLconf
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
-from django.urls import include, path
+from django.urls import path, include
 from django.views.generic import RedirectView
 
 from staff.views import login_user, logout_view
+from rest_framework_simplejwt.views import (
+    TokenObtainPairView,
+    TokenRefreshView,
+)
+
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('rujukan/', include('wad.urls')),
-    path('staff/', include('staff.urls')),
-    path("__debug__/", include("debug_toolbar.urls")),
     path("login/",login_user),
     path("logout/",logout_view),
-    path('', include("exam.urls"))
-
+    path('staff/', include('staff.urls')),
+    path('wad/', include('wad.urls')),
+    path('', include('exam.urls')),
+    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 ]
+
 if settings.DEBUG:
+    import debug_toolbar
+    urlpatterns = [
+        path('__debug__/', include(debug_toolbar.urls)),
+    ] + urlpatterns
+    
     import os
     from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 

@@ -1,5 +1,7 @@
 {
   "dependencies": {
+    "lucide-react": "^0.525.0",
+    "next-auth": "^4.24.11",
     "node-fetch": "^3.3.2"
   }
 }
