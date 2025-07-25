@@ -27,7 +27,7 @@ class DisiplinViewSet(viewsets.ModelViewSet):
 @login_required
 def ward_list(request):
     wards = Ward.objects.all().order_by('wad')
-    return render(request, 'wad/ward_list.html', {'wards': wards})
+    return render(request, 'wad/wad_list.html', {'wards': wards})
 
 @login_required
 def wad_tambah(request):

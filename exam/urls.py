@@ -55,9 +55,9 @@ urlpatterns = [
     path("senarai/exam/", views.orthanc_study, name="orthanc-study"),
     
     # REST API endpoints
-    path('api/', include(router.urls)),
+    path('', include(router.urls)),
     
     # Additional REST API endpoints for workflow
-    path('api/registration/workflow/', RegistrationWorkflowView.as_view(), name='registration-workflow'),
-    path('api/mwl/worklist/', MWLWorklistView.as_view(), name='mwl-worklist'),
+    path('registration/workflow/', RegistrationWorkflowView.as_view(), name='registration-workflow'),
+    path('mwl/worklist/', MWLWorklistView.as_view(), name='mwl-worklist'),
 ]

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Users, Settings, BarChart } from "lucide-react";
+import { LayoutDashboard, Users, Settings, BarChart, Home, Stethoscope, X, Bone, FileText, ClipboardList, ListChecks } from "lucide-react";
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
   isCollapsed: boolean;
@@ -26,15 +26,70 @@ export default function Sidebar({ className, isCollapsed }: SidebarProps) {
             </Link>
           </li>
           <li>
-            <div className="flex items-center p-2 text-gray-400">
-              <Settings className="h-5 w-5 mr-2" />
-              {!isCollapsed && "(Settings - TBD)"}
+            <Link href="/register" className="flex items-center p-2 rounded hover:bg-white/10">
+              <ClipboardList className="h-5 w-5 mr-2" />
+              {!isCollapsed && "Registration"}
+            </Link>
+          </li>
+          
+          <li className="pt-4 pb-2">
+            <div className={cn("text-xs font-semibold text-gray-400 uppercase", isCollapsed && "text-center")}>
+              {!isCollapsed ? "Configuration" : "Config"}
+            </div>
+          </li>
+          
+          <li>
+            <Link href="/wards" className="flex items-center p-2 rounded hover:bg-white/10">
+              <Home className="h-5 w-5 mr-2" />
+              {!isCollapsed && "Wards"}
+            </Link>
+          </li>
+          <li>
+            <Link href="/disciplines" className="flex items-center p-2 rounded hover:bg-white/10">
+              <Stethoscope className="h-5 w-5 mr-2" />
+              {!isCollapsed && "Disciplines"}
+            </Link>
+          </li>
+          <li>
+            <Link href="/modalities" className="flex items-center p-2 rounded hover:bg-white/10">
+              <X className="h-5 w-5 mr-2" />
+              {!isCollapsed && "Modalities"}
+            </Link>
+          </li>
+          <li>
+            <Link href="/body-parts" className="flex items-center p-2 rounded hover:bg-white/10">
+              <Bone className="h-5 w-5 mr-2" />
+              {!isCollapsed && "Body Parts"}
+            </Link>
+          </li>
+          <li>
+            <Link href="/exams" className="flex items-center p-2 rounded hover:bg-white/10">
+              <FileText className="h-5 w-5 mr-2" />
+              {!isCollapsed && "Exam Types"}
+            </Link>
+          </li>
+          <li>
+            <Link href="/mwl" className="flex items-center p-2 rounded hover:bg-white/10">
+              <ListChecks className="h-5 w-5 mr-2" />
+              {!isCollapsed && "MWL Worklist"}
+            </Link>
+          </li>
+          
+          <li className="pt-4 pb-2">
+            <div className={cn("text-xs font-semibold text-gray-400 uppercase", isCollapsed && "text-center")}>
+              {!isCollapsed ? "System" : "Sys"}
             </div>
           </li>
           <li>
-            <div className="flex items-center p-2 text-gray-400">
+            <div className="flex items-center p-2 text-gray-400 cursor-not-allowed">
+              <Settings className="h-5 w-5 mr-2" />
+              {!isCollapsed && "Settings"}
+            </div>
+          </li>
+          <li>
+            <div className="flex items-center p-2 text-gray-400 cursor-not-allowed">
               <BarChart className="h-5 w-5 mr-2" />
-              {!isCollapsed && "(Reports - TBD)"}
+              {!isCollapsed && "Reports"}
             </div>
           </li>
         </ul>

@@ -22,5 +22,5 @@ urlpatterns = [
     path('<int:id>/padam/', views.wad_delete, name='wad-padam'),
     
     # REST API endpoints
-    path('api/', include(router.urls)),
+    path('', include(router.urls)),
 ]
