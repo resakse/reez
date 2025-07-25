@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useSession } from 'next-auth/react';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   Table,
   TableBody,
@@ -12,6 +12,8 @@ import {
 } from '@/components/ui/table';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import Link from 'next/link';
+import AuthService from '@/lib/auth';
 
 interface Patient {
   id: number;
@@ -35,20 +37,14 @@ function formatDate(dateString: string | null | undefined): string {
 }
 
 export default function PatientsPage() {
-  const { data: session } = useSession();
+  const { user } = useAuth();
   const [patients, setPatients] = useState<Patient[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchPatients = async () => {
-      if (session?.user?.accessToken) {
-        try {
-          // Bypass the Next.js proxy and call Django directly
-          const res = await fetch('http://127.0.0.1:8000/api/patients', {
-            headers: {
-              'Authorization': `Bearer ${session.user.accessToken}`,
-            },
-          });
+      try {
+        const res = await AuthService.authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/patients/`);
 
           if (!res.ok) {
             throw new Error('Failed to fetch patients');
@@ -59,11 +55,10 @@ export default function PatientsPage() {
         } catch (err) {
           setError(err instanceof Error ? err.message : 'An unknown error occurred');
         }
-      }
     };
 
     fetchPatients();
-  }, [session]);
+  }, [user]);
 
   return (
     <Card>
@@ -72,7 +67,9 @@ export default function PatientsPage() {
             <CardTitle>Patients</CardTitle>
             <CardDescription>A list of all patients in the system.</CardDescription>
         </div>
-        <Button>Add New Patient</Button>
+        <Button asChild>
+            <Link href="/patients/new">Add New Patient</Link>
+        </Button>
       </CardHeader>
       <CardContent>
         {error && <p className="text-red-500">{error}</p>}

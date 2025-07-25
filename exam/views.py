@@ -11,11 +11,166 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 from django_htmx.http import trigger_client_event, push_url
 
-from exam.models import Pemeriksaan, Daftar, Exam, Modaliti, Region, kiraxray
+from exam.models import Pemeriksaan, Daftar, Exam, Modaliti, Part, Region, kiraxray
 from pesakit.models import Pesakit
 from exam.models import PacsConfig
 from .filters import DaftarFilter
 from .forms import BcsForm, DaftarForm, RegionForm, ExamForm, PacsConfigForm
+
+from rest_framework import viewsets, status
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from .serializers import (
+    ModalitiSerializer, PartSerializer, ExamSerializer, 
+    DaftarSerializer, PemeriksaanSerializer, 
+    RegistrationWorkflowSerializer, MWLWorklistSerializer
+)
+
+class ModalitiViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint that allows modalities to be viewed or edited.
+    """
+    queryset = Modaliti.objects.all().order_by('nama')
+    serializer_class = ModalitiSerializer
+    permission_classes = [IsAuthenticated]
+
+class PartViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint that allows body parts to be viewed or edited.
+    """
+    queryset = Part.objects.all().order_by('part')
+    serializer_class = PartSerializer
+    permission_classes = [IsAuthenticated]
+
+class ExamViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint that allows examination types to be viewed or edited.
+    """
+    queryset = Exam.objects.all().order_by('modaliti', 'part', 'exam')
+    serializer_class = ExamSerializer
+    permission_classes = [IsAuthenticated]
+
+
+class DaftarViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for registration management (Daftar - Pendaftaran Radiologi)
+    """
+    queryset = Daftar.objects.all().select_related('pesakit', 'rujukan').order_by('-tarikh')
+    serializer_class = DaftarSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        
+        # Filter by patient
+        patient_id = self.request.query_params.get('patient_id')
+        if patient_id:
+            queryset = queryset.filter(pesakit_id=patient_id)
+        
+        # Filter by ward
+        ward_id = self.request.query_params.get('ward_id')
+        if ward_id:
+            queryset = queryset.filter(rujukan_id=ward_id)
+        
+        # Filter by status
+        status = self.request.query_params.get('status')
+        if status:
+            queryset = queryset.filter(status=status)
+        
+        # Filter by date range
+        from_date = self.request.query_params.get('from_date')
+        to_date = self.request.query_params.get('to_date')
+        if from_date:
+            queryset = queryset.filter(tarikh__date__gte=from_date)
+        if to_date:
+            queryset = queryset.filter(tarikh__date__lte=to_date)
+        
+        return queryset
+
+    @action(detail=True, methods=['get', 'post'])
+    def examinations(self, request, pk=None):
+        """Get or add examinations for a registration"""
+        registration = self.get_object()
+        
+        if request.method == 'GET':
+            examinations = Pemeriksaan.objects.filter(daftar=registration)
+            serializer = PemeriksaanSerializer(examinations, many=True)
+            return Response(serializer.data)
+        
+        elif request.method == 'POST':
+            data = request.data.copy()
+            data['daftar_id'] = registration.id
+            serializer = PemeriksaanSerializer(data=data)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class PemeriksaanViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for examination details (Pemeriksaan)
+    """
+    queryset = Pemeriksaan.objects.all().select_related('daftar', 'exam', 'daftar__pesakit')
+    serializer_class = PemeriksaanSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        
+        # Filter by registration
+        registration_id = self.request.query_params.get('registration_id')
+        if registration_id:
+            queryset = queryset.filter(daftar_id=registration_id)
+        
+        # Filter by exam type
+        exam_id = self.request.query_params.get('exam_id')
+        if exam_id:
+            queryset = queryset.filter(exam_id=exam_id)
+        
+        return queryset
+
+
+class RegistrationWorkflowView(APIView):
+    """
+    API endpoint for complete registration workflow
+    Combines patient creation, registration, and examinations in a single transaction
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = RegistrationWorkflowSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            result = serializer.save()
+            return Response({
+                'patient': PesakitSerializer(result['patient']).data,
+                'registration': DaftarSerializer(result['registration']).data,
+                'examinations': PemeriksaanSerializer(result['examinations'], many=True).data
+            }, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class MWLWorklistView(APIView):
+    """
+    API endpoint for MWL (Modality Worklist) data
+    Provides worklist data for CR machine integration
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # Get registrations with status 'Registered' or 'Performed'
+        registrations = Daftar.objects.filter(
+            status__in=['Registered', 'Performed']
+        ).select_related('pesakit').prefetch_related('pemeriksaan')
+        
+        # Filter by date if provided
+        date_filter = request.query_params.get('date')
+        if date_filter:
+            registrations = registrations.filter(tarikh__date=date_filter)
+        
+        serializer = MWLWorklistSerializer(registrations, many=True)
+        return Response(serializer.data)
 
 
 # Create your views here.

@@ -171,6 +171,26 @@ status_chocies = [
 ]
 
 
+# MWL Integration choices
+priority_choices = [
+    ('STAT', 'STAT'),
+    ('HIGH', 'High'),
+    ('MEDIUM', 'Medium'),
+    ('LOW', 'Low'),
+]
+
+patient_position_choices = [
+    ('HFS', 'Head First-Supine'),
+    ('HFP', 'Head First-Prone'),
+    ('HFDR', 'Head First-Decubitus Right'),
+    ('HFDL', 'Head First-Decubitus Left'),
+    ('FFS', 'Feet First-Supine'),
+    ('FFP', 'Feet First-Prone'),
+    ('FFDR', 'Feet First-Decubitus Right'),
+    ('FFDL', 'Feet First-Decubitus Left'),
+]
+
+
 class Daftar(auto_prefetch.Model):
     tarikh = models.DateTimeField(default=timezone.now)
 
@@ -179,6 +199,40 @@ class Daftar(auto_prefetch.Model):
     lmp = models.DateField(verbose_name='LMP', blank=True, null=True)
     rujukan = auto_prefetch.ForeignKey(Ward, on_delete=models.SET_NULL, null=True)
     ambulatori = models.CharField(max_length=15, choices=ambulatori_choice, default='Berjalan Kaki')
+
+    # MWL Integration fields for CR machine
+    study_instance_uid = models.CharField(
+        max_length=64, unique=True, blank=True, null=True,
+        help_text="Unique identifier for DICOM study"
+    )
+    accession_number = models.CharField(
+        max_length=16, blank=True, null=True,
+        help_text="Hospital's unique identifier for the study"
+    )
+    scheduled_datetime = models.DateTimeField(
+        blank=True, null=True,
+        help_text="Scheduled date and time for the examination"
+    )
+    study_priority = models.CharField(
+        max_length=10, choices=priority_choices, default='MEDIUM',
+        help_text="Priority level for the study"
+    )
+    requested_procedure_description = models.CharField(
+        max_length=200, blank=True, null=True,
+        help_text="Description of the requested procedure"
+    )
+    study_comments = models.TextField(
+        blank=True, null=True,
+        help_text="Additional comments for the study"
+    )
+    patient_position = models.CharField(
+        max_length=4, choices=patient_position_choices, blank=True, null=True,
+        help_text="Patient position for the examination"
+    )
+    modality = models.CharField(
+        max_length=10, blank=True, null=True,
+        help_text="Modality type (CR, DX, etc.)"
+    )
 
     pemohon = models.CharField(max_length=30, blank=True, null=True)
     status = models.CharField(max_length=15, choices=status_chocies, default='Performed')
@@ -205,6 +259,16 @@ class Daftar(auto_prefetch.Model):
     def save(self, *args, **kwargs):
         if self.pemohon:
             self.pemohon = titlecase(self.pemohon)
+        
+        # Generate study_instance_uid if not provided
+        if not self.study_instance_uid:
+            import uuid
+            self.study_instance_uid = str(uuid.uuid4())
+        
+        # Use no_resit as accession_number if not provided
+        if not self.accession_number and self.no_resit:
+            self.accession_number = self.no_resit
+        
         super(Daftar, self).save(*args, **kwargs)
 
     def get_absolute_url(self):

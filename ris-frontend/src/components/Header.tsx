@@ -1,6 +1,6 @@
 'use client';
 
-import { useSession, signOut } from "next-auth/react";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,8 +20,7 @@ interface HeaderProps {
 }
 
 export default function Header({ onToggleSidebar }: HeaderProps) {
-  const { data: session } = useSession();
-  const user = session?.user;
+  const { user, logout } = useAuth();
 
   return (
     <header className="sticky top-0 z-50 w-full bg-sidebar text-white">
@@ -43,8 +42,8 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-8 w-8 rounded-full hover:bg-white/10 hover:text-white">
                 <Avatar className="h-8 w-8">
-                  <AvatarImage src={user?.image ?? ""} alt={user?.name ?? ""} />
-                  <AvatarFallback>{user?.name?.[0].toUpperCase()}</AvatarFallback>
+                  <AvatarImage src="" alt={user?.username ?? ""} />
+                  <AvatarFallback>{user?.username?.[0].toUpperCase()}</AvatarFallback>
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
@@ -52,15 +51,15 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">
                   <p className="text-sm font-medium leading-none">
-                    {user?.name}
+                    {user?.username}
                   </p>
                   <p className="text-xs leading-none text-muted-foreground">
-                    {user?.email}
+                    {user?.username}
                   </p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => signOut()}>
+              <DropdownMenuItem onClick={logout}>
                 Log out
               </DropdownMenuItem>
             </DropdownMenuContent>

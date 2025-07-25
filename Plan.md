@@ -137,7 +137,48 @@ The full OHIF viewer application proved to be too complex and dependency-heavy f
 
 ---
 
-## Next Steps
-1. Approve this roadmap (or supply adjustments).
-2. Kick off **M0 Discovery**: schedule stakeholder interviews, allocate PoC team.
-3. Provision CI/CD and staging infrastructure. 
+## Current Progress Update (July 2025)
+
+### ✅ **Phase 1 Complete - Backend API Foundation**
+1. **Authentication Migration**: Successfully removed NextAuth.js and implemented direct JWT authentication
+2. **REST API Endpoints Complete**:
+   - `/api/wards/` - Ward management (CRUD operations)
+   - `/api/disciplines/` - Discipline management (CRUD operations) 
+   - `/api/modalities/` - Modality management (CRUD operations)
+   - `/api/parts/` - Body part management (CRUD operations)
+   - `/api/exams/` - Examination type management (CRUD operations)
+   - `/api/patients/` - Patient management with enhanced NRIC parsing
+   - `/api/registrations/` - Registration management (Daftar - Pendaftaran Radiologi)
+   - `/api/examinations/` - Examination details (Pemeriksaan)
+   - `/api/registration/workflow/` - Complete registration workflow endpoint
+   - `/api/mwl/worklist/` - MWL data for CR machine integration
+
+3. **Enhanced Patient System**:
+   - **NRIC Parser**: Auto-detects NRIC vs passport format, extracts DOB and gender from NRIC (999999-99-9999 format), calculates age automatically
+   - **Combined Registration**: Single API endpoint for patient + registration + multiple examinations
+   - **Validation**: Comprehensive validation with helpful error messages
+
+4. **MWL Integration Fields**:
+   - `study_instance_uid` - Unique DICOM study identifier (auto-generated UUID4)
+   - `accession_number` - Hospital's unique study identifier
+   - `scheduled_datetime` - Scheduled exam date/time for CR machine
+   - `study_priority` - Priority levels (STAT, HIGH, MEDIUM, LOW)
+   - `requested_procedure_description` - Detailed procedure description
+   - `study_comments` - Additional clinical notes
+   - `patient_position` - Patient positioning (HFS, HFP, etc.)
+   - `modality` - Modality type (CR, DX, etc.)
+
+### 🎯 **Next Steps - Phase 2 Frontend Implementation**
+Now ready to proceed with **Phase 2** - Frontend React/Next.js implementation:
+
+1. **S2.1 Ward & Exam Management Pages** - CRUD interfaces for wards, disciplines, modalities, body parts, and examination types
+2. **S2.2 Enhanced Patient Registration Forms** - NRIC auto-parsing forms with real-time validation
+3. **S2.3 Complete Registration Workflow UI** - Single-page workflow combining patient creation, registration, and examination scheduling
+4. **S2.4 MWL Integration Interface** - CR machine worklist management and scheduling interface
+
+### 🔄 **Technical Architecture Ready**
+- **Backend**: Django 4.2.6 + DRF + JWT authentication ready
+- **Frontend Framework**: Next.js 15.4.3 + React 19.1.0 + TypeScript + TailwindCSS v4 + shadcn/ui
+- **Authentication**: Direct JWT tokens via cookies, automatic token refresh
+- **API Design**: RESTful endpoints with proper filtering, pagination, and nested relationships
+- **DICOM Integration**: Ready for Cornerstone.js custom viewer implementation 

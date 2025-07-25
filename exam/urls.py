@@ -1,11 +1,23 @@
-from django.urls import path
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
 from . import views
+from .views import (
+    ModalitiViewSet, PartViewSet, ExamViewSet, 
+    DaftarViewSet, PemeriksaanViewSet, 
+    RegistrationWorkflowView, MWLWorklistView
+)
 
-app_name = 'exam'
 from . import api
 # from .export import export_xls
 app_name = "bcs"
 
+# REST API router
+router = DefaultRouter(trailing_slash=True)
+router.register(r'modalities', ModalitiViewSet, basename='modality')
+router.register(r'parts', PartViewSet, basename='part')
+router.register(r'exams', ExamViewSet, basename='exam')
+router.register(r'registrations', DaftarViewSet, basename='registration')
+router.register(r'examinations', PemeriksaanViewSet, basename='examination')
 
 urlpatterns = [
     path("", views.orthanc_study, name="orthanc-study"),
@@ -41,5 +53,11 @@ urlpatterns = [
     #orthanc
     path("senarai/pesakit/", views.orthanc_list, name="orthanc-list"),
     path("senarai/exam/", views.orthanc_study, name="orthanc-study"),
-
+    
+    # REST API endpoints
+    path('api/', include(router.urls)),
+    
+    # Additional REST API endpoints for workflow
+    path('api/registration/workflow/', RegistrationWorkflowView.as_view(), name='registration-workflow'),
+    path('api/mwl/worklist/', MWLWorklistView.as_view(), name='mwl-worklist'),
 ]
