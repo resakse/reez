@@ -20,6 +20,7 @@ import { Plus } from 'lucide-react';
 interface Exam {
   id: number;
   exam: string;
+  singkatan: string;
   exam_code: string | null;
   part: {
     id: number;
@@ -30,6 +31,8 @@ interface Exam {
     nama: string;
     singkatan: string;
   };
+  catatan: string | null;
+  short_desc: string | null;
   contrast: boolean;
   status_ca: string;
 }
@@ -159,7 +162,7 @@ export default function ExamsPage() {
                         <Button variant="ghost" size="sm" asChild>
                           <Link href={`/exams/${exam.id}/edit`}>Edit</Link>
                         </Button>
-                        <Button variant="ghost" size="sm">Delete</Button>
+                        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">Delete</Button>
                       </div>
                     </TableCell>
                   </TableRow>

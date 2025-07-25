@@ -138,20 +138,20 @@ export default function NewPatientPage() {
     };
 
     return (
-        \u003cdiv className="space-y-6"\u003e
-            \u003cdiv className="flex items-center justify-between"\u003e
-                \u003cdiv\u003e
-                    \u003ch1 className="text-3xl font-bold tracking-tight"\u003eNew Patient Registration\u003c/h1\u003e
-                    \u003cp className="text-muted-foreground"\u003e
+        <div className="space-y-6">
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight">New Patient Registration</h1>
+                    <p className="text-muted-foreground">
                         Create a new patient record with NRIC auto-parsing
-                    \u003c/p\u003e
-                \u003c/div\u003e
-                \u003cButton variant="outline" asChild\u003e
-                    \u003cLink href="/patients"\u003e
-                        \u003cArrowLeft className="mr-2 h-4 w-4" /\u003e
+                    </p>
+                </div>
+                <Button variant="outline" asChild>
+                    <Link href="/patients">
+                        <ArrowLeft className="mr-2 h-4 w-4" />
                         Back to Patients
-                    \u003c/Link\u003e
-                \u003c/Button\u003e
+                    </Link>
+                </Button>
             \u003c/div\u003e
 
             \u003cform onSubmit={handleSubmit} className="space-y-6"\u003e

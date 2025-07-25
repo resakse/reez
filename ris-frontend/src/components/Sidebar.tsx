@@ -45,16 +45,9 @@ export default function Sidebar({ className, isCollapsed }: SidebarProps) {
             </Link>
           </li>
           <li>
-            <Link href="/disciplines" className="flex items-center p-2 rounded hover:bg-white/10">
-              <Stethoscope className="h-5 w-5 mr-2" />
-              {!isCollapsed && "Disciplines"}
-            </Link>
-          </li>
-          <li>
             <Link href="/modalities" className="flex items-center p-2 rounded hover:bg-white/10">
               <X className="h-5 w-5 mr-2" />
-              {!isCollapsed && "Modalities"}
-            </Link>
+              {!isCollapsed && "Modalities"}</Link>
           </li>
           <li>
             <Link href="/body-parts" className="flex items-center p-2 rounded hover:bg-white/10">

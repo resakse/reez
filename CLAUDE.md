@@ -235,3 +235,7 @@ Based on @Plan.md, the current migration follows these phases:
 - **M8**: UAT & Roll-out
 
 > **Note**: Parallel backend work (DRF endpoints, MWL service) should start in M1 and continue through M5.
+
+## Important Notes
+
+- **never run django runserver**
