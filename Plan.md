@@ -1,6 +1,6 @@
 # Radiology Information System (RIS) – React / Next.js Migration Plan
 
-This document outlines a pragmatic, phase-by-phase roadmap for rebuilding the RIS front-end with **Next.js (React), Tailwind CSS, shadcn-ui**, and an **embedded OHIF viewer**.  The plan assumes the existing Django codebase continues to serve as the back-end API (Django REST Framework) and admin.
+This document outlines a pragmatic, phase-by-phase roadmap for rebuilding the RIS front-end with **Next.js (React), Tailwind CSS, shadcn-ui**, and a **custom, lightweight DICOM viewer built with Cornerstone.js**. The plan assumes the existing Django codebase continues to serve as the back-end API (Django REST Framework) and admin.
 
 ## Legend
 * **M** = Milestone / high-level phase
@@ -14,14 +14,14 @@ This document outlines a pragmatic, phase-by-phase roadmap for rebuilding the RI
    • Validate features list, constraints, KPIs, user roles.
 2. **S0.2 Architecture spike**  
    • Spin up *throw-away* Next.js 14 project, add Tailwind & shadcn-ui.  
-   • Compile OHIF viewer as a React component inside Next.js (see research notes below).  
+   • Develop a custom DICOM viewer component using Cornerstone.js.
    • Call Orthanc `/studies` via CORS proxy → render thumbnails.
 3. **S0.3 Risks & Decisions**  
    • Auth flavour (DRF JWT vs session).  
    • Repo strategy (mono-repo vs split).  
    • CI/CD runners (GitHub Actions).
 
-**Exit-criteria**: PoC renders one study in OHIF, login works, light/dark switch persists.
+**Exit-criteria**: PoC renders one study using the custom Cornerstone.js viewer, login works, light/dark switch persists.
 
 ---
 
@@ -54,11 +54,11 @@ This document outlines a pragmatic, phase-by-phase roadmap for rebuilding the RI
 
 ---
 
-## M5 – Imaging Workflows (OHIF) (⏱ 3 w)
-1. **S5.1 OHIF build** — Fork + yarn workspace; custom theme to match Tailwind tokens.
-2. **S5.2 Viewer page** — protected route `/viewer/[studyId]` opened in modal or new tab.
-3. **S5.3 Orthanc auth handshake** — token forward or basic auth proxy.
-4. **S5.4 Radiographer tools** — create ward, examination, print CD label (PDFmake).
+## M5 – Imaging Workflows (Cornerstone.js Viewer) (⏱ 2 w)
+1. **S5.1 Custom Viewer Implementation** — Build the core Cornerstone.js component, featuring a main image viewport and a scrollable series thumbnail strip.
+2. **S5.2 Viewer Page Integration** — protected route `/viewer/[studyId]` uses the new component.
+3. **S5.3 Orthanc Data Connection** — Configure `cornerstone-wado-image-loader` to fetch all series and instances for a given study.
+4. **S5.4 Viewer Tools** — Implement window/level, patient info overlay, invert, measurement, zoom, and reset tools on the main viewport.
 
 ---
 
@@ -94,9 +94,13 @@ This document outlines a pragmatic, phase-by-phase roadmap for rebuilding the RI
 
 ## Research Notes
 
-### OHIF Integration
-1. **Option A (Recommended)**: Add OHIF as a git submodule/workspace, run `yarn install && yarn run dev` as part of Next.js build.  Expose viewer via iframe pointing to `/ohif`. Pros: full feature parity; easier to merge upstream. Cons: heavier bundle.
-2. **Option B**: Use `@ohif/viewer` as NPM package.  Wrap in dynamic import inside Next.js; tree-shake modules not needed.  Fewer customisation knobs; better DX.
+### Custom Viewer (Cornerstone.js)
+The full OHIF viewer application proved to be too complex and dependency-heavy for our needs. The new approach is to build a lightweight, performant, and maintainable viewer component from the ground up using the core Cornerstone.js libraries. This provides full control over features and avoids dependency conflicts.
+
+- **`cornerstone-core`**: The main rendering library.
+- **`cornerstone-tools`**: Provides measurement, window/level, and other tools.
+- **`cornerstone-wado-image-loader`**: Handles data fetching from DICOMweb sources like Orthanc.
+- **`dicom-parser`**: Used by the image loader to parse DICOM data.
 
 ### Dual Theme Strategy
 * Tailwind v3 supports dark mode class; shadcn component generator can export both themes.  Persist user choice in `localStorage`; fall back to `prefers-color-scheme`.
