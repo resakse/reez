@@ -68,9 +68,14 @@ class Pesakit(models.Model):
 
     @property
     def t_lahir(self):
+        if not self.nric:
+            return None
         tlahir = self.nric[:6]
-        lahir = datetime.strptime(tlahir, "%y%m%d").date()
-        return lahir
+        try:
+            lahir = datetime.strptime(tlahir, "%y%m%d").date()
+            return lahir
+        except ValueError:
+            return None
 
     @property
     def kira_umur(self):

@@ -21,6 +21,19 @@ interface Patient {
   jantina: string;
 }
 
+function formatDate(dateString: string | null | undefined): string {
+  if (!dateString) {
+    return 'N/A';
+  }
+  try {
+    const [year, month, day] = dateString.split('-');
+    return `${day}/${month}/${year}`;
+  } catch (error) {
+    console.error("Failed to format date:", dateString, error);
+    return dateString; // Return original string if formatting fails
+  }
+}
+
 export default function PatientsPage() {
   const { data: session } = useSession();
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -30,7 +43,8 @@ export default function PatientsPage() {
     const fetchPatients = async () => {
       if (session?.user?.accessToken) {
         try {
-          const res = await fetch('/api/patients/', {
+          // Bypass the Next.js proxy and call Django directly
+          const res = await fetch('http://127.0.0.1:8000/api/patients', {
             headers: {
               'Authorization': `Bearer ${session.user.accessToken}`,
             },
@@ -77,7 +91,7 @@ export default function PatientsPage() {
               <TableRow key={patient.id}>
                 <TableCell>{patient.mrn}</TableCell>
                 <TableCell>{patient.nama}</TableCell>
-                <TableCell>{patient.t_lahir}</TableCell>
+                <TableCell>{formatDate(patient.t_lahir)}</TableCell>
                 <TableCell>{patient.jantina === 'L' ? 'Male' : 'Female'}</TableCell>
                 <TableCell>
                   <Button variant="outline" size="sm">View</Button>
