@@ -1,7 +1,11 @@
 import json
+import logging
 from datetime import datetime
 
 from django.contrib.auth.decorators import login_required
+from django.utils import timezone
+
+logger = logging.getLogger(__name__)
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.db.models import Q
 from django.http import HttpResponse
@@ -11,7 +15,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 from django_htmx.http import trigger_client_event, push_url
 
-from exam.models import Pemeriksaan, Daftar, Exam, Modaliti, Part, Region, kiraxray
+from exam.models import Pemeriksaan, Daftar, Exam, Modaliti, Part, Region, generate_exam_accession
 from pesakit.models import Pesakit
 from exam.models import PacsConfig
 from .filters import DaftarFilter
@@ -27,8 +31,12 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 from .serializers import (
     ModalitiSerializer, PartSerializer, ExamSerializer, 
     DaftarSerializer, PemeriksaanSerializer, 
-    RegistrationWorkflowSerializer, MWLWorklistSerializer
+    RegistrationWorkflowSerializer, MWLWorklistSerializer,
+    GroupedExaminationSerializer, GroupedMWLWorklistSerializer,
+    PositionChoicesSerializer, PacsConfigSerializer
 )
+
+from .dicom_mwl import mwl_service
 from pesakit.serializers import PesakitSerializer
 
 class ModalitiViewSet(viewsets.ModelViewSet):
@@ -185,6 +193,198 @@ class MWLWorklistView(APIView):
         return Response(serializer.data)
 
 
+class GroupedExaminationView(APIView):
+    """
+    API endpoint for creating grouped examinations under a single study
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        serializer = GroupedExaminationSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            result = serializer.save()
+            
+            # Return structured response
+            return Response({
+                'study': DaftarSerializer(result['study']).data,
+                'examinations': PemeriksaanSerializer(result['examinations'], many=True).data,
+                'message': f"Created study {result['study'].parent_accession_number} with {len(result['examinations'])} examinations"
+            }, status=status.HTTP_201_CREATED)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class GroupedMWLView(APIView):
+    """
+    Enhanced MWL API endpoint showing parent-child study relationships
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        # Get studies with scheduled status
+        studies = Daftar.objects.filter(
+            study_status__in=['SCHEDULED', 'IN_PROGRESS']
+        ).select_related('pesakit').prefetch_related('pemeriksaan__exam__part')
+        
+        # Filter by date if provided
+        date_filter = request.query_params.get('date')
+        if date_filter:
+            studies = studies.filter(tarikh__date=date_filter)
+        
+        # Filter by modality if provided
+        modality_filter = request.query_params.get('modality')
+        if modality_filter:
+            studies = studies.filter(modality=modality_filter)
+        
+        # Filter by priority if provided
+        priority_filter = request.query_params.get('priority')
+        if priority_filter:
+            studies = studies.filter(study_priority=priority_filter)
+        
+        serializer = GroupedMWLWorklistSerializer(studies, many=True)
+        return Response({
+            'count': studies.count(),
+            'results': serializer.data
+        })
+
+
+class PositionChoicesView(APIView):
+    """
+    API endpoint for position choices used in examinations
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        serializer = PositionChoicesSerializer({})
+        return Response(serializer.data)
+
+
+class DicomWorklistExportView(APIView):
+    """
+    API endpoint for DICOM Modality Worklist export
+    
+    Provides worklist data in various formats for CR/DR machine integration:
+    - JSON format for API consumption
+    - DICOM C-FIND compatible format
+    - CSV export for machine import
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        # Get query parameters
+        format_type = request.query_params.get('format', 'json')
+        date_filter = request.query_params.get('date')
+        modality_filter = request.query_params.get('modality')
+        priority_filter = request.query_params.get('priority')
+        accession_filter = request.query_params.get('accession')
+        patient_filter = request.query_params.get('patient_id')
+        
+        # Build query parameters
+        query_params = {}
+        if accession_filter:
+            query_params['AccessionNumber'] = accession_filter
+        if patient_filter:
+            query_params['PatientID'] = patient_filter
+        if date_filter:
+            query_params['StudyDate'] = date_filter.replace('-', '')  # Convert to DICOM format
+        if modality_filter:
+            query_params['Modality'] = modality_filter
+        
+        try:
+            # Get worklist items from MWL service
+            worklist_items = mwl_service.get_worklist_items(query_params)
+            
+            if format_type == 'json':
+                return Response({
+                    'count': len(worklist_items),
+                    'worklist_items': worklist_items
+                })
+            
+            elif format_type == 'dicom_datasets':
+                # Return DICOM datasets as JSON (for debugging/testing)
+                datasets = []
+                for item in worklist_items:
+                    ds = mwl_service.create_dicom_dataset(item)
+                    # Convert dataset to JSON-serializable format
+                    dataset_dict = {}
+                    for elem in ds:
+                        if elem.VR in ['PN', 'LO', 'SH', 'UI', 'DA', 'TM', 'CS']:
+                            dataset_dict[elem.keyword] = str(elem.value)
+                        elif elem.VR == 'SQ':  # Sequence
+                            dataset_dict[elem.keyword] = []
+                            for seq_item in elem.value:
+                                seq_dict = {}
+                                for seq_elem in seq_item:
+                                    if seq_elem.VR in ['PN', 'LO', 'SH', 'UI', 'DA', 'TM', 'CS']:
+                                        seq_dict[seq_elem.keyword] = str(seq_elem.value)
+                                dataset_dict[elem.keyword].append(seq_dict)
+                    datasets.append(dataset_dict)
+                
+                return Response({
+                    'count': len(datasets),
+                    'dicom_datasets': datasets
+                })
+            
+            elif format_type == 'csv':
+                # Export as CSV for CR machine import
+                import csv
+                from io import StringIO
+                
+                output = StringIO()
+                writer = csv.writer(output)
+                
+                # CSV Headers
+                headers = [
+                    'PatientName', 'PatientID', 'PatientSex', 'PatientBirthDate',
+                    'StudyInstanceUID', 'AccessionNumber', 'StudyDescription',
+                    'ScheduledProcedureStepID', 'ScheduledProcedureStepDescription',
+                    'Modality', 'ScheduledStationAETitle', 'StudyDate', 'StudyTime',
+                    'PatientPosition', 'ReferringPhysicianName', 'StudyPriority'
+                ]
+                writer.writerow(headers)
+                
+                # Write data rows
+                for item in worklist_items:
+                    row = [
+                        item.get('PatientName', ''),
+                        item.get('PatientID', ''),
+                        item.get('PatientSex', ''),
+                        item.get('PatientBirthDate', ''),
+                        item.get('StudyInstanceUID', ''),
+                        item.get('AccessionNumber', ''),
+                        item.get('StudyDescription', ''),
+                        item.get('ScheduledProcedureStepID', ''),
+                        item.get('ScheduledProcedureStepDescription', ''),
+                        item.get('Modality', ''),
+                        item.get('ScheduledStationAETitle', ''),
+                        item.get('StudyDate', ''),
+                        item.get('StudyTime', ''),
+                        item.get('PatientPosition', ''),
+                        item.get('ReferringPhysicianName', ''),
+                        item.get('StudyPriority', ''),
+                    ]
+                    writer.writerow(row)
+                
+                # Return CSV response
+                from django.http import HttpResponse
+                response = HttpResponse(output.getvalue(), content_type='text/csv')
+                response['Content-Disposition'] = f'attachment; filename="mwl_export_{timezone.now().strftime("%Y%m%d_%H%M%S")}.csv"'
+                return response
+            
+            else:
+                return Response(
+                    {'error': f'Unsupported format: {format_type}. Supported formats: json, dicom_datasets, csv'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+                
+        except Exception as e:
+            logger.error(f"Error exporting DICOM worklist: {e}")
+            return Response(
+                {'error': 'Failed to export worklist data'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
 # Create your views here.
 @login_required
 def senarai_bcs(request):
@@ -219,7 +419,7 @@ def senarai_bcs(request):
 def tambah_bcs(request):
     tajuk = 'Daftar Pemeriksaan'
     form = BcsForm(request.POST or None, initial={'jxr': request.user})
-    noxraybaru = kiraxray()
+    noxraybaru = generate_exam_accession()
     examform = DaftarForm(request.POST or None, initial={'no_xray': noxraybaru})
     hantar_url = reverse("bcs:bcs-tambah")
     data = {
@@ -365,7 +565,7 @@ def del_exam(request, pk=None):
 
 @login_required
 def tambah_exam(request, pk=None):
-    noxraybaru = kiraxray()
+    noxraybaru = generate_exam_accession()
     examform = DaftarForm(request.POST or None, initial={'no_xray': noxraybaru})
     bcs = Daftar.objects.get(pk=pk)
     if request.method == "POST":

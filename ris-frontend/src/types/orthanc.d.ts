@@ -4,16 +4,21 @@
  */
 
 export interface OrthancMainDicomTags {
-  PatientName: string;
-  PatientID: string;
-  StudyInstanceUID: string;
-  StudyDescription: string;
-  StudyDate: string;
-  SeriesInstanceUID: string;
-  SeriesDescription: string;
-  SeriesNumber: string;
-  SOPInstanceUID: string;
-  InstanceNumber: string;
+  PatientName?: string;
+  PatientID?: string;
+  PatientBirthDate?: string;
+  PatientSex?: string;
+  StudyInstanceUID?: string;
+  StudyDescription?: string;
+  StudyDate?: string;
+  StudyTime?: string;
+  InstitutionName?: string;
+  Modality?: string;
+  SeriesInstanceUID?: string;
+  SeriesDescription?: string;
+  SeriesNumber?: string;
+  SOPInstanceUID?: string;
+  InstanceNumber?: string;
 }
 
 export interface OrthancInstance {
@@ -25,17 +30,17 @@ export interface OrthancInstance {
 
 export interface OrthancSeries {
   ID: string;
-  MainDicomTags: Pick<OrthancMainDicomTags, 'SeriesInstanceUID' | 'SeriesDescription' | 'SeriesNumber'>;
-  Instances: OrthancInstance[];
-  PatientID: string;
-  Study: string;
+  MainDicomTags: Pick<OrthancMainDicomTags, 'SeriesInstanceUID' | 'SeriesDescription' | 'SeriesNumber' | 'Modality'>;
+  Instances?: OrthancInstance[];
+  PatientID?: string;
+  Study?: string;
 }
 
 export interface OrthancStudy {
   ID: string;
-  MainDicomTags: Pick<OrthancMainDicomTags, 'PatientName' | 'PatientID' | 'StudyInstanceUID' | 'StudyDescription' | 'StudyDate'>;
-  PatientMainDicomTags: Pick<OrthancMainDicomTags, 'PatientName' | 'PatientID'>;
-  Series: OrthancSeries[];
-  IsStable: boolean;
-  LastUpdate: string;
+  MainDicomTags?: Pick<OrthancMainDicomTags, 'PatientName' | 'PatientID' | 'StudyInstanceUID' | 'StudyDescription' | 'StudyDate' | 'StudyTime' | 'InstitutionName'>;
+  PatientMainDicomTags?: Pick<OrthancMainDicomTags, 'PatientName' | 'PatientID' | 'PatientBirthDate' | 'PatientSex'>;
+  Series?: OrthancSeries[];
+  IsStable?: boolean;
+  LastUpdate?: string;
 } 

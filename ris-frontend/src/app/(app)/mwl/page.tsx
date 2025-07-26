@@ -11,40 +11,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import AuthService from '@/lib/auth';
-import { Calendar, Clock, User, Hospital, Search, Filter, Download, RefreshCw } from 'lucide-react';
+import { Calendar, Clock, User, Hospital, Search, Filter, Download, RefreshCw, ChevronDown, ChevronRight } from 'lucide-react';
 
-interface MwlEntry {
-  id: number;
-  patient: {
-    id: number;
-    nama: string;
-    no_kp: string;
-    t_lahir: string;
-    jantina: string;
-  };
-  study_instance_uid: string;
-  accession_number: string;
-  scheduled_datetime: string;
-  study_priority: string;
-  requested_procedure_description: string;
-  patient_position: string;
-  modality: string;
-  status: string;
-  registration: {
-    id: number;
-    discipline: {
-      id: number;
-      nama: string;
-    };
-    doctor: string;
-    clinical_notes: string;
-  };
-}
+import type { GroupedMWLEntry, GroupedMWLResponse } from '@/types/exam';
 
-export default function MwlPage() {
+export default function GroupedMwlPage() {
   const { user } = useAuth();
-  const [mwlEntries, setMwlEntries] = useState<MwlEntry[]>([]);
+  const [mwlEntries, setMwlEntries] = useState<GroupedMWLEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedStudies, setExpandedStudies] = useState<Set<number>>(new Set());
   const [filters, setFilters] = useState({
     date: new Date().toISOString().split('T')[0],
     modality: '',
@@ -62,12 +37,14 @@ export default function MwlPage() {
       if (filters.status) params.append('status', filters.status);
 
       const res = await AuthService.authenticatedFetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/mwl-worklist/?${params}`
+        `${process.env.NEXT_PUBLIC_API_URL}/api/mwl/grouped/?${params}`
       );
       
       if (res.ok) {
-        const data = await res.json();
-        setMwlEntries(data.results || data);
+        const data: GroupedMWLResponse = await res.json();
+        setMwlEntries(data.results || []);
+      } else {
+        console.error('Failed to fetch MWL entries');
       }
     } catch (error) {
       console.error('Error fetching MWL entries:', error);
@@ -86,32 +63,76 @@ export default function MwlPage() {
     fetchMwlEntries();
   };
 
+  const toggleStudyExpansion = (studyId: number) => {
+    setExpandedStudies(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(studyId)) {
+        newSet.delete(studyId);
+      } else {
+        newSet.add(studyId);
+      }
+      return newSet;
+    });
+  };
+
   const handleExport = () => {
     // Export to CSV for CR machine compatibility
-    const csvData = mwlEntries.map(entry => ({
-      'Patient Name': entry.patient.nama,
-      'Patient ID': entry.patient.no_kp,
-      'Study Instance UID': entry.study_instance_uid,
-      'Accession Number': entry.accession_number,
-      'Scheduled Date': entry.scheduled_datetime,
-      'Priority': entry.study_priority,
-      'Procedure': entry.requested_procedure_description,
-      'Modality': entry.modality,
-      'Position': entry.patient_position,
-      'Gender': entry.patient.jantina,
-      'DOB': entry.patient.t_lahir
-    }));
+    const csvData: any[] = [];
+    
+    mwlEntries.forEach(study => {
+      // Add parent study entry
+      csvData.push({
+        'Type': 'STUDY',
+        'Patient Name': study.patient_name,
+        'Patient ID': study.patient_id,
+        'Study Instance UID': study.study_instance_uid,
+        'Accession Number': study.parent_accession_number,
+        'Study Description': study.study_description || '',
+        'Scheduled Date': study.scheduled_datetime || study.tarikh,
+        'Priority': study.study_priority,
+        'Modality': study.modality || '',
+        'Status': study.study_status,
+        'Gender': study.patient_gender,
+        'DOB': study.patient_birth_date || '',
+        'Referring Physician': study.referring_physician || '',
+        'Examinations Count': study.examinations.length
+      });
+
+      // Add child examination entries
+      study.examinations.forEach(exam => {
+        csvData.push({
+          'Type': 'EXAMINATION',
+          'Patient Name': study.patient_name,
+          'Patient ID': study.patient_id,
+          'Study Instance UID': study.study_instance_uid,
+          'Accession Number': exam.accession_number,
+          'Study Description': exam.exam_description,
+          'Scheduled Date': study.scheduled_datetime || study.tarikh,
+          'Priority': study.study_priority,
+          'Modality': study.modality || '',
+          'Status': exam.exam_status,
+          'Gender': study.patient_gender,
+          'DOB': study.patient_birth_date || '',
+          'Body Part': exam.body_part || '',
+          'Patient Position': exam.patient_position || '',
+          'Body Position': exam.body_position || '',
+          'Laterality': exam.laterality || '',
+          'Sequence': exam.sequence_number,
+          'Notes': exam.catatan || ''
+        });
+      });
+    });
 
     const csv = [
       Object.keys(csvData[0] || {}).join(','),
-      ...csvData.map(row => Object.values(row).join(','))
+      ...csvData.map(row => Object.values(row).map(val => `"${val}"`).join(','))
     ].join('\n');
 
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `mwl-export-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `grouped-mwl-export-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
   };
@@ -119,11 +140,21 @@ export default function MwlPage() {
   const getPriorityColor = (priority: string) => {
     const colors = {
       'STAT': 'destructive',
-      'HIGH': 'warning',
+      'HIGH': 'default',
       'MEDIUM': 'secondary',
-      'ROUTINE': 'default'
+      'LOW': 'outline'
     };
-    return colors[priority as keyof typeof colors] || 'default';
+    return colors[priority as keyof typeof colors] || 'outline';
+  };
+
+  const getStatusColor = (status: string) => {
+    const colors = {
+      'SCHEDULED': 'outline',
+      'IN_PROGRESS': 'default',
+      'COMPLETED': 'secondary',
+      'CANCELLED': 'destructive'
+    };
+    return colors[status as keyof typeof colors] || 'outline';
   };
 
   const formatDateTime = (datetime: string) => {
@@ -149,8 +180,8 @@ export default function MwlPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">MWL Worklist Management</h1>
-          <p className="text-muted-foreground">Manage Modality Worklist for CR machine integration</p>
+          <h1 className="text-3xl font-bold tracking-tight">Grouped MWL Worklist</h1>
+          <p className="text-muted-foreground">Manage Modality Worklist with parent-child study structure</p>
         </div>
         <div className="flex gap-2">
           <Button onClick={handleRefresh} disabled={refreshing}>
@@ -191,6 +222,7 @@ export default function MwlPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="">All</SelectItem>
+                  <SelectItem value="XR">X-Ray</SelectItem>
                   <SelectItem value="CR">CR</SelectItem>
                   <SelectItem value="DR">DR</SelectItem>
                   <SelectItem value="CT">CT</SelectItem>
@@ -211,7 +243,7 @@ export default function MwlPage() {
                   <SelectItem value="STAT">STAT</SelectItem>
                   <SelectItem value="HIGH">High</SelectItem>
                   <SelectItem value="MEDIUM">Medium</SelectItem>
-                  <SelectItem value="ROUTINE">Routine</SelectItem>
+                  <SelectItem value="LOW">Low</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -235,77 +267,174 @@ export default function MwlPage() {
         </CardContent>
       </Card>
 
-      {/* MWL Table */}
+      {/* MWL Table with Parent-Child Structure */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center">
             <Calendar className="h-5 w-5 mr-2" />
-            Worklist Entries ({mwlEntries.length})
+            Grouped Worklist Entries ({mwlEntries.length} studies)
           </CardTitle>
+          <CardDescription>
+            Click on a study to expand and view individual examinations
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-12">#</TableHead>
+                <TableHead className="w-12"></TableHead>
                 <TableHead>Patient</TableHead>
-                <TableHead>Study UID</TableHead>
-                <TableHead>Accession #</TableHead>
-                <TableHead>Procedure</TableHead>
+                <TableHead>Study ID</TableHead>
+                <TableHead>Description</TableHead>
                 <TableHead>Modality</TableHead>
                 <TableHead>Scheduled</TableHead>
                 <TableHead>Priority</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Referring</TableHead>
+                <TableHead>Examinations</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {mwlEntries.map((entry, index) => (
-                <TableRow key={entry.id}>
-                  <TableCell>{index + 1}</TableCell>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">{entry.patient.nama}</div>
-                      <div className="text-sm text-muted-foreground">{entry.patient.no_kp}</div>
-                      <div className="text-sm">{entry.patient.jantina}, {entry.patient.t_lahir}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">
-                    {entry.study_instance_uid.substring(0, 8)}...
-                  </TableCell>
-                  <TableCell className="font-mono text-sm">{entry.accession_number}</TableCell>
-                  <TableCell>{entry.requested_procedure_description}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{entry.modality}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center">
-                      <Calendar className="h-4 w-4 mr-1" />
-                      {formatDateTime(entry.scheduled_datetime)}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={getPriorityColor(entry.study_priority)}>{entry.study_priority}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge 
-                      variant={entry.status === 'COMPLETED' ? 'default' : 
-                               entry.status === 'IN_PROGRESS' ? 'secondary' : 'outline'}
-                    >
-                      {entry.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium text-sm">{entry.registration.discipline.nama}</div>
-                      <div className="text-sm text-muted-foreground">{entry.registration.doctor}</div>
-                    </div>
-                  </TableCell>
-                </TableRow>
+              {mwlEntries.map((study) => (
+                <>
+                  {/* Parent Study Row */}
+                  <TableRow 
+                    key={study.id} 
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => toggleStudyExpansion(study.id)}
+                  >
+                    <TableCell>
+                      {expandedStudies.has(study.id) ? (
+                        <ChevronDown className="h-4 w-4" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4" />
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">{study.patient_name}</div>
+                        <div className="text-sm text-muted-foreground">{study.patient_id}</div>
+                        <div className="text-sm">{study.patient_gender}, {study.patient_birth_date}</div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-mono text-sm">
+                        <div className="font-semibold">{study.parent_accession_number}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {study.study_instance_uid.substring(0, 8)}...
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">{study.study_description}</div>
+                        {study.referring_physician && (
+                          <div className="text-sm text-muted-foreground">
+                            Dr. {study.referring_physician}
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{study.modality}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center">
+                        <Calendar className="h-4 w-4 mr-1" />
+                        <span className="text-sm">
+                          {formatDateTime(study.scheduled_datetime || study.tarikh)}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={getPriorityColor(study.study_priority)}>
+                        {study.study_priority}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={getStatusColor(study.study_status)}>
+                        {study.study_status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">
+                        {study.examinations.length} exam{study.examinations.length !== 1 ? 's' : ''}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+
+                  {/* Child Examination Rows */}
+                  {expandedStudies.has(study.id) && study.examinations.map((exam, examIndex) => (
+                    <TableRow key={`${study.id}-${examIndex}`} className="bg-muted/20">
+                      <TableCell></TableCell>
+                      <TableCell className="pl-8">
+                        <div className="text-sm text-muted-foreground">
+                          Examination {exam.sequence_number}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-mono text-sm">
+                          <div>{exam.accession_number}</div>
+                          <div className="text-xs text-muted-foreground">
+                            Step: {exam.scheduled_step_id}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{exam.exam_description}</div>
+                          {exam.exam_short_desc && (
+                            <div className="text-sm text-muted-foreground">
+                              {exam.exam_short_desc}
+                            </div>
+                          )}
+                          {exam.body_part && (
+                            <Badge variant="outline" className="text-xs mt-1">
+                              {exam.body_part}
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          {exam.patient_position && (
+                            <Badge variant="outline" className="text-xs">
+                              {exam.patient_position}
+                            </Badge>
+                          )}
+                          {exam.body_position && (
+                            <Badge variant="outline" className="text-xs">
+                              {exam.body_position}
+                            </Badge>
+                          )}
+                          {exam.laterality && (
+                            <Badge variant="outline" className="text-xs">
+                              {exam.laterality}
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell></TableCell>
+                      <TableCell></TableCell>
+                      <TableCell>
+                        <Badge variant={getStatusColor(exam.exam_status)}>
+                          {exam.exam_status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {exam.catatan && (
+                          <div className="text-sm text-muted-foreground" title={exam.catatan}>
+                            📝 {exam.catatan.substring(0, 30)}
+                            {exam.catatan.length > 30 && '...'}
+                          </div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </>
               ))}
               {mwlEntries.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                     No worklist entries found.
                   </TableCell>
                 </TableRow>

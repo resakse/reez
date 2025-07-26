@@ -39,15 +39,33 @@ class PacsConfigDetailAPIView(generics.RetrieveUpdateAPIView):
 @permission_classes([IsSupervisorPermission])
 def get_current_pacs_config(request):
     """
-    Get the current PACS configuration (latest one)
+    Get the current PACS configuration (latest one) - Admin only
     """
     config = PacsConfig.objects.first()
     if not config:
         # Create default configuration if none exists
         config = PacsConfig.objects.create(
-            orthancurl='http://localhost:8042',
+            orthancurl='http://localhost:8043',
             viewrurl='http://localhost:3000/viewer'
         )
     
     serializer = PacsConfigSerializer(config)
     return Response(serializer.data)
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_pacs_orthanc_url(request):
+    """
+    Get only the Orthanc URL from PACS configuration for authenticated users
+    This is needed for the DICOM viewer to connect to the PACS server
+    """
+    config = PacsConfig.objects.first()
+    if not config:
+        # Return default URL if no configuration exists
+        return Response({
+            'orthancurl': 'http://localhost:8043'
+        })
+    
+    return Response({
+        'orthancurl': config.orthancurl
+    })

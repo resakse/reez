@@ -4,9 +4,11 @@ from . import views
 from .views import (
     ModalitiViewSet, PartViewSet, ExamViewSet, 
     DaftarViewSet, PemeriksaanViewSet, 
-    RegistrationWorkflowView, MWLWorklistView
+    RegistrationWorkflowView, MWLWorklistView,
+    GroupedExaminationView, GroupedMWLView, PositionChoicesView,
+    DicomWorklistExportView
 )
-from .settings_views import PacsConfigListCreateAPIView, PacsConfigDetailAPIView, get_current_pacs_config
+from .settings_views import PacsConfigListCreateAPIView, PacsConfigDetailAPIView, get_current_pacs_config, get_pacs_orthanc_url
 from .examination_views import ExaminationListAPIView, ExaminationDetailAPIView
 
 from . import api
@@ -56,17 +58,26 @@ urlpatterns = [
     path("senarai/pesakit/", views.orthanc_list, name="orthanc-list"),
     path("senarai/exam/", views.orthanc_study, name="orthanc-study"),
     
-    # REST API endpoints
-    path('', include(router.urls)),
+    # New grouped examination endpoints (MUST come before router to avoid conflicts)
+    path('examinations/grouped/', GroupedExaminationView.as_view(), name='grouped-examinations'),
+    path('mwl/grouped/', GroupedMWLView.as_view(), name='grouped-mwl'),
+    path('choices/positions/', PositionChoicesView.as_view(), name='position-choices'),
+    path('dicom/worklist/export/', DicomWorklistExportView.as_view(), name='dicom-worklist-export'),
     
     # Additional REST API endpoints for workflow
     path('registration/workflow/', RegistrationWorkflowView.as_view(), name='registration-workflow'),
     path('mwl/worklist/', MWLWorklistView.as_view(), name='mwl-worklist'),
     
+    # REST API endpoints
+    path('', include(router.urls)),
+    
     # PACS Settings API endpoints (supervisor only)
     path('settings/pacs/', PacsConfigListCreateAPIView.as_view(), name='pacs-settings-list'),
     path('settings/pacs/<int:pk>/', PacsConfigDetailAPIView.as_view(), name='pacs-settings-detail'),
     path('settings/pacs/current/', get_current_pacs_config, name='pacs-settings-current'),
+    
+    # PACS Orthanc URL endpoint (authenticated users)
+    path('pacs/orthanc-url/', get_pacs_orthanc_url, name='pacs-orthanc-url'),
     
     # Examination API endpoints (active users only)
     path('examinations/list/', ExaminationListAPIView.as_view(), name='examinations-list'),

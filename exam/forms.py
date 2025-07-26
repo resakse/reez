@@ -52,20 +52,18 @@ class BcsForm(forms.ModelForm):
             "tarikh",
             "rujukan",
             "pemohon",
-            "dcatatan",
             'no_resit',
             'lmp',
             'ambulatori',
             'hamil',
             'status',
-            'performed',
             'jxr'
         )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
-        self.fields['dcatatan'].widget = forms.Textarea(attrs={'rows': 4})
+        # Remove dcatatan widget setup as field was deleted
         self.helper.layout = Layout(
             Row(
                 Column("tarikh", css_class="form-group col-md-4 mb-0"),
@@ -109,13 +107,8 @@ class BcsForm(forms.ModelForm):
                         Column("status", css_class="form-group col-md-6 mb-0"),
                     ),
                     Row(
-                        Column("jxr", css_class="form-group col-md-6 mb-0"),
-                        Column("performed", css_class="form-group col-md-6 mb-0"),
-                    ), css_class='col-md-8',
-                ),
-                Column(
-                    Column("dcatatan", css_class="form-group col-md-12 mb-0"),
-                    css_class="col-md-4",
+                        Column("jxr", css_class="form-group col-md-12 mb-0"),
+                    ), css_class='col-md-12',
                 ),
             ),
 
@@ -169,13 +162,13 @@ class DaftarForm(forms.ModelForm):
 
 
 class KomenForm(forms.ModelForm):
-    dcatatan = forms.CharField(widget=forms.Textarea, required=False, label="Catatan")
+    study_comments = forms.CharField(widget=forms.Textarea, required=False, label="Catatan")
 
     class Meta:
         model = Daftar
         fields = (
             "id",
-            "dcatatan",
+            "study_comments",
         )
 
     def __init__(self, *args, **kwargs):
@@ -198,7 +191,7 @@ class RegionForm(forms.ModelForm):
 class ExamForm(forms.ModelForm):
     class Meta:
         model = Exam
-        fields = ['exam', 'exam_code', 'part', 'statistik', 'modaliti', 'catatan', 'contrast']
+        fields = ['exam', 'part', 'statistik', 'modaliti', 'catatan', 'contrast']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -209,8 +202,7 @@ class ExamForm(forms.ModelForm):
                 Column("part", css_class="form-group col-md-6 mb-0"),
             ),
             Row(
-                Column("statistik", css_class="form-group col-md-6 mb-0"),
-                Column("exam_code", css_class="form-group col-md-6 mb-0"),
+                Column("statistik", css_class="form-group col-md-12 mb-0"),
             ),
             Row(
                 Column("exam", css_class="form-group col-md-10 mb-0"),

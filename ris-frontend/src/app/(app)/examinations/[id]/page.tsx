@@ -2,12 +2,27 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { ArrowLeft, Calendar, User, Building2, Stethoscope, Settings, FileText, Edit } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ArrowLeft, Calendar, User, Building2, Stethoscope, Settings, FileText, Edit, Eye, Monitor } from 'lucide-react';
 import AuthService from '@/lib/auth';
+
+// Dynamically import DicomViewer to avoid SSR issues
+const DicomViewer = dynamic(() => import('@/components/DicomViewer'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-96 bg-black rounded-lg">
+      <div className="text-center text-white">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
+        <p>Loading DICOM Viewer...</p>
+      </div>
+    </div>
+  ),
+});
 
 interface ExaminationDetail {
   id: number;
@@ -138,6 +153,8 @@ export default function ExaminationDetailPage() {
     );
   }
 
+  const hasStudyInstanceUID = examination.daftar_info.study_instance_uid;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -145,26 +162,57 @@ export default function ExaminationDetailPage() {
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Examinations
         </Button>
-        <Button 
-          onClick={() => router.push(`/studies/${examination.daftar_info.id}/edit`)}
-          variant="outline"
-        >
-          <Edit className="w-4 h-4 mr-2" />
-          Edit Study
-        </Button>
+        <div className="flex gap-2">
+          {hasStudyInstanceUID && (
+            <Button 
+              onClick={() => router.push(`/viewer/${encodeURIComponent(examination.daftar_info.study_instance_uid!)}`)}
+              variant="default"
+            >
+              <Eye className="w-4 h-4 mr-2" />
+              Open in Full Viewer
+            </Button>
+          )}
+          <Button 
+            onClick={() => router.push(`/studies/${examination.daftar_info.id}/edit`)}
+            variant="outline"
+          >
+            <Edit className="w-4 h-4 mr-2" />
+            Edit Study
+          </Button>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Stethoscope className="h-5 w-5" />
-            Examination Details
-          </CardTitle>
-          <CardDescription>
-            Detailed information for X-Ray #{examination.no_xray}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
+      {/* Main Content with Tabs */}
+      <div className="w-full">
+        <Tabs defaultValue="details" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="details" className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Examination Details
+            </TabsTrigger>
+            <TabsTrigger 
+              value="viewer" 
+              disabled={!hasStudyInstanceUID}
+              className="flex items-center gap-2"
+            >
+              <Monitor className="h-4 w-4" />
+              DICOM Viewer
+              {!hasStudyInstanceUID && <Badge variant="secondary" className="ml-1 text-xs">N/A</Badge>}
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="details" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Stethoscope className="h-5 w-5" />
+                  Examination Details
+                </CardTitle>
+                <CardDescription>
+                  Detailed information for X-Ray #{examination.no_xray}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
           {/* X-Ray Information */}
           <div>
             <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
@@ -372,15 +420,69 @@ export default function ExaminationDetailPage() {
             </div>
           )}
 
-          {/* Timestamps */}
-          <div className="text-xs text-gray-500 pt-4 border-t">
-            <div className="flex justify-between">
-              <span>Created: {formatDate(examination.created)}</span>
-              <span>Modified: {formatDate(examination.modified)}</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+                {/* Timestamps */}
+                <div className="text-xs text-gray-500 pt-4 border-t">
+                  <div className="flex justify-between">
+                    <span>Created: {formatDate(examination.created)}</span>
+                    <span>Modified: {formatDate(examination.modified)}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="viewer" className="mt-6">
+            {hasStudyInstanceUID ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Monitor className="h-5 w-5" />
+                    DICOM Viewer
+                  </CardTitle>
+                  <CardDescription>
+                    View DICOM images for study: {examination.daftar_info.study_instance_uid}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <DicomViewer studyId={examination.daftar_info.study_instance_uid} />
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-muted-foreground">
+                    <Monitor className="h-5 w-5" />
+                    DICOM Viewer Not Available
+                  </CardTitle>
+                  <CardDescription>
+                    No Study Instance UID found for this examination
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Monitor className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p className="text-lg mb-2">DICOM Images Not Available</p>
+                    <p className="text-sm">
+                      This examination does not have an associated DICOM study.
+                      Images may not have been acquired yet or the study may not be linked to the PACS system.
+                    </p>
+                    {examination.daftar_info.accession_number && (
+                      <div className="mt-4 p-3 bg-muted rounded-lg">
+                        <p className="text-xs">
+                          <strong>Accession Number:</strong> {examination.daftar_info.accession_number}
+                        </p>
+                        <p className="text-xs mt-1">
+                          Use this accession number to manually link the study in the PACS system.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 }

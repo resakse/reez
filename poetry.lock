@@ -471,6 +471,24 @@ test = ["hypothesis (>=6.46.1)", "pytest (>=7.3.2)", "pytest-xdist (>=2.2.0)"]
 xml = ["lxml (>=4.8.0)"]
 
 [[package]]
+name = "pydicom"
+version = "3.0.1"
+description = "A pure Python package for reading and writing DICOM data"
+optional = false
+python-versions = ">=3.10"
+files = [
+    {file = "pydicom-3.0.1-py3-none-any.whl", hash = "sha256:db32f78b2641bd7972096b8289111ddab01fb221610de8d7afa835eb938adb41"},
+    {file = "pydicom-3.0.1.tar.gz", hash = "sha256:7b8be344b5b62493c9452ba6f5a299f78f8a6ab79786c729b0613698209603ec"},
+]
+
+[package.extras]
+basic = ["numpy", "types-pydicom"]
+dev = ["black (==24.8.0)", "mypy (==1.11.2)", "pre-commit", "pydicom-data", "pytest", "pytest-cov", "ruff (==0.6.3)", "types-requests"]
+docs = ["matplotlib", "numpy", "numpydoc", "pillow", "sphinx", "sphinx-copybutton", "sphinx-gallery", "sphinx_rtd_theme", "sphinxcontrib-jquery", "sphinxcontrib-napoleon"]
+gpl-license = ["pylibjpeg[libjpeg]"]
+pixeldata = ["numpy", "pillow", "pyjpegls", "pylibjpeg[openjpeg]", "pylibjpeg[rle]", "python-gdcm"]
+
+[[package]]
 name = "pyjwt"
 version = "2.10.1"
 description = "JSON Web Token implementation in Python"
@@ -486,6 +504,26 @@ crypto = ["cryptography (>=3.4.0)"]
 dev = ["coverage[toml] (==5.0.4)", "cryptography (>=3.4.0)", "pre-commit", "pytest (>=6.0.0,<7.0.0)", "sphinx", "sphinx-rtd-theme", "zope.interface"]
 docs = ["sphinx", "sphinx-rtd-theme", "zope.interface"]
 tests = ["coverage[toml] (==5.0.4)", "pytest (>=6.0.0,<7.0.0)"]
+
+[[package]]
+name = "pynetdicom"
+version = "3.0.3"
+description = "A Python implementation of the DICOM networking protocol"
+optional = false
+python-versions = ">=3.10"
+files = [
+    {file = "pynetdicom-3.0.3-py3-none-any.whl", hash = "sha256:1fb421b90bd3b1b2f87a0721a75237dfcb625a35e29bd5b58dc02452b1c67bd6"},
+    {file = "pynetdicom-3.0.3.tar.gz", hash = "sha256:8ecb4bfc726dc0f7dfd7b7162be24f030124c00280be818d40b33f3629f620a9"},
+]
+
+[package.dependencies]
+pydicom = ">=3,<4"
+
+[package.extras]
+apps = ["sqlalchemy"]
+dev = ["asv (>=0.6)", "black (>=23.1)", "codespell (>=2.2)", "coverage (>=7.3)", "mypy (>=1.11)", "pyfakefs (>=5.3)", "pytest (>=7.4)", "pytest-cov (>=4.1)", "pytest-xdist (>=3.7)", "ruff (>=0.1)", "sqlalchemy (>=2.0)"]
+docs = ["numpydoc (>=1.6)", "pydata-sphinx-theme (>=0.16.1)", "sphinx (>=7.2)", "sphinx-copybutton (>=0.5)", "sphinxcontrib-jquery (>=4.1)"]
+tests = ["coverage (>=7.3)", "pyfakefs (>=5.3)", "pytest (>=7.4)", "pytest-cov (>=4.1)", "pytest-xdist (>=3.7)", "sqlalchemy (>=2.0)"]
 
 [[package]]
 name = "python-dateutil"
@@ -694,4 +732,4 @@ zstd = ["zstandard (>=0.18.0)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "b6132f95647a55a3ea21a262221bf1427a08677a12bba2ff534d759f00563786"
+content-hash = "af365e7cb593b97d5af65500497d8a4cbf874eb1d5181bbd228e461d66b77a42"

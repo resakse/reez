@@ -8,6 +8,7 @@ from reez import settings
 from custom.katanama import titlecase
 from ordered_model.models import OrderedModel
 import auto_prefetch
+import uuid
 
 User = settings.AUTH_USER_MODEL
 
@@ -95,7 +96,6 @@ class Exam(auto_prefetch.Model):
         ("DISABLE", "Disable"),
     )
     exam = models.CharField(max_length=50)
-    exam_code = models.CharField(max_length=15, blank=True, null=True)
     part = auto_prefetch.ForeignKey(Part, on_delete=models.SET_NULL, null=True, blank=True)
     modaliti = auto_prefetch.ForeignKey(Modaliti, on_delete=models.CASCADE)
     catatan = models.CharField(max_length=200, blank=True, null=True)
@@ -119,7 +119,8 @@ class Exam(auto_prefetch.Model):
 
     def save(self, *args, **kwargs):
         self.exam = titlecase(self.exam)
-        self.short_desc = self.short_desc.upper()
+        if self.short_desc:
+            self.short_desc = self.short_desc.upper()
         super(Exam, self).save(*args, **kwargs)
 
 
@@ -129,34 +130,53 @@ lateral_choices = (
 )
 
 
-def kiraxray(nombor=None):
+def generate_study_accession(modality_code="XR"):
+    """Generate parent accession number for study (e.g., KKP2025XR0000001)"""
     tahun = timezone.now().year
-    print(nombor)
-    if nombor is not None:
-        print("dah ada nombor")
-        return nombor
-    try:
-        lnombor = (
-            Pemeriksaan.objects.filter(daftar__tarikh__year=tahun).order_by("-no_xray").first()
-        )
-        if lnombor is None:
-            print("takde nombor")
-            latest = "1"
-        else:
-            print("ada nombor ({})..tambah nombor baru".format(lnombor.no_xray))
-            latest = int(lnombor.no_xray[-4:])  # amik last 6 numbor
-            latest = latest + 1
-            print("nombor baru : ", latest)
-    except Pemeriksaan.DoesNotExist:
-        print("takde case..set nombor = 1")
-        latest = "1"
+    prefix = f"{settings.KLINIKSHORT}{tahun}{modality_code}"
+    
+    # Get all existing accession numbers with same prefix
+    existing = Daftar.objects.filter(
+        parent_accession_number__startswith=prefix
+    ).values_list('parent_accession_number', flat=True)
+    
+    # Find the highest number used
+    max_number = 0
+    for acc in existing:
+        if acc and len(acc) >= 7:  # Ensure we have a valid accession number
+            try:
+                number = int(acc[-7:])  # Last 7 digits
+                max_number = max(max_number, number)
+            except (ValueError, IndexError):
+                continue
+    
+    new_number = max_number + 1
+    return f"{prefix}{str(new_number).zfill(7)}"
 
-    print("last check nombor : ", latest)
-    latest = str(latest).zfill(4)
-    print("tambah 00000 kat nombor : ", latest)
-    nombornya = "{}{}{}".format(settings.KLINIKSHORT, tahun, latest)
-    print("nombor xray : ", nombornya)
-    return nombornya
+
+def generate_exam_accession():
+    """Generate child accession number for individual examination (e.g., KKP202500000001)"""
+    tahun = timezone.now().year
+    prefix = f"{settings.KLINIKSHORT}{tahun}"
+    
+    # Get all existing accession numbers with same prefix
+    existing = Pemeriksaan.objects.filter(
+        accession_number__startswith=prefix
+    ).values_list('accession_number', flat=True)
+    
+    # Find the highest number used
+    max_number = 0
+    for acc in existing:
+        if acc and len(acc) >= 10:  # Ensure we have a valid accession number
+            try:
+                # For exam accessions, we use last 10 digits
+                number = int(acc[-10:])
+                max_number = max(max_number, number)
+            except (ValueError, IndexError):
+                continue
+    
+    new_number = max_number + 1
+    return f"{prefix}{str(new_number).zfill(10)}"
 
 
 ambulatori_choice = [
@@ -200,14 +220,39 @@ class Daftar(auto_prefetch.Model):
     rujukan = auto_prefetch.ForeignKey(Ward, on_delete=models.SET_NULL, null=True)
     ambulatori = models.CharField(max_length=15, choices=ambulatori_choice, default='Berjalan Kaki')
 
+    # Parent-Child Study Hierarchy
+    parent_accession_number = models.CharField(
+        max_length=20, unique=True, blank=True, null=True,
+        help_text="Parent accession number for grouped studies (e.g., KKP2025XR0000001)"
+    )
+    requested_procedure_id = models.CharField(
+        max_length=20, blank=True, null=True,
+        help_text="DICOM Requested Procedure ID (maps 1-to-1 with parent_accession_number)"
+    )
+    study_description = models.CharField(
+        max_length=200, blank=True, null=True,
+        help_text="Description of the study (e.g., 'XR Series')"
+    )
+    
     # MWL Integration fields for CR machine
     study_instance_uid = models.CharField(
         max_length=64, unique=True, blank=True, null=True,
         help_text="Unique identifier for DICOM study"
     )
     accession_number = models.CharField(
-        max_length=16, blank=True, null=True,
-        help_text="Hospital's unique identifier for the study"
+        max_length=20, blank=True, null=True,
+        help_text="Legacy accession number field (use parent_accession_number for new studies)"
+    )
+    
+    # Study Status
+    study_status = models.CharField(
+        max_length=15, choices=[
+            ('SCHEDULED', 'Scheduled'),
+            ('IN_PROGRESS', 'In Progress'),
+            ('COMPLETED', 'Completed'),
+            ('CANCELLED', 'Cancelled')
+        ], default='SCHEDULED',
+        help_text="Overall study status"
     )
     scheduled_datetime = models.DateTimeField(
         blank=True, null=True,
@@ -237,15 +282,11 @@ class Daftar(auto_prefetch.Model):
     pemohon = models.CharField(max_length=30, blank=True, null=True)
     status = models.CharField(max_length=15, choices=status_chocies, default='Performed')
     hamil = models.BooleanField(default=False)
-    dcatatan = models.CharField(
-        verbose_name="Catatan", blank=True, null=True, max_length=20
-    )
     jxr = auto_prefetch.ForeignKey(User, verbose_name='Juru X-Ray', on_delete=models.SET_NULL, null=True, blank=True,
                                    related_name="bcs_jxr"
                                    )
     created = models.DateTimeField(auto_now_add=True)
     modified = models.DateTimeField(auto_now=True)
-    performed = models.DateTimeField(default=timezone.now, blank=True, null=True)
 
     class Meta(auto_prefetch.Model.Meta):
         verbose_name_plural = "Pendaftaran Radiologi"
@@ -253,6 +294,18 @@ class Daftar(auto_prefetch.Model):
             "tarikh", 'pesakit'
         ]
 
+    def generate_study_instance_uid(self):
+        """Generate a DICOM Study Instance UID"""
+        try:
+            # Try to use pydicom's generate_uid if available
+            from pydicom.uid import generate_uid
+            return generate_uid()
+        except ImportError:
+            # Fallback to simple UUID-based generation
+            org_root = getattr(settings, 'DICOM_ORG_ROOT', '1.2.826.0.1.3680043.8.498')
+            uid_suffix = str(uuid.uuid4().int)[:20]  # Limit for DICOM compliance
+            return f"{org_root}.{uid_suffix}"
+    
     def __str__(self):
         return "{} - {}".format(self.tarikh, self.pesakit.nama)
 
@@ -260,34 +313,86 @@ class Daftar(auto_prefetch.Model):
         if self.pemohon:
             self.pemohon = titlecase(self.pemohon)
         
-        # Generate study_instance_uid if not provided
-        if not self.study_instance_uid:
-            import uuid
-            self.study_instance_uid = str(uuid.uuid4())
+        # Generate parent accession number if not provided
+        if not self.parent_accession_number:
+            # Determine modality from related examinations or default to XR
+            modality_code = self.modality or "XR"
+            self.parent_accession_number = generate_study_accession(modality_code)
+            self.requested_procedure_id = self.parent_accession_number
         
-        # Use no_resit as accession_number if not provided
-        if not self.accession_number and self.no_resit:
-            self.accession_number = self.no_resit
+        # Generate Study Instance UID if not provided (for DICOM integration)
+        if not self.study_instance_uid:
+            self.study_instance_uid = self.generate_study_instance_uid()
+        
+        # Use parent_accession_number as legacy accession_number for compatibility
+        if not self.accession_number:
+            self.accession_number = self.parent_accession_number or self.no_resit
         
         super(Daftar, self).save(*args, **kwargs)
 
-    def get_absolute_url(self):
-        return ''
-        return reverse("bcs:exam-detail", args=[self.pk])
-
-    def get_komen_url(self):
-        return ''
-        return reverse("bcs:exam-komen", args=[self.pk])
 
 
 class Pemeriksaan(auto_prefetch.Model):
     daftar = auto_prefetch.ForeignKey(Daftar, on_delete=models.CASCADE, related_name='pemeriksaan')
-    no_xray = models.CharField(
-        verbose_name="No. X-Ray", blank=True, null=True, max_length=20
+    
+    # Individual examination identifiers
+    accession_number = models.CharField(
+        verbose_name="Accession Number", blank=True, null=True, max_length=20,
+        help_text="Individual accession number for this examination (e.g., KKP202500000001)"
     )
+    no_xray = models.CharField(
+        verbose_name="No. X-Ray (Legacy)", blank=True, null=True, max_length=20,
+        help_text="Legacy X-ray number field (use accession_number for new examinations)"
+    )
+    scheduled_step_id = models.CharField(
+        max_length=20, blank=True, null=True,
+        help_text="DICOM Scheduled Procedure Step ID (maps to accession_number)"
+    )
+    
+    # Examination details
     exam = auto_prefetch.ForeignKey(Exam, on_delete=models.CASCADE)
     laterality = models.CharField(
         choices=lateral_choices, blank=True, null=True, max_length=10
+    )
+    
+    # Positioning information
+    patient_position = models.CharField(
+        max_length=20, choices=[
+            ('AP', 'Anterior-Posterior'),
+            ('PA', 'Posterior-Anterior'),
+            ('LAT', 'Lateral'),
+            ('LATERAL_LEFT', 'Left Lateral'),
+            ('LATERAL_RIGHT', 'Right Lateral'),
+            ('OBLIQUE', 'Oblique'),
+        ], blank=True, null=True,
+        help_text="Patient position for X-ray (AP/PA/Lateral)"
+    )
+    
+    body_position = models.CharField(
+        max_length=20, choices=[
+            ('ERECT', 'Erect/Standing'),
+            ('SUPINE', 'Supine'),
+            ('PRONE', 'Prone'),
+            ('DECUBITUS_LEFT', 'Left Decubitus'),
+            ('DECUBITUS_RIGHT', 'Right Decubitus'),
+        ], blank=True, null=True,
+        help_text="Body position during examination"
+    )
+    
+    # Examination status and sequence
+    exam_status = models.CharField(
+        max_length=15, choices=[
+            ('SCHEDULED', 'Scheduled'),
+            ('IN_PROGRESS', 'In Progress'),
+            ('COMPLETED', 'Completed'),
+            ('CANCELLED', 'Cancelled')
+        ], default='SCHEDULED',
+        help_text="Individual examination status"
+    )
+    
+    sequence_number = models.PositiveSmallIntegerField(
+        default=1,
+        help_text="Order of this examination within the study"
     )
     kv = models.PositiveSmallIntegerField(verbose_name='kVp', blank=True, null=True)
     mas = models.PositiveSmallIntegerField(verbose_name='mAs', blank=True, null=True)
@@ -310,9 +415,15 @@ class Pemeriksaan(auto_prefetch.Model):
         return self.no_xray
 
     def save(self, *args, **kwargs):
-        nombor = kiraxray(self.no_xray)
-        print(nombor)
-        self.no_xray = nombor
+        # Generate accession number if not provided
+        if not self.accession_number:
+            self.accession_number = generate_exam_accession()
+            self.scheduled_step_id = self.accession_number
+        
+        # Keep legacy no_xray for backward compatibility
+        if not self.no_xray:
+            self.no_xray = self.accession_number
+            
         super(Pemeriksaan, self).save(*args, **kwargs)
 
 

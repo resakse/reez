@@ -195,3 +195,8 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
 }
+
+# DICOM Configuration
+DICOM_ORG_ROOT = '1.2.826.0.1.3680043.8.498'  # Example organization root UID
+DICOM_AE_TITLE = 'RIS_MWL_SCP'  # Application Entity title for MWL server
+DICOM_MWL_PORT = 11112  # Default port for MWL server

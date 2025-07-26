@@ -37,7 +37,7 @@ class ExamSerializer(serializers.ModelSerializer):
     class Meta:
         model = Exam
         fields = [
-            'id', 'exam', 'exam_code', 'part', 'part_id', 'modaliti', 'modaliti_id',
+            'id', 'exam', 'part', 'part_id', 'modaliti', 'modaliti_id',
             'catatan', 'short_desc', 'contrast', 'status_ca'
         ]
 
@@ -63,10 +63,12 @@ class PemeriksaanSerializer(serializers.ModelSerializer):
     class Meta:
         model = Pemeriksaan
         fields = [
-            'id', 'no_xray', 'exam', 'exam_id', 'laterality', 'kv', 'mas', 'mgy',
-            'jxr', 'jxr_id', 'jxr_info', 'created', 'modified', 'daftar_id', 'daftar_info'
+            'id', 'accession_number', 'no_xray', 'scheduled_step_id', 'exam', 'exam_id', 
+            'laterality', 'patient_position', 'body_position', 'kv', 'mas', 'mgy',
+            'catatan', 'exam_status', 'sequence_number', 'jxr', 'jxr_id', 'jxr_info', 
+            'created', 'modified', 'daftar_id', 'daftar_info'
         ]
-        read_only_fields = ['no_xray', 'created', 'modified', 'jxr_info']
+        read_only_fields = ['accession_number', 'no_xray', 'scheduled_step_id', 'created', 'modified', 'jxr_info']
 
     def get_daftar_info(self, obj):
         from staff.serializers import UserSerializer
@@ -142,14 +144,16 @@ class DaftarSerializer(serializers.ModelSerializer):
         model = Daftar
         fields = [
             'id', 'tarikh', 'pesakit', 'pesakit_id', 'no_resit', 'lmp', 'rujukan',
-            'rujukan_id', 'ambulatori', 'pemohon', 'status', 'hamil', 'dcatatan',
-            'jxr', 'created', 'modified', 'performed', 'pemeriksaan',
+            'rujukan_id', 'ambulatori', 'pemohon', 'status', 'hamil',
+            'jxr', 'created', 'modified', 'pemeriksaan',
+            # Parent-Child Study Hierarchy
+            'parent_accession_number', 'requested_procedure_id', 'study_description', 'study_status',
             # MWL Integration fields
             'study_instance_uid', 'accession_number', 'scheduled_datetime',
             'study_priority', 'requested_procedure_description', 'study_comments',
             'patient_position', 'modality'
         ]
-        read_only_fields = ['tarikh', 'created', 'modified', 'jxr', 'study_instance_uid']
+        read_only_fields = ['tarikh', 'created', 'modified', 'jxr', 'study_instance_uid', 'parent_accession_number', 'requested_procedure_id']
 
     def create(self, validated_data):
         request = self.context.get('request')
@@ -162,6 +166,77 @@ class DaftarSerializer(serializers.ModelSerializer):
             setattr(instance, attr, value)
         instance.save()
         return instance
+
+class GroupedExaminationSerializer(serializers.Serializer):
+    """
+    Serializer for creating grouped examinations under a single study
+    """
+    # Study data
+    study_description = serializers.CharField(max_length=200, required=False)
+    modality = serializers.CharField(max_length=10)
+    study_priority = serializers.ChoiceField(
+        choices=[
+            ('STAT', 'STAT'),
+            ('HIGH', 'High'),
+            ('MEDIUM', 'Medium'),
+            ('LOW', 'Low'),
+        ], default='MEDIUM'
+    )
+    scheduled_datetime = serializers.DateTimeField(required=False)
+    study_comments = serializers.CharField(required=False, allow_blank=True)
+    
+    # Patient and study metadata
+    pesakit_id = serializers.IntegerField()
+    rujukan_id = serializers.IntegerField(required=False, allow_null=True)
+    pemohon = serializers.CharField(max_length=30, required=False, allow_blank=True)
+    no_resit = serializers.CharField(max_length=50, required=False, allow_blank=True)
+    lmp = serializers.DateField(required=False, allow_null=True)
+    ambulatori = serializers.CharField(max_length=15, required=False)
+    hamil = serializers.BooleanField(default=False)
+    
+    # Multiple examinations
+    examinations = serializers.ListField(
+        child=serializers.JSONField(),
+        min_length=1,
+        help_text="List of examination data objects"
+    )
+    
+    def validate_examinations(self, value):
+        """Validate examination data structure"""
+        required_fields = ['exam_id']
+        for i, exam in enumerate(value):
+            for field in required_fields:
+                if field not in exam:
+                    raise serializers.ValidationError(
+                        f"Examination {i+1} missing required field: {field}"
+                    )
+        return value
+    
+    def create(self, validated_data):
+        examinations_data = validated_data.pop('examinations')
+        
+        # Create the study
+        study = Daftar.objects.create(**validated_data)
+        
+        # Create examinations
+        examinations = []
+        for i, exam_data in enumerate(examinations_data, 1):
+            exam_data['daftar'] = study
+            exam_data['sequence_number'] = i
+            
+            # Set jxr from request context if available
+            request = self.context.get('request')
+            if request and hasattr(request, 'user') and not exam_data.get('jxr'):
+                exam_data['jxr'] = request.user
+            
+            examination = Pemeriksaan.objects.create(**exam_data)
+            examinations.append(examination)
+        
+        return {
+            'study': study,
+            'examinations': examinations
+        }
+
 
 class RegistrationWorkflowSerializer(serializers.Serializer):
     """
@@ -226,33 +301,108 @@ class RegistrationWorkflowSerializer(serializers.Serializer):
             'examinations': examinations
         }
 
-class MWLWorklistSerializer(serializers.ModelSerializer):
+class GroupedMWLWorklistSerializer(serializers.ModelSerializer):
     """
-    Serializer for MWL (Modality Worklist) data for CR machine integration
+    Enhanced MWL serializer for grouped examinations with parent-child structure
     """
     patient_name = serializers.CharField(source='pesakit.nama', read_only=True)
     patient_id = serializers.CharField(source='pesakit.nric', read_only=True)
     patient_birth_date = serializers.CharField(source='pesakit.t_lahir', read_only=True)
     patient_gender = serializers.CharField(source='pesakit.jantina', read_only=True)
-    study_description = serializers.CharField(source='pemeriksaan.exam.exam', read_only=True)
-    accession_number = serializers.CharField(source='no_resit', read_only=True)
+    referring_physician = serializers.CharField(source='pemohon', read_only=True)
+    
+    # Parent study information
+    parent_accession_number = serializers.CharField(read_only=True)
+    study_description = serializers.CharField(read_only=True)
+    study_instance_uid = serializers.CharField(read_only=True)
+    study_status = serializers.CharField(read_only=True)
+    study_priority = serializers.CharField(read_only=True)
+    
+    # Child examinations
+    examinations = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Daftar
+        fields = [
+            'id', 'patient_name', 'patient_id', 'patient_birth_date', 'patient_gender',
+            'parent_accession_number', 'study_description', 'study_instance_uid', 
+            'study_status', 'study_priority', 'tarikh', 'referring_physician',
+            'scheduled_datetime', 'modality', 'examinations'
+        ]
+    
+    def get_examinations(self, obj):
+        """Get all child examinations for this study"""
+        examinations = obj.pemeriksaan.all().order_by('sequence_number')
+        return [{
+            'accession_number': exam.accession_number,
+            'scheduled_step_id': exam.scheduled_step_id,
+            'exam_description': exam.exam.exam,
+            'exam_short_desc': exam.exam.short_desc,
+            'body_part': exam.exam.part.part if exam.exam.part else None,
+            'patient_position': exam.patient_position,
+            'body_position': exam.body_position,
+            'laterality': exam.laterality,
+            'sequence_number': exam.sequence_number,
+            'exam_status': exam.exam_status,
+            'catatan': exam.catatan
+        } for exam in examinations]
+
+
+class MWLWorklistSerializer(serializers.ModelSerializer):
+    """
+    Legacy MWL serializer for backward compatibility
+    """
+    patient_name = serializers.CharField(source='pesakit.nama', read_only=True)
+    patient_id = serializers.CharField(source='pesakit.nric', read_only=True)
+    patient_birth_date = serializers.CharField(source='pesakit.t_lahir', read_only=True)
+    patient_gender = serializers.CharField(source='pesakit.jantina', read_only=True)
+    study_description = serializers.CharField(source='study_description', read_only=True)
+    accession_number = serializers.CharField(source='parent_accession_number', read_only=True)
     study_date = serializers.DateTimeField(source='tarikh', read_only=True)
     referring_physician = serializers.CharField(source='pemohon', read_only=True)
-    study_instance_uid = serializers.SerializerMethodField()
-    klinik = serializers.CharField(source='jxr.klinik', read_only=True)  # Added klinik field
+    study_instance_uid = serializers.CharField(read_only=True)
 
     class Meta:
         model = Daftar
         fields = [
             'id', 'patient_name', 'patient_id', 'patient_birth_date', 'patient_gender',
             'study_description', 'accession_number', 'study_date', 'referring_physician',
-            'study_instance_uid', 'status', 'klinik'  # Added klinik to fields
+            'study_instance_uid', 'study_status'
         ]
 
-    def get_study_instance_uid(self, obj):
-        # Generate unique study instance UID for DICOM
-        import uuid
-        return str(uuid.uuid4())
+class PositionChoicesSerializer(serializers.Serializer):
+    """
+    Serializer for position choices used in examinations
+    """
+    patient_positions = serializers.SerializerMethodField()
+    body_positions = serializers.SerializerMethodField()
+    laterality_choices = serializers.SerializerMethodField()
+    
+    def get_patient_positions(self, obj):
+        return [
+            {'value': 'AP', 'label': 'Anterior-Posterior'},
+            {'value': 'PA', 'label': 'Posterior-Anterior'},
+            {'value': 'LAT', 'label': 'Lateral'},
+            {'value': 'LATERAL_LEFT', 'label': 'Left Lateral'},
+            {'value': 'LATERAL_RIGHT', 'label': 'Right Lateral'},
+            {'value': 'OBLIQUE', 'label': 'Oblique'},
+        ]
+    
+    def get_body_positions(self, obj):
+        return [
+            {'value': 'ERECT', 'label': 'Erect/Standing'},
+            {'value': 'SUPINE', 'label': 'Supine'},
+            {'value': 'PRONE', 'label': 'Prone'},
+            {'value': 'DECUBITUS_LEFT', 'label': 'Left Decubitus'},
+            {'value': 'DECUBITUS_RIGHT', 'label': 'Right Decubitus'},
+        ]
+    
+    def get_laterality_choices(self, obj):
+        return [
+            {'value': 'Kiri', 'label': 'Kiri'},
+            {'value': 'Kanan', 'label': 'Kanan'},
+        ]
+
 
 class PacsConfigSerializer(serializers.ModelSerializer):
     class Meta:
