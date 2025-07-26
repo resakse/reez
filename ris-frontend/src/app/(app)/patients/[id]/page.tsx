@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,7 +11,7 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import AuthService from '@/lib/auth';
-import { ArrowLeft, Calendar, User, MapPin, Phone, Mail, CreditCard } from 'lucide-react';
+import { ArrowLeft, Calendar, User, MapPin, Phone, Mail, CreditCard, Edit } from 'lucide-react';
 
 interface Patient {
   id: number;
@@ -270,13 +271,23 @@ export default function PatientDetailPage() {
       {/* Patient Information Card */}
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle className="flex items-center">
-            <User className="w-5 h-5 mr-2" />
-            Patient Information
-          </CardTitle>
-          <CardDescription>
-            Basic details and contact information
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center">
+                <User className="w-5 h-5 mr-2" />
+                Patient Information
+              </CardTitle>
+              <CardDescription>
+                Basic details and contact information
+              </CardDescription>
+            </div>
+            <Button asChild variant="outline">
+              <Link href={`/patients/${patient.id}/edit`}>
+                <Edit className="w-4 h-4 mr-2" />
+                Edit Patient
+              </Link>
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

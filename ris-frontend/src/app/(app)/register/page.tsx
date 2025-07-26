@@ -465,8 +465,8 @@ export default function RegistrationWorkflowPage() {
                       </Alert>
                     )}
                     {nricInfo?.isValid && (
-                      <Alert className="py-2 bg-green-50 border-green-200">
-                        <AlertDescription className="text-sm">
+                      <Alert className="py-2 bg-green-200/80 border-green-400">
+                        <AlertDescription className="text-sm text-green-800">
                           ✓ Valid NRIC - Age: {nricInfo.age}, Gender: {nricInfo.gender === 'male' ? 'L' : 'P'}
                         </AlertDescription>
                       </Alert>

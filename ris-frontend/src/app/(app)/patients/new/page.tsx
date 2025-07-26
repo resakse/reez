@@ -14,15 +14,9 @@ import { parseNric, formatNric, type NricInfo } from '@/lib/nric';
 import { ArrowLeft, User, Calendar, MapPin, Phone, Mail } from 'lucide-react';
 import Link from 'next/link';
 
-interface Ward {
-  id: number;
-  nama: string;
-}
-
 export default function NewPatientPage() {
     const router = useRouter();
     const { user } = useAuth();
-    const [wards, setWards] = useState<Ward[]>([]);
     
     const [formData, setFormData] = useState({
         nama: '',
@@ -33,31 +27,15 @@ export default function NewPatientPage() {
         alamat: '',
         telefon: '',
         email: '',
-        wad: '',
         bangsa: 'Melayu',
-        mrn: ''
+        mrn: '',
+        catatan: ''
     });
     
     const [nricInfo, setNricInfo] = useState<NricInfo | null>(null);
     const [nricError, setNricError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-
-    useEffect(() => {
-        fetchWards();
-    }, [user]);
-
-    const fetchWards = async () => {
-        try {
-            const res = await AuthService.authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/wards/`);
-            if (res.ok) {
-                const data = await res.json();
-                setWards(data);
-            }
-        } catch (error) {
-            console.error('Error fetching wards:', error);
-        }
-    };
 
     const handleNricChange = (value: string) => {
         const formatted = formatNric(value);
@@ -86,7 +64,7 @@ export default function NewPatientPage() {
         }
     };
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         setFormData({ ...formData, [e.target.id]: e.target.value });
     };
 
@@ -109,9 +87,9 @@ export default function NewPatientPage() {
                 alamat: formData.alamat,
                 telefon: formData.telefon,
                 email: formData.email,
-                wad: formData.wad ? parseInt(formData.wad) : null,
                 bangsa: formData.bangsa,
-                mrn: formData.mrn || null
+                mrn: formData.mrn || null,
+                catatan: formData.catatan
             };
 
             const response = await AuthService.authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/patients/`, {
@@ -152,211 +130,205 @@ export default function NewPatientPage() {
                         Back to Patients
                     </Link>
                 </Button>
-            \u003c/div\u003e
+            </div>
 
-            \u003cform onSubmit={handleSubmit} className="space-y-6"\u003e
-                \u003cCard\u003e
-                    \u003cCardHeader\u003e
-                        \u003cCardTitle\u003ePatient Information\u003c/CardTitle\u003e
-                        \u003cCardDescription\u003e
+            <form onSubmit={handleSubmit} className="space-y-6">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Patient Information</CardTitle>
+                        <CardDescription>
                             Enter patient details. NRIC will automatically populate age and gender.
-                        \u003c/CardDescription\u003e
-                    \u003c/CardHeader\u003e
-                    \u003cCardContent className="space-y-4"\u003e
-                        \u003cdiv className="grid grid-cols-1 md:grid-cols-2 gap-4"\u003e
-                            \u003cdiv className="space-y-2"\u003e
-                                \u003cLabel htmlFor="nama"\u003eFull Name *\u003c/Label\u003e
-                                \u003cdiv className="relative"\u003e
-                                    \u003cUser className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /\u003e
-                                    \u003cInput
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="nama">Full Name *</Label>
+                                <div className="relative">
+                                    <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                                    <Input
                                         id="nama"
                                         placeholder="Enter patient name"
                                         value={formData.nama}
                                         onChange={handleChange}
                                         className="pl-10"
                                         required
-                                    /\u003e
-                                \u003c/div\u003e
-                            \u003c/div\u003e
+                                    />
+                                </div>
+                            </div>
 
-                            \u003cdiv className="space-y-2"\u003e
-                                \u003cLabel htmlFor="no_kp"\u003eNRIC Number *\u003c/Label\u003e
-                                \u003cInput
+                            <div className="space-y-2">
+                                <Label htmlFor="no_kp">NRIC Number *</Label>
+                                <Input
                                     id="no_kp"
                                     placeholder="e.g., 791113-12-3456"
                                     value={formData.no_kp}
-                                    onChange={(e) =\u003e handleNricChange(e.target.value)}
+                                    onChange={(e) => handleNricChange(e.target.value)}
                                     maxLength={17}
                                     className={nricError ? 'border-red-500' : nricInfo?.isValid ? 'border-green-500' : ''}
                                     required
-                                /\u003e
-                                {nricError \u0026\u0026 (
-                                    \u003cAlert variant="destructive" className="py-2"\u003e
-                                        \u003cAlertDescription className="text-sm"\u003e{nricError}\u003c/AlertDescription\u003e
-                                    \u003c/Alert\u003e
+                                />
+                                {nricError && (
+                                    <Alert variant="destructive" className="py-2">
+                                        <AlertDescription className="text-sm">{nricError}</AlertDescription>
+                                    </Alert>
                                 )}
-                                {nricInfo?.isValid \u0026\u0026 (
-                                    \u003cAlert className="py-2 bg-green-50 border-green-200"\u003e
-                                        \u003cAlertDescription className="text-sm"\u003e
+                                {nricInfo?.isValid && (
+                                    <Alert className="py-2 bg-green-50 border-green-200">
+                                        <AlertDescription className="text-sm">
                                             {nricInfo.type === 'nric' 
                                                 ? `✓ Valid NRIC - Age: ${nricInfo.age}, Gender: ${nricInfo.gender === 'male' ? 'L' : 'P'}`
                                                 : '✓ Valid Passport Format'
                                             }
-                                        \u003c/AlertDescription\u003e
-                                    \u003c/Alert\u003e
+                                        </AlertDescription>
+                                    </Alert>
                                 )}
-                            \u003c/div\u003e
+                            </div>
 
-                            \u003cdiv className="space-y-2"\u003e
-                                \u003cLabel htmlFor="mrn"\u003eMedical Record Number\u003c/Label\u003e
-                                \u003cInput
+                            <div className="space-y-2">
+                                <Label htmlFor="mrn">Medical Record Number</Label>
+                                <Input
                                     id="mrn"
                                     placeholder="e.g., MRN-2024-0001"
                                     value={formData.mrn}
                                     onChange={handleChange}
-                                /\u003e
-                            \u003c/div\u003e
+                                />
+                            </div>
 
-                            \u003cdiv className="space-y-2"\u003e
-                                \u003cLabel htmlFor="t_lahir"\u003eDate of Birth\u003c/Label\u003e
-                                \u003cdiv className="relative"\u003e
-                                    \u003cCalendar className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /\u003e
-                                    \u003cInput
+                            <div className="space-y-2">
+                                <Label htmlFor="t_lahir">Date of Birth</Label>
+                                <div className="relative">
+                                    <Calendar className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                                    <Input
                                         id="t_lahir"
                                         type="date"
                                         value={formData.t_lahir}
-                                        onChange={(e) =\u003e handleSelectChange('t_lahir', e.target.value)}
+                                        onChange={(e) => handleSelectChange('t_lahir', e.target.value)}
                                         className="pl-10"
-                                    /\u003e
-                                \u003c/div\u003e
-                            \u003c/div\u003e
+                                    />
+                                </div>
+                            </div>
+                        </div>
 
-                            \u003cdiv className="space-y-2"\u003e
-                                \u003cLabel htmlFor="jantina"\u003eGender\u003c/Label\u003e
-                                \u003cSelect
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="jantina">Gender</Label>
+                                <Select
                                     value={formData.jantina}
-                                    onValueChange={(value) =\u003e handleSelectChange('jantina', value)}
-                                \u003e
-                                    \u003cSelectTrigger\u003e
-                                        \u003cSelectValue placeholder="Select gender" /\u003e
-                                    \u003c/SelectTrigger\u003e
-                                    \u003cSelectContent\u003e
-                                        \u003cSelectItem value="L"\u003eMale (L)\u003c/SelectItem\u003e
-                                        \u003cSelectItem value="P"\u003eFemale (P)\u003c/SelectItem\u003e
-                                    \u003c/SelectContent\u003e
-                                \u003c/Select\u003e
-                            \u003c/div\u003e
+                                    onValueChange={(value) => handleSelectChange('jantina', value)}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select gender" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="L">Male (L)</SelectItem>
+                                        <SelectItem value="P">Female (P)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
 
-                            \u003cdiv className="space-y-2"\u003e
-                                \u003cLabel htmlFor="umur"\u003eAge\u003c/Label\u003e
-                                \u003cInput
+                            <div className="space-y-2">
+                                <Label htmlFor="bangsa">Race</Label>
+                                <Select
+                                    value={formData.bangsa}
+                                    onValueChange={(value) => handleSelectChange('bangsa', value)}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select race" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Melayu">Melayu</SelectItem>
+                                        <SelectItem value="Cina">Cina</SelectItem>
+                                        <SelectItem value="India">India</SelectItem>
+                                        <SelectItem value="Lain-Lain">Lain-Lain</SelectItem>
+                                        <SelectItem value="Warga Asing">Warga Asing</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="umur">Age</Label>
+                                <Input
                                     id="umur"
                                     type="number"
                                     value={formData.umur}
-                                    onChange={(e) =\u003e handleSelectChange('umur', e.target.value)}
+                                    onChange={(e) => handleSelectChange('umur', e.target.value)}
                                     placeholder="Auto-calculated from NRIC"
                                     readOnly={!!nricInfo?.age}
-                                /\u003e
-                            \u003c/div\u003e
+                                />
+                            </div>
+                        </div>
 
-                            \u003cdiv className="space-y-2"\u003e
-                                \u003cLabel htmlFor="bangsa"\u003eRace\u003c/Label\u003e
-                                \u003cSelect
-                                    value={formData.bangsa}
-                                    onValueChange={(value) =\u003e handleSelectChange('bangsa', value)}
-                                \u003e
-                                    \u003cSelectTrigger\u003e
-                                        \u003cSelectValue placeholder="Select race" /\u003e
-                                    \u003c/SelectTrigger\u003e
-                                    \u003cSelectContent\u003e
-                                        \u003cSelectItem value="Melayu"\u003eMelayu\u003c/SelectItem\u003e
-                                        \u003cSelectItem value="Cina"\u003eCina\u003c/SelectItem\u003e
-                                        \u003cSelectItem value="India"\u003eIndia\u003c/SelectItem\u003e
-                                        \u003cSelectItem value="Lain-Lain"\u003eLain-Lain\u003c/SelectItem\u003e
-                                        \u003cSelectItem value="Warga Asing"\u003eWarga Asing\u003c/SelectItem\u003e
-                                    \u003c/SelectContent\u003e
-                                \u003c/Select\u003e
-                            \u003c/div\u003e
-
-                            \u003cdiv className="space-y-2"\u003e
-                                \u003cLabel htmlFor="wad"\u003eWard\u003c/Label\u003e
-                                \u003cSelect
-                                    value={formData.wad}
-                                    onValueChange={(value) =\u003e handleSelectChange('wad', value)}
-                                \u003e
-                                    \u003cSelectTrigger\u003e
-                                        \u003cSelectValue placeholder="Select ward" /\u003e
-                                    \u003c/SelectTrigger\u003e
-                                    \u003cSelectContent\u003e
-                                        {wards.map((ward) =\u003e (
-                                            \u003cSelectItem key={ward.id} value={ward.id.toString()}\u003e
-                                                {ward.nama}
-                                            \u003c/SelectItem\u003e
-                                        ))}
-                                    \u003c/SelectContent\u003e
-                                \u003c/Select\u003e
-                            \u003c/div\u003e
-                        \u003c/div\u003e
-
-                        \u003cdiv className="space-y-2"\u003e
-                            \u003cLabel htmlFor="alamat"\u003eAddress\u003c/Label\u003e
-                            \u003cdiv className="relative"\u003e
-                                \u003cMapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /\u003e
-                                \u003cInput
+                        <div className="space-y-2">
+                            <Label htmlFor="alamat">Address</Label>
+                            <div className="relative">
+                                <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                                <Input
                                     id="alamat"
                                     placeholder="Enter patient address"
                                     value={formData.alamat}
                                     onChange={handleChange}
                                     className="pl-10"
-                                /\u003e
-                            \u003c/div\u003e
-                        \u003c/div\u003e
+                                />
+                            </div>
+                        </div>
 
-                        \u003cdiv className="grid grid-cols-1 md:grid-cols-2 gap-4"\u003e
-                            \u003cdiv className="space-y-2"\u003e
-                                \u003cLabel htmlFor="telefon"\u003ePhone Number\u003c/Label\u003e
-                                \u003cdiv className="relative"\u003e
-                                    \u003cPhone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /\u003e
-                                    \u003cInput
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="telefon">Phone Number</Label>
+                                <div className="relative">
+                                    <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                                    <Input
                                         id="telefon"
                                         type="tel"
                                         placeholder="e.g., +6012-3456789"
                                         value={formData.telefon}
                                         onChange={handleChange}
                                         className="pl-10"
-                                    /\u003e
-                                \u003c/div\u003e
-                            \u003c/div\u003e
+                                    />
+                                </div>
+                            </div>
 
-                            \u003cdiv className="space-y-2"\u003e
-                                \u003cLabel htmlFor="email"\u003eEmail\u003c/Label\u003e
-                                \u003cdiv className="relative"\u003e
-                                    \u003cMail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /\u003e
-                                    \u003cInput
+                            <div className="space-y-2">
+                                <Label htmlFor="email">Email</Label>
+                                <div className="relative">
+                                    <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                                    <Input
                                         id="email"
                                         type="email"
                                         placeholder="patient@email.com"
                                         value={formData.email}
                                         onChange={handleChange}
                                         className="pl-10"
-                                    /\u003e
-                                \u003c/div\u003e
-                            \u003c/div\u003e
-                        \u003c/div\u003e
+                                    />
+                                </div>
+                            </div>
+                        </div>
 
-                        {error \u0026\u0026 (\u003cp className="text-sm text-red-500"\u003e{error}\u003c/p\u003e)}
-                    \u003c/CardContent\u003e
-                \u003c/Card\u003e
+                        <div className="space-y-2">
+                            <Label htmlFor="catatan">Notes</Label>
+                            <textarea
+                                id="catatan"
+                                placeholder="Enter any additional notes or remarks about the patient"
+                                value={formData.catatan}
+                                onChange={(e) => handleChange(e)}
+                                className="w-full min-h-[80px] px-3 py-2 border border-input bg-background rounded-md text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            />
+                        </div>
 
-                \u003cdiv className="flex justify-end space-x-4"\u003e
-                    \u003cButton type="button" variant="outline" onClick={() =\u003e router.back()}\u003e
+                        {error && (<p className="text-sm text-red-500">{error}</p>)}
+                    </CardContent>
+                </Card>
+
+                <div className="flex justify-end space-x-4">
+                    <Button type="button" variant="outline" onClick={() => router.back()}>
                         Cancel
-                    \u003c/Button\u003e
-                    \u003cButton type="submit" disabled={isLoading || (!!nricError \u0026\u0026 !!formData.no_kp)}\u003e
+                    </Button>
+                    <Button type="submit" disabled={isLoading || (!!nricError && !!formData.no_kp)}>
                         {isLoading ? 'Creating...' : 'Create Patient'}
-                    \u003c/Button\u003e
-                \u003c/div\u003e
-            \u003c/form\u003e
-        \u003c/div\u003e
+                    </Button>
+                </div>
+            </form>
+        </div>
     );
-} 
+}

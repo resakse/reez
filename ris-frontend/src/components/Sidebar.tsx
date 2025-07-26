@@ -2,13 +2,17 @@
 
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Users, Settings, BarChart, Home, Stethoscope, X, Bone, FileText, ClipboardList, ListChecks } from "lucide-react";
+import { LayoutDashboard, Users, Settings, BarChart, Home, Stethoscope, X, Bone, FileText, ClipboardList, ListChecks, UserCog } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
   isCollapsed: boolean;
 }
 
 export default function Sidebar({ className, isCollapsed }: SidebarProps) {
+  const { user } = useAuth();
+  const isSupervisor = user?.is_superuser || false;
+
   return (
     <aside className={cn("hidden md:block text-white bg-sidebar", isCollapsed ? "w-20" : "w-64", "transition-all duration-300", className)}>
       <nav className="p-4">
@@ -74,11 +78,19 @@ export default function Sidebar({ className, isCollapsed }: SidebarProps) {
             </div>
           </li>
           <li>
-            <div className="flex items-center p-2 text-gray-400 cursor-not-allowed">
-              <Settings className="h-5 w-5 mr-2" />
-              {!isCollapsed && "Settings"}
-            </div>
+            <Link href="/staff" className="flex items-center p-2 rounded hover:bg-white/10">
+              <UserCog className="h-5 w-5 mr-2" />
+              {!isCollapsed && "Staff Management"}
+            </Link>
           </li>
+          {isSupervisor && (
+            <li>
+              <Link href="/settings" className="flex items-center p-2 rounded hover:bg-white/10">
+                <Settings className="h-5 w-5 mr-2" />
+                {!isCollapsed && "Settings"}
+              </Link>
+            </li>
+          )}
           <li>
             <div className="flex items-center p-2 text-gray-400 cursor-not-allowed">
               <BarChart className="h-5 w-5 mr-2" />

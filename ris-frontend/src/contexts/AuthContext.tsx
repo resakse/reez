@@ -6,6 +6,11 @@ import AuthService from '@/lib/auth';
 interface User {
   id: number;
   username: string;
+  is_staff?: boolean;
+  is_superuser?: boolean;
+  first_name?: string;
+  last_name?: string;
+  email?: string;
 }
 
 interface AuthContextType {
@@ -13,7 +18,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
-  refreshUser: () => void;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -26,10 +31,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refreshUser();
   }, []);
 
-  const refreshUser = () => {
+  const refreshUser = async () => {
     const currentUser = AuthService.getCurrentUser();
     if (currentUser) {
-      setUser({ id: currentUser.user_id, username: currentUser.username });
+      try {
+        // Fetch full user profile from API
+        const response = await AuthService.authenticatedFetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/staff/${currentUser.user_id}/`
+        );
+        
+        if (response.ok) {
+          const userData = await response.json();
+          setUser({
+            id: userData.id,
+            username: userData.username,
+            is_staff: userData.is_staff,
+            is_superuser: userData.is_superuser,
+            first_name: userData.first_name,
+            last_name: userData.last_name,
+            email: userData.email,
+          });
+        } else {
+          // Fallback to token data if API call fails
+          setUser({ id: currentUser.user_id, username: currentUser.username });
+        }
+      } catch (error) {
+        console.error('Failed to fetch user profile:', error);
+        // Fallback to token data
+        setUser({ id: currentUser.user_id, username: currentUser.username });
+      }
     } else {
       setUser(null);
     }
@@ -39,7 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (username: string, password: string): Promise<boolean> => {
     const success = await AuthService.login(username, password);
     if (success) {
-      refreshUser();
+      await refreshUser();
     }
     return success;
   };

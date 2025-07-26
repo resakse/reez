@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Modaliti, Part, Exam, Daftar, Pemeriksaan
+from .models import Modaliti, Part, Exam, Daftar, Pemeriksaan, PacsConfig
 from pesakit.models import Pesakit
 from wad.models import Ward
 from pesakit.serializers import PesakitSerializer
@@ -230,3 +230,9 @@ class MWLWorklistSerializer(serializers.ModelSerializer):
         # Generate unique study instance UID for DICOM
         import uuid
         return str(uuid.uuid4())
+
+class PacsConfigSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PacsConfig
+        fields = ['id', 'orthancurl', 'viewrurl', 'created', 'modified']
+        read_only_fields = ['created', 'modified']

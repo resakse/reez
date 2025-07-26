@@ -6,6 +6,7 @@ from .views import (
     DaftarViewSet, PemeriksaanViewSet, 
     RegistrationWorkflowView, MWLWorklistView
 )
+from .settings_views import PacsConfigListCreateAPIView, PacsConfigDetailAPIView, get_current_pacs_config
 
 from . import api
 # from .export import export_xls
@@ -60,4 +61,9 @@ urlpatterns = [
     # Additional REST API endpoints for workflow
     path('registration/workflow/', RegistrationWorkflowView.as_view(), name='registration-workflow'),
     path('mwl/worklist/', MWLWorklistView.as_view(), name='mwl-worklist'),
+    
+    # PACS Settings API endpoints (supervisor only)
+    path('settings/pacs/', PacsConfigListCreateAPIView.as_view(), name='pacs-settings-list'),
+    path('settings/pacs/<int:pk>/', PacsConfigDetailAPIView.as_view(), name='pacs-settings-detail'),
+    path('settings/pacs/current/', get_current_pacs_config, name='pacs-settings-current'),
 ]

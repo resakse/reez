@@ -33,7 +33,10 @@ class Pesakit(models.Model):
     bangsa = models.CharField(max_length=15, choices=bangsa_list, default='Melayu')
     jantina = models.CharField(max_length=2, choices=jantina_list, default='L')
     umur = models.CharField(max_length=10, blank=True, null=True)
-    catatan = models.TextField(blank=True, null=True)
+    alamat = models.TextField(blank=True, null=True, verbose_name="Address")
+    telefon = models.CharField(max_length=20, blank=True, null=True, verbose_name="Phone Number")
+    email = models.EmailField(blank=True, null=True, verbose_name="Email Address")
+    catatan = models.TextField(blank=True, null=True, verbose_name="Notes")
 
     jxr = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=False)
     created = models.DateTimeField(auto_now_add=True)
