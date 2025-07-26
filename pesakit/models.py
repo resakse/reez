@@ -53,7 +53,8 @@ class Pesakit(models.Model):
         return f"{info} - {self.nama}"
 
     def save(self, *args, **kwargs):
-        self.nama = titlecase(self.nama)
+        if self.nama:
+            self.nama = titlecase(self.nama)
         if self.mrn:
             self.mrn = self.mrn.upper()
         if self.nric:
@@ -68,7 +69,7 @@ class Pesakit(models.Model):
 
     @property
     def t_lahir(self):
-        if not self.nric:
+        if not self.nric or len(self.nric) < 6:
             return None
         tlahir = self.nric[:6]
         try:
@@ -87,6 +88,8 @@ class Pesakit(models.Model):
 
     @property
     def cek_jantina(self):
+        if not self.nric:
+            return None
         lastic = self.nric[-1]
         if (int(lastic) % 2) == 0:
             return 'Perempuan'

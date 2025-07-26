@@ -4,6 +4,7 @@ from pesakit.models import Pesakit
 from wad.models import Ward
 from pesakit.serializers import PesakitSerializer
 from wad.serializers import WardSerializer
+from staff.serializers import UserSerializer
 
 class ModalitiSerializer(serializers.ModelSerializer):
     class Meta:
@@ -45,14 +46,52 @@ class PemeriksaanSerializer(serializers.ModelSerializer):
         write_only=True
     )
     daftar_id = serializers.IntegerField(write_only=True)
+    daftar_info = serializers.SerializerMethodField()
 
     class Meta:
         model = Pemeriksaan
         fields = [
             'id', 'no_xray', 'exam', 'exam_id', 'laterality', 'kv', 'mas', 'mgy',
-            'created', 'modified', 'daftar_id'
+            'created', 'modified', 'daftar_id', 'daftar_info'
         ]
         read_only_fields = ['no_xray', 'created', 'modified']
+
+    def get_daftar_info(self, obj):
+        from staff.serializers import UserSerializer
+        jxr_data = None
+        if obj.daftar.jxr:
+            jxr_data = {
+                'id': obj.daftar.jxr.id,
+                'username': obj.daftar.jxr.username,
+                'first_name': obj.daftar.jxr.first_name,
+                'last_name': obj.daftar.jxr.last_name
+            }
+        
+        rujukan_data = None
+        if obj.daftar.rujukan:
+            rujukan_data = {
+                'id': obj.daftar.rujukan.id,
+                'wad': obj.daftar.rujukan.wad
+            }
+        
+        return {
+            'id': obj.daftar.id,
+            'tarikh': obj.daftar.tarikh,
+            'no_resit': obj.daftar.no_resit,
+            'accession_number': obj.daftar.accession_number,
+            'study_instance_uid': obj.daftar.study_instance_uid,
+            'pemohon': obj.daftar.pemohon,
+            'ambulatori': obj.daftar.ambulatori,
+            'lmp': obj.daftar.lmp,
+            'rujukan': rujukan_data,
+            'jxr': jxr_data,
+            'pesakit': {
+                'id': obj.daftar.pesakit.id,
+                'nama': obj.daftar.pesakit.nama,
+                'nric': obj.daftar.pesakit.nric,
+                'jantina': obj.daftar.pesakit.jantina
+            }
+        }
 
     def create(self, validated_data):
         daftar_id = validated_data.pop('daftar_id')
@@ -75,7 +114,7 @@ class DaftarSerializer(serializers.ModelSerializer):
         allow_null=True
     )
     pemeriksaan = PemeriksaanSerializer(many=True, read_only=True)
-    jxr = serializers.StringRelatedField(read_only=True)
+    jxr = UserSerializer(read_only=True)
 
     class Meta:
         model = Daftar
@@ -120,11 +159,27 @@ class RegistrationWorkflowSerializer(serializers.Serializer):
     )
 
     def create(self, validated_data):
-        # Create patient
+        # Check for existing patient or create new one
         patient_data = validated_data.pop('patient_data')
-        patient_serializer = PesakitSerializer(data=patient_data)
-        patient_serializer.is_valid(raise_exception=True)
-        patient = patient_serializer.save()
+        
+        # Try to find existing patient by NRIC or MRN
+        existing_patient = None
+        if patient_data.get('nric'):
+            existing_patient = Pesakit.objects.filter(nric=patient_data['nric']).first()
+        elif patient_data.get('mrn'):
+            existing_patient = Pesakit.objects.filter(mrn=patient_data['mrn']).first()
+        
+        if existing_patient:
+            # Update existing patient with new data
+            for key, value in patient_data.items():
+                setattr(existing_patient, key, value)
+            existing_patient.save()
+            patient = existing_patient
+        else:
+            # Create new patient
+            patient_serializer = PesakitSerializer(data=patient_data)
+            patient_serializer.is_valid(raise_exception=True)
+            patient = patient_serializer.save()
 
         # Create registration
         registration_data = validated_data.pop('registration_data')

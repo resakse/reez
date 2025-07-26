@@ -91,7 +91,9 @@ export default function PatientsPage() {
                 <TableCell>{formatDate(patient.t_lahir)}</TableCell>
                 <TableCell>{patient.jantina === 'L' ? 'Male' : 'Female'}</TableCell>
                 <TableCell>
-                  <Button variant="outline" size="sm">View</Button>
+                  <Button asChild variant="outline" size="sm">
+                    <Link href={`/patients/${patient.id}`}>View</Link>
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}

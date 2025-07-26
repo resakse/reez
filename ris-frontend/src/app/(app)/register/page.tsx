@@ -15,7 +15,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import AuthService from '@/lib/auth';
 import { parseNric, formatNric, type NricInfo } from '@/lib/nric';
-import { Search, User, Calendar, MapPin, Phone, Mail, Plus, X, Check } from 'lucide-react';
+import { Search, User, Calendar, MapPin, Phone, Mail, Plus, X, Check, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 
 interface Patient {
   id: number;
@@ -29,13 +29,13 @@ interface Patient {
   email: string;
   wad: {
     id: number;
-    nama: string;
+    wad: string;
   } | null;
 }
 
 interface Ward {
   id: number;
-  nama: string;
+  wad: string;
 }
 
 interface Discipline {
@@ -61,8 +61,11 @@ interface Exam {
 
 interface SelectedExam {
   exam: number;
-  priority: string;
   notes: string;
+  laterality: string;
+  kv: string;
+  mas: string;
+  mgy: string;
 }
 
 export default function RegistrationWorkflowPage() {
@@ -70,6 +73,19 @@ export default function RegistrationWorkflowPage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'error' | 'success' | 'info'>('error');
+
+  const showToastNotification = (message: string, type: 'error' | 'success' | 'info' = 'error') => {
+    setToastMessage(message);
+    setToastType(type);
+    setShowToast(true);
+    setTimeout(() => {
+      setShowToast(false);
+    }, 5000);
+  };
   
   // Patient search/creation states
   const [searchQuery, setSearchQuery] = useState('');
@@ -106,10 +122,11 @@ export default function RegistrationWorkflowPage() {
   const [registrationData, setRegistrationData] = useState({
     ward: 'none',
     doctor: '',
+    receipt_number: '',
     clinical_notes: '',
-    transport: 'Berjalan Kaki',
+    transport: 'Berjalan',
     pregnant: false,
-    lmp: '' // Last Menstrual Period
+    lmp: '' // Last Menstrual Period - only shown for female patients
   });
 
   const [selectedExams, setSelectedExams] = useState<SelectedExam[]>([]);
@@ -141,6 +158,7 @@ export default function RegistrationWorkflowPage() {
       if (bodyPartsRes.ok) setBodyParts(await bodyPartsRes.json());
     } catch (error) {
       console.error('Error fetching configuration:', error);
+      showToastNotification('Failed to load configuration data. Please refresh the page.', 'error');
     }
   };
 
@@ -154,9 +172,13 @@ export default function RegistrationWorkflowPage() {
       if (res.ok) {
         const data = await res.json();
         setSearchResults(data.results || data);
+      } else {
+        const errorData = await res.json();
+        showToastNotification(errorData.detail || 'Failed to search patients', 'error');
       }
     } catch (error) {
       console.error('Error searching patients:', error);
+      showToastNotification('Failed to search patients. Please try again.', 'error');
     }
   };
 
@@ -188,7 +210,13 @@ export default function RegistrationWorkflowPage() {
   };
 
   const createNewPatient = async () => {
+    if (!newPatientData.nama || !newPatientData.no_kp) {
+      showToastNotification('Please fill in all required fields', 'error');
+      return;
+    }
+
     setLoading(true);
+    
     try {
       const payload = {
         nama: newPatientData.nama,
@@ -214,60 +242,73 @@ export default function RegistrationWorkflowPage() {
         const patient = await res.json();
         setSelectedPatient(patient);
         setStep(2);
+        showToastNotification('Patient created successfully!', 'success');
+      } else {
+        const errorData = await res.json();
+        showToastNotification(errorData.detail || 'Failed to create patient', 'error');
       }
     } catch (error) {
       console.error('Error creating patient:', error);
+      showToastNotification('Failed to create patient. Please check your connection and try again.', 'error');
     } finally {
       setLoading(false);
     }
   };
 
   const completeRegistration = async () => {
-    if (!selectedPatient || selectedExams.length === 0) return;
+    if (!selectedPatient || selectedExams.length === 0) {
+      showToastNotification('Please select at least one examination', 'error');
+      return;
+    }
 
     setLoading(true);
     try {
-      // Create registration for each selected exam
-      const registrations = selectedExams.map(ex => {
-        const examData = exams.find(e => e.id === ex.exam);
-        return {
-          pesakit: selectedPatient.id,
-          rujukan: registrationData.ward !== 'none' ? parseInt(registrationData.ward) : null,
-          pemohon: registrationData.doctor,
+      // Use the registration workflow endpoint to create everything in one transaction
+      const workflowData = {
+        patient_data: {
+          id: selectedPatient.id
+        },
+        registration_data: {
+          pesakit_id: selectedPatient.id,
+          rujukan_id: registrationData.ward !== 'none' ? parseInt(registrationData.ward) : null,
+          pemohon: registrationData.doctor || 'Unknown',
           no_resit: registrationData.receipt_number || null,
           lmp: registrationData.lmp || null,
-          study_priority: registrationData.priority,
-          study_comments: registrationData.clinical_notes || null,
-          requested_procedure_description: registrationData.procedure_description || examData?.exam || null,
-          patient_position: registrationData.patient_position || null,
-          modality: registrationData.modality || examData?.modaliti?.singkatan || null,
           hamil: registrationData.pregnant || false,
           ambulatori: registrationData.transport || 'Berjalan Kaki',
-          dcatatan: registrationData.additional_notes || ex.notes || null
-        };
+          dcatatan: registrationData.clinical_notes || null,
+          study_priority: 'MEDIUM'
+        },
+        examinations_data: selectedExams.map(ex => ({
+          exam_id: ex.exam,
+          laterality: ex.laterality !== 'none' ? ex.laterality : null,
+          kv: ex.kv ? parseInt(ex.kv) : null,
+          mas: ex.mas ? parseInt(ex.mas) : null,
+          mgy: ex.mgy ? parseInt(ex.mgy) : null,
+          catatan: ex.notes || null
+        }))
+      };
+
+      const res = await AuthService.authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/registration/workflow/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(workflowData)
       });
-
-      // Create registrations one by one for each exam
-      const results = [];
-      for (const registration of registrations) {
-        const res = await AuthService.authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/daftar/`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(registration)
-        });
-        
-        if (!res.ok) {
-          throw new Error(`Failed to create registration: ${await res.text()}`);
-        }
-        
-        const result = await res.json();
-        results.push(result);
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.detail || 'Failed to create registration');
       }
-
-      // Redirect to patient page after successful registration
-      router.push(`/patients/${selectedPatient.id}`);
+      
+      const result = await res.json();
+      
+      showToastNotification('Registration completed successfully!', 'success');
+      setTimeout(() => {
+        router.push(`/patients/${result.patient.id}`);
+      }, 1000);
     } catch (error) {
       console.error('Error completing registration:', error);
+      showToastNotification(error instanceof Error ? error.message : 'Failed to complete registration. Please try again.', 'error');
     } finally {
       setLoading(false);
     }
@@ -300,8 +341,11 @@ export default function RegistrationWorkflowPage() {
     if (!selectedExams.find(e => e.exam === examId)) {
       setSelectedExams([...selectedExams, {
         exam: examId,
-        priority: 'ROUTINE',
-        notes: ''
+        notes: '',
+        laterality: 'none',
+        kv: '',
+        mas: '',
+        mgy: ''
       }]);
     }
   };
@@ -376,7 +420,7 @@ export default function RegistrationWorkflowPage() {
                           <p className="text-sm text-muted-foreground">{patient.no_kp}</p>
                           <p className="text-sm">Age: {patient.umur}, Gender: {patient.jantina}</p>
                         </div>
-                        <Badge variant="outline">{patient.wad?.nama || 'OPD'}</Badge>
+                        <Badge variant="outline">{patient.wad?.wad || 'OPD'}</Badge>
                       </div>
                     </div>
                   ))}
@@ -392,12 +436,17 @@ export default function RegistrationWorkflowPage() {
                 <CardDescription>Enter patient details with NRIC auto-parsing</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Full Name *</Label>
                     <Input
                       value={newPatientData.nama}
-                      onChange={(e) => setNewPatientData({...newPatientData, nama: e.target.value})}
+                      onChange={(e) => { setNewPatientData({...newPatientData, nama: e.target.value}); setError(null); }}
                       placeholder="Enter patient name"
                     />
                   </div>
@@ -465,7 +514,7 @@ export default function RegistrationWorkflowPage() {
                       </SelectTrigger>
                       <SelectContent>
                         {wards.map((ward) => (
-                          <SelectItem key={ward.id} value={ward.id.toString()}>{ward.nama}</SelectItem>
+                          <SelectItem key={ward.id} value={ward.id.toString()}>{ward.wad}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -543,14 +592,14 @@ export default function RegistrationWorkflowPage() {
                     <SelectContent>
                       <SelectItem value="none">OPD/No Ward</SelectItem>
                       {wards.map((ward) => (
-                        <SelectItem key={ward.id} value={ward.id.toString()}>{ward.nama}</SelectItem>
+                        <SelectItem key={ward.id} value={ward.id.toString()}>{ward.wad}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Referring Physician *</Label>
+                  <Label>Referring Physician</Label>
                   <Input
                     value={registrationData.doctor}
                     onChange={(e) => setRegistrationData({...registrationData, doctor: e.target.value})}
@@ -568,125 +617,54 @@ export default function RegistrationWorkflowPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>LMP (Last Menstrual Period)</Label>
-                  <Input
-                    type="date"
-                    value={registrationData.lmp}
-                    onChange={(e) => setRegistrationData({...registrationData, lmp: e.target.value})}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Priority</Label>
-                  <Select value={registrationData.priority} onValueChange={(value) => setRegistrationData({...registrationData, priority: value})}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="STAT">STAT</SelectItem>
-                      <SelectItem value="HIGH">High</SelectItem>
-                      <SelectItem value="MEDIUM">Medium</SelectItem>
-                      <SelectItem value="LOW">Low</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>How Patient Came</Label>
+                  <Label>Ambulatory</Label>
                   <Select value={registrationData.transport} onValueChange={(value) => setRegistrationData({...registrationData, transport: value})}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Berjalan Kaki">Berjalan Kaki</SelectItem>
+                      <SelectItem value="Berjalan">Berjalan</SelectItem>
                       <SelectItem value="Kerusi Roda">Kerusi Roda</SelectItem>
                       <SelectItem value="Troli">Troli</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      id="pregnant"
-                      checked={registrationData.pregnant}
-                      onChange={(e) => setRegistrationData({...registrationData, pregnant: e.target.checked})}
-                      className="h-4 w-4 rounded border-gray-300"
+                {selectedPatient?.jantina === 'P' && (
+                  <div className="space-y-2">
+                    <Label>LMP (Last Menstrual Period)</Label>
+                    <Input
+                      type="date"
+                      value={registrationData.lmp}
+                      onChange={(e) => setRegistrationData({...registrationData, lmp: e.target.value})}
                     />
-                    <Label htmlFor="pregnant">Pregnant</Label>
                   </div>
-                </div>
-              </div>
+                )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Patient Position</Label>
-                  <Select value={registrationData.patient_position} onValueChange={(value) => setRegistrationData({...registrationData, patient_position: value})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select position" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">Auto/Not specified</SelectItem>
-                      <SelectItem value="HFS">Head First-Supine</SelectItem>
-                      <SelectItem value="HFP">Head First-Prone</SelectItem>
-                      <SelectItem value="HFDR">Head First-Decubitus Right</SelectItem>
-                      <SelectItem value="HFDL">Head First-Decubitus Left</SelectItem>
-                      <SelectItem value="FFS">Feet First-Supine</SelectItem>
-                      <SelectItem value="FFP">Feet First-Prone</SelectItem>
-                      <SelectItem value="FFDR">Feet First-Decubitus Right</SelectItem>
-                      <SelectItem value="FFDL">Feet First-Decubitus Left</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Modality</Label>
-                  <Select value={registrationData.modality} onValueChange={(value) => setRegistrationData({...registrationData, modality: value})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select modality" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">Auto/From exam</SelectItem>
-                      <SelectItem value="CR">CR</SelectItem>
-                      <SelectItem value="DX">DX</SelectItem>
-                      <SelectItem value="CT">CT</SelectItem>
-                      <SelectItem value="MR">MR</SelectItem>
-                      <SelectItem value="US">US</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                {selectedPatient?.jantina === 'P' && (
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="pregnant"
+                        checked={registrationData.pregnant}
+                        onChange={(e) => setRegistrationData({...registrationData, pregnant: e.target.checked})}
+                        className="h-4 w-4 rounded border-gray-300"
+                      />
+                      <Label htmlFor="pregnant">Pregnant</Label>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
                 <Label>Clinical Notes</Label>
-                <Input
-                  type="text"
+                <textarea
                   className="w-full min-h-20 p-2 border rounded-md"
                   value={registrationData.clinical_notes}
                   onChange={(e) => setRegistrationData({...registrationData, clinical_notes: e.target.value})}
                   placeholder="Enter clinical indications and notes..."
                 />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Procedure Description</Label>
-                  <Input
-                    value={registrationData.procedure_description}
-                    onChange={(e) => setRegistrationData({...registrationData, procedure_description: e.target.value})}
-                    placeholder="Override exam name if needed"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Additional Notes</Label>
-                  <Input
-                    value={registrationData.additional_notes}
-                    onChange={(e) => setRegistrationData({...registrationData, additional_notes: e.target.value})}
-                    placeholder="Additional registration notes"
-                  />
-                </div>
               </div>
             </CardContent>
           </Card>
@@ -756,25 +734,9 @@ export default function RegistrationWorkflowPage() {
                             </div>
                             <div className="flex items-center space-x-2">
                               {isSelected ? (
-                                <>
-                                  <Select
-                                    value={isSelected.priority}
-                                    onValueChange={(value) => updateExam(exam.id, 'priority', value)}
-                                  >
-                                    <SelectTrigger className="w-32 h-8">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="STAT">STAT</SelectItem>
-                                      <SelectItem value="HIGH">High</SelectItem>
-                                      <SelectItem value="MEDIUM">Medium</SelectItem>
-                                      <SelectItem value="LOW">Low</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                  <Button variant="ghost" size="sm" onClick={() => removeExam(exam.id)}>
-                                    <X className="h-4 w-4" />
-                                  </Button>
-                                </>
+                                <Button variant="ghost" size="sm" onClick={() => removeExam(exam.id)}>
+                                  <X className="h-4 w-4" />
+                                </Button>
                               ) : (
                                 <Button size="sm" onClick={() => addExam(exam.id)}>
                                   <Plus className="h-4 w-4 mr-1" />
@@ -784,7 +746,55 @@ export default function RegistrationWorkflowPage() {
                             </div>
                           </div>
                           {isSelected && (
-                            <div className="mt-2">
+                            <div className="mt-4 space-y-2">
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                <div>
+                                  <Label className="text-xs">Laterality</Label>
+                                  <Select 
+                                    value={isSelected.laterality} 
+                                    onValueChange={(value) => updateExam(exam.id, 'laterality', value)}
+                                  >
+                                    <SelectTrigger className="h-8 text-xs">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="none">None</SelectItem>
+                                      <SelectItem value="Kiri">Kiri</SelectItem>
+                                      <SelectItem value="Kanan">Kanan</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div>
+                                  <Label className="text-xs">kVp</Label>
+                                  <Input
+                                    type="number"
+                                    placeholder="kV"
+                                    value={isSelected.kv}
+                                    onChange={(e) => updateExam(exam.id, 'kv', e.target.value)}
+                                    className="h-8 text-xs"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-xs">mAs</Label>
+                                  <Input
+                                    type="number"
+                                    placeholder="mAs"
+                                    value={isSelected.mas}
+                                    onChange={(e) => updateExam(exam.id, 'mas', e.target.value)}
+                                    className="h-8 text-xs"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-xs">mGy</Label>
+                                  <Input
+                                    type="number"
+                                    placeholder="mGy"
+                                    value={isSelected.mgy}
+                                    onChange={(e) => updateExam(exam.id, 'mgy', e.target.value)}
+                                    className="h-8 text-xs"
+                                  />
+                                </div>
+                              </div>
                               <Input
                                 placeholder="Additional notes for this exam..."
                                 value={isSelected.notes}
@@ -805,10 +815,38 @@ export default function RegistrationWorkflowPage() {
             <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
             <Button 
               onClick={completeRegistration} 
-              disabled={loading || selectedExams.length === 0 || !registrationData.discipline}
+              disabled={loading || selectedExams.length === 0}
             >
               {loading ? 'Processing...' : 'Complete Registration'}
             </Button>
+          </div>
+          {error && (
+            <Alert variant="destructive" className="mt-4">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+        </div>
+      )}
+
+      {showToast && (
+        <div className="fixed top-4 right-4 z-50">
+          <div className={`p-4 rounded-lg shadow-lg border flex items-center space-x-3 ${
+            toastType === 'error' 
+              ? 'bg-red-50 border-red-200 text-red-800' 
+              : toastType === 'success' 
+              ? 'bg-green-50 border-green-200 text-green-800' 
+              : 'bg-blue-50 border-blue-200 text-blue-800'
+          }`}>
+            {toastType === 'error' && <AlertCircle className="h-5 w-5" />}
+            {toastType === 'success' && <CheckCircle className="h-5 w-5" />}
+            {toastType === 'info' && <AlertCircle className="h-5 w-5" />}
+            <p className="text-sm font-medium">{toastMessage}</p>
+            <button 
+              onClick={() => setShowToast(false)} 
+              className="ml-4 text-sm font-medium hover:underline"
+            >
+              Dismiss
+            </button>
           </div>
         </div>
       )}

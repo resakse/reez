@@ -281,7 +281,7 @@ class Daftar(auto_prefetch.Model):
 
 
 class Pemeriksaan(auto_prefetch.Model):
-    daftar = auto_prefetch.ForeignKey(Daftar, on_delete=models.CASCADE)
+    daftar = auto_prefetch.ForeignKey(Daftar, on_delete=models.CASCADE, related_name='pemeriksaan')
     no_xray = models.CharField(
         verbose_name="No. X-Ray", blank=True, null=True, max_length=20
     )

@@ -27,6 +27,7 @@ from .serializers import (
     DaftarSerializer, PemeriksaanSerializer, 
     RegistrationWorkflowSerializer, MWLWorklistSerializer
 )
+from pesakit.serializers import PesakitSerializer
 
 class ModalitiViewSet(viewsets.ModelViewSet):
     """
@@ -57,7 +58,7 @@ class DaftarViewSet(viewsets.ModelViewSet):
     """
     API endpoint for registration management (Daftar - Pendaftaran Radiologi)
     """
-    queryset = Daftar.objects.all().select_related('pesakit', 'rujukan').order_by('-tarikh')
+    queryset = Daftar.objects.all().select_related('pesakit', 'rujukan').prefetch_related('pemeriksaan', 'pemeriksaan__exam', 'pemeriksaan__exam__modaliti').order_by('-tarikh')
     serializer_class = DaftarSerializer
     permission_classes = [IsAuthenticated]
 
@@ -68,6 +69,11 @@ class DaftarViewSet(viewsets.ModelViewSet):
         patient_id = self.request.query_params.get('patient_id')
         if patient_id:
             queryset = queryset.filter(pesakit_id=patient_id)
+        
+        # Filter by patient (alternative parameter)
+        pesakit_id = self.request.query_params.get('pesakit')
+        if pesakit_id:
+            queryset = queryset.filter(pesakit_id=pesakit_id)
         
         # Filter by ward
         ward_id = self.request.query_params.get('ward_id')
