@@ -150,7 +150,7 @@ export default function EditPatientPage() {
     try {
       const payload = {
         nama: formData.nama,
-        no_kp: formData.nric.replace(/[-\s]/g, ''),
+        nric: formData.nric.replace(/[-\s]/g, ''),
         t_lahir: formData.t_lahir,
         jantina: formData.jantina,
         umur: parseInt(formData.umur) || null,

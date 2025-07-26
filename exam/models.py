@@ -292,6 +292,10 @@ class Pemeriksaan(auto_prefetch.Model):
     kv = models.PositiveSmallIntegerField(verbose_name='kVp', blank=True, null=True)
     mas = models.PositiveSmallIntegerField(verbose_name='mAs', blank=True, null=True)
     mgy = models.PositiveSmallIntegerField(verbose_name='mGy', blank=True, null=True)
+    catatan = models.CharField(
+        verbose_name="Catatan", max_length=200, blank=True, null=True,
+        help_text="Catatan khusus untuk pemeriksaan ini (contoh: pesakit tidak dapat luruskan jari)"
+    )
     jxr = auto_prefetch.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True, related_name="exam_jxr"
     )

@@ -239,3 +239,33 @@ Based on @Plan.md, the current migration follows these phases:
 ## Important Notes
 
 - **never run django runserver**
+
+## Theme Development Guidelines
+
+- We are using dual theme light and dark mode. so, NO HARDCODE WHITE / BLACK / DARK BACKGROUND anywhere.
+
+## Frontend Toast Notifications
+
+A consistent toast notification system is available throughout the Next.js frontend:
+
+```typescript
+// Import the toast service
+import { toast } from '@/lib/toast';
+
+// Usage in any component
+toast.success('Operation completed successfully');
+toast.error('Failed to save data');
+toast.warning('Please check your input');
+toast.info('Processing your request');
+
+// All toasts appear in top-right corner with consistent styling
+// Width: 24cm (w-96), with proper icons and animations
+```
+
+**Toast Features:**
+- Consistent positioning: Always top-right corner
+- Consistent styling: Professional design with type-specific colors
+- Auto-dismiss: 3 seconds by default
+- Manual close: Click the X button to dismiss
+- Responsive: Works on mobile and desktop
+- Dark mode compatible: Uses current theme colors

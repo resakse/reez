@@ -35,6 +35,12 @@ export default function Sidebar({ className, isCollapsed }: SidebarProps) {
               {!isCollapsed && "Registration"}
             </Link>
           </li>
+          <li>
+            <Link href="/examinations" className="flex items-center p-2 rounded hover:bg-white/10">
+              <Stethoscope className="h-5 w-5 mr-2" />
+              {!isCollapsed && "Examinations"}
+            </Link>
+          </li>
           
           <li className="pt-4 pb-2">
             <div className={cn("text-xs font-semibold text-gray-400 uppercase", isCollapsed && "text-center")}>

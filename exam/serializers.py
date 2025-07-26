@@ -5,6 +5,9 @@ from wad.models import Ward
 from pesakit.serializers import PesakitSerializer
 from wad.serializers import WardSerializer
 from staff.serializers import UserSerializer
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 class ModalitiSerializer(serializers.ModelSerializer):
     class Meta:
@@ -47,14 +50,23 @@ class PemeriksaanSerializer(serializers.ModelSerializer):
     )
     daftar_id = serializers.IntegerField(write_only=True)
     daftar_info = serializers.SerializerMethodField()
+    jxr = UserSerializer(read_only=True)
+    jxr_id = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(),
+        source='jxr',
+        write_only=True,
+        allow_null=True,
+        required=False
+    )
+    jxr_info = serializers.SerializerMethodField()
 
     class Meta:
         model = Pemeriksaan
         fields = [
             'id', 'no_xray', 'exam', 'exam_id', 'laterality', 'kv', 'mas', 'mgy',
-            'created', 'modified', 'daftar_id', 'daftar_info'
+            'jxr', 'jxr_id', 'jxr_info', 'created', 'modified', 'daftar_id', 'daftar_info'
         ]
-        read_only_fields = ['no_xray', 'created', 'modified']
+        read_only_fields = ['no_xray', 'created', 'modified', 'jxr_info']
 
     def get_daftar_info(self, obj):
         from staff.serializers import UserSerializer
@@ -92,6 +104,16 @@ class PemeriksaanSerializer(serializers.ModelSerializer):
                 'jantina': obj.daftar.pesakit.jantina
             }
         }
+
+    def get_jxr_info(self, obj):
+        if obj.jxr:
+            return {
+                'id': obj.jxr.id,
+                'username': obj.jxr.username,
+                'first_name': obj.jxr.first_name,
+                'last_name': obj.jxr.last_name
+            }
+        return None
 
     def create(self, validated_data):
         daftar_id = validated_data.pop('daftar_id')
@@ -217,13 +239,14 @@ class MWLWorklistSerializer(serializers.ModelSerializer):
     study_date = serializers.DateTimeField(source='tarikh', read_only=True)
     referring_physician = serializers.CharField(source='pemohon', read_only=True)
     study_instance_uid = serializers.SerializerMethodField()
+    klinik = serializers.CharField(source='jxr.klinik', read_only=True)  # Added klinik field
 
     class Meta:
         model = Daftar
         fields = [
             'id', 'patient_name', 'patient_id', 'patient_birth_date', 'patient_gender',
             'study_description', 'accession_number', 'study_date', 'referring_physician',
-            'study_instance_uid', 'status'
+            'study_instance_uid', 'status', 'klinik'  # Added klinik to fields
         ]
 
     def get_study_instance_uid(self, obj):

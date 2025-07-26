@@ -7,6 +7,7 @@ from .views import (
     RegistrationWorkflowView, MWLWorklistView
 )
 from .settings_views import PacsConfigListCreateAPIView, PacsConfigDetailAPIView, get_current_pacs_config
+from .examination_views import ExaminationListAPIView, ExaminationDetailAPIView
 
 from . import api
 # from .export import export_xls
@@ -66,4 +67,8 @@ urlpatterns = [
     path('settings/pacs/', PacsConfigListCreateAPIView.as_view(), name='pacs-settings-list'),
     path('settings/pacs/<int:pk>/', PacsConfigDetailAPIView.as_view(), name='pacs-settings-detail'),
     path('settings/pacs/current/', get_current_pacs_config, name='pacs-settings-current'),
+    
+    # Examination API endpoints (active users only)
+    path('examinations/list/', ExaminationListAPIView.as_view(), name='examinations-list'),
+    path('examinations/<int:pk>/', ExaminationDetailAPIView.as_view(), name='examinations-detail'),
 ]

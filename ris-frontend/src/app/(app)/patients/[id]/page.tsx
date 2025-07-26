@@ -475,7 +475,7 @@ export default function PatientDetailPage() {
                                       <Button 
                                         variant="outline" 
                                         size="sm"
-                                        onClick={() => router.push(`/examinations/${exam.id}/edit`)}
+                                        onClick={() => router.push(`/studies/${registration.id}/edit`)}
                                         className="text-xs"
                                       >
                                         Edit

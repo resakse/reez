@@ -22,6 +22,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import SearchFilter, OrderingFilter
 from .serializers import (
     ModalitiSerializer, PartSerializer, ExamSerializer, 
     DaftarSerializer, PemeriksaanSerializer, 
@@ -58,7 +60,7 @@ class DaftarViewSet(viewsets.ModelViewSet):
     """
     API endpoint for registration management (Daftar - Pendaftaran Radiologi)
     """
-    queryset = Daftar.objects.all().select_related('pesakit', 'rujukan').prefetch_related('pemeriksaan', 'pemeriksaan__exam', 'pemeriksaan__exam__modaliti').order_by('-tarikh')
+    queryset = Daftar.objects.all().select_related('pesakit', 'rujukan', 'jxr').prefetch_related('pemeriksaan', 'pemeriksaan__exam', 'pemeriksaan__exam__modaliti', 'pemeriksaan__jxr').order_by('-tarikh')
     serializer_class = DaftarSerializer
     permission_classes = [IsAuthenticated]
 
@@ -118,9 +120,13 @@ class PemeriksaanViewSet(viewsets.ModelViewSet):
     """
     API endpoint for examination details (Pemeriksaan)
     """
-    queryset = Pemeriksaan.objects.all().select_related('daftar', 'exam', 'daftar__pesakit')
+    queryset = Pemeriksaan.objects.all().select_related('daftar', 'exam', 'daftar__pesakit', 'exam__modaliti', 'daftar__rujukan', 'daftar__jxr', 'jxr')
     serializer_class = PemeriksaanSerializer
     permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    search_fields = ['no_xray', 'daftar__pesakit__nama', 'daftar__pemohon', 'exam__exam']
+    ordering_fields = ['no_xray', 'created', 'daftar__tarikh']
+    ordering = ['-no_xray']  # Default ordering by X-ray number descending
 
     def get_queryset(self):
         queryset = super().get_queryset()

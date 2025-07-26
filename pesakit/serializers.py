@@ -15,7 +15,7 @@ class PesakitSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'mrn', 'nric', 'formatted_nric', 'nama', 'bangsa', 'jantina', 'umur',
             't_lahir', 'calculated_age', 'parsed_gender', 'identification_type',
-            'is_nric_valid', 'catatan', 'created', 'modified', 'ic', 'kira_umur', 'cek_jantina'
+            'is_nric_valid', 'catatan', 'telefon', 'email', 'alamat', 'created', 'modified', 'ic', 'kira_umur', 'cek_jantina'
         ]
     
     def get_t_lahir(self, obj):

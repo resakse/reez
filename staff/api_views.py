@@ -26,6 +26,13 @@ class StaffListCreateAPIView(generics.ListCreateAPIView):
             return StaffCreateUpdateSerializer
         return StaffSerializer
     
+    def get_queryset(self):
+        queryset = Staff.objects.all()
+        jawatan = self.request.query_params.get('jawatan', None)
+        if jawatan is not None:
+            queryset = queryset.filter(jawatan=jawatan)
+        return queryset
+    
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context['request'] = self.request
