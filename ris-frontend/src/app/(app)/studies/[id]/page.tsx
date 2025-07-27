@@ -211,8 +211,15 @@ export default function StudyDetailsPage() {
               Edit Study
             </Button>
             <Button 
-              onClick={() => alert('DICOM Viewer - implementation needed')}
+              onClick={() => {
+                if (study.study_instance_uid) {
+                  router.push(`/pacs-browser/${study.study_instance_uid}`);
+                } else {
+                  alert('No DICOM study found for this registration');
+                }
+              }}
               variant="default"
+              disabled={!study.study_instance_uid}
             >
               <Eye className="w-4 h-4 mr-2" />
               View DICOM

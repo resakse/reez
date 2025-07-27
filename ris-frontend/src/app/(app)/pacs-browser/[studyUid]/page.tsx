@@ -37,6 +37,7 @@ const SimpleDicomViewer = dynamic(() => import('@/components/SimpleDicomViewer')
 });
 import { getStudyMetadata, getStudyImageIds } from '@/lib/orthanc';
 import { toast } from '@/lib/toast';
+import AuthService from '@/lib/auth';
 import { 
   ArrowLeft, 
   Download, 
@@ -81,11 +82,56 @@ export default function LegacyStudyViewerPage() {
   const [importing, setImporting] = useState(false);
   const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
   const [isFullWindow, setIsFullWindow] = useState(false);
+  const [isImportedToRis, setIsImportedToRis] = useState(false);
+  const [risStudyId, setRisStudyId] = useState<number | null>(null);
   
   // Track fetched studies to prevent duplicate API calls
   const fetchedStudiesRef = useRef(new Set<string>());
 
   const studyUid = params?.studyUid as string;
+
+  const checkRisImportStatus = useCallback(async () => {
+    if (!studyUid) return;
+    
+    console.log(`🔍 Checking RIS import status for Study UID: ${studyUid}`);
+    
+    try {
+      // Check if study exists in RIS by searching for study_instance_uid
+      const apiUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/registrations/?study_instance_uid=${studyUid}`;
+      console.log(`📡 Making API call to: ${apiUrl}`);
+      
+      const response = await AuthService.authenticatedFetch(apiUrl);
+      
+      console.log(`📥 API Response status: ${response.status}`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('📋 API Response data:', data);
+        
+        // Handle both paginated and direct array responses
+        const results = data.results || data;
+        console.log(`📊 Found ${Array.isArray(results) ? results.length : 0} results`);
+        
+        if (Array.isArray(results) && results.length > 0) {
+          console.log('✅ Study found in RIS:', results[0]);
+          setIsImportedToRis(true);
+          setRisStudyId(results[0].id);
+        } else {
+          console.log('❌ Study not found in RIS');
+          setIsImportedToRis(false);
+          setRisStudyId(null);
+        }
+      } else {
+        console.log(`❌ API call failed with status: ${response.status}`);
+        setIsImportedToRis(false);
+        setRisStudyId(null);
+      }
+    } catch (err) {
+      console.error('💥 Error checking RIS import status:', err);
+      // Don't set error state for this check, just assume not imported
+      setIsImportedToRis(false);
+    }
+  }, [studyUid]);
 
   const fetchStudyData = useCallback(async () => {
     if (!studyUid) return;
@@ -158,8 +204,9 @@ export default function LegacyStudyViewerPage() {
     if (studyUid && user) {
       console.log(`useEffect triggered for study: ${studyUid}`);
       fetchStudyData();
+      checkRisImportStatus();
     }
-  }, [studyUid, user, fetchStudyData]);
+  }, [studyUid, user, fetchStudyData, checkRisImportStatus]);
 
   // Keyboard shortcut for full window toggle (F key)
   useEffect(() => {
@@ -214,20 +261,55 @@ export default function LegacyStudyViewerPage() {
   };
 
   const handleImportStudy = async () => {
-    if (!metadata) return;
+    if (!metadata || !studyUid) return;
 
     setImporting(true);
     try {
-      // TODO: Implement actual import functionality
-      // This would involve:
-      // 1. Creating patient record if not exists
-      // 2. Creating study record in RIS database
-      // 3. Linking to PACS study
-      
-      toast.info('Import functionality coming soon');
+      const response = await AuthService.authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/pacs/import/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          studyInstanceUid: studyUid,
+          createPatient: true
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        toast.success(`Study imported successfully! Registration ID: ${result.registrationId}`);
+        
+        // Update the RIS status immediately
+        setIsImportedToRis(true);
+        setRisStudyId(result.registrationId);
+        
+        // Optionally redirect to the imported study in RIS
+        setTimeout(() => {
+          router.push(`/studies/${result.registrationId}`);
+        }, 2000);
+      } else {
+        // Handle specific error cases
+        if (response.status === 403) {
+          toast.error('Only superusers can import studies');
+        } else if (response.status === 400 && result.error?.includes('already imported')) {
+          toast.warning(`Study already imported as registration ${result.registrationId}`);
+          
+          // Update the RIS status
+          setIsImportedToRis(true);
+          setRisStudyId(result.registrationId);
+          
+          setTimeout(() => {
+            router.push(`/studies/${result.registrationId}`);
+          }, 2000);
+        } else {
+          toast.error(result.error || 'Failed to import study');
+        }
+      }
     } catch (err) {
       console.error('Error importing study:', err);
-      toast.error('Failed to import study');
+      toast.error('Network error: Failed to import study');
     } finally {
       setImporting(false);
     }
@@ -407,24 +489,37 @@ export default function LegacyStudyViewerPage() {
           <div className="overflow-y-auto h-full">
         <div className="p-4 space-y-4">
 
-          {/* Import Button */}
-          <Button 
-            onClick={handleImportStudy}
-            disabled={importing}
-            className="w-full"
-          >
-            {importing ? (
-              <>
-                <div className="w-4 h-4 mr-2 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
-                Importing...
-              </>
-            ) : (
-              <>
-                <Download className="w-4 h-4 mr-2" />
-                Import to RIS
-              </>
-            )}
-          </Button>
+          {/* Import Button or RIS Link */}
+          {isImportedToRis ? (
+            <Button 
+              onClick={() => router.push(`/studies/${risStudyId}`)}
+              className="w-full"
+              variant="outline"
+              title="View this study in RIS"
+            >
+              <Eye className="w-4 h-4 mr-2" />
+              View in RIS
+            </Button>
+          ) : user?.is_superuser ? (
+            <Button 
+              onClick={handleImportStudy}
+              disabled={importing}
+              className="w-full"
+              title="Import this study into the RIS database (Superuser only)"
+            >
+              {importing ? (
+                <>
+                  <div className="w-4 h-4 mr-2 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
+                  Importing...
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4 mr-2" />
+                  Import to RIS
+                </>
+              )}
+            </Button>
+          ) : null}
 
           {/* Patient Information */}
           <Card>
@@ -546,9 +641,12 @@ export default function LegacyStudyViewerPage() {
                   {studyUid}
                 </p>
               </div>
-              <Badge variant="outline" className="text-xs mt-2">
+              <Badge 
+                variant={isImportedToRis ? "default" : "outline"} 
+                className="text-xs mt-2"
+              >
                 <Archive className="h-3 w-3 mr-1" />
-                Legacy Study
+                {isImportedToRis ? "RIS Study" : "Legacy Study"}
               </Badge>
             </CardContent>
           </Card>

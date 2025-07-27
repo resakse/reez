@@ -194,28 +194,202 @@ def import_legacy_study(request):
         "createPatient": true/false
     }
     """
+    # Check if user is superuser
+    if not request.user.is_superuser:
+        return Response({'error': 'Only superusers can import legacy studies'}, status=status.HTTP_403_FORBIDDEN)
+    
     try:
+        from django.db import transaction
+        from pesakit.models import Pesakit
+        from exam.models import Daftar, Pemeriksaan, Exam, Modaliti, PacsExam
+        from datetime import datetime
+        import re
+        
         study_uid = request.data.get('studyInstanceUid')
         create_patient = request.data.get('createPatient', True)
         
         if not study_uid:
             return Response({'error': 'studyInstanceUid is required'}, status=status.HTTP_400_BAD_REQUEST)
         
-        # TODO: Implement actual import logic
-        # This would involve:
-        # 1. Fetching study metadata from Orthanc
-        # 2. Creating or finding patient record in RIS
-        # 3. Creating study record in RIS database
-        # 4. Linking to PACS study
+        # Check if study already exists in RIS
+        existing_daftar = Daftar.objects.filter(study_instance_uid=study_uid).first()
+        if existing_daftar:
+            return Response({
+                'error': f'Study already imported as registration ID {existing_daftar.id}',
+                'registrationId': existing_daftar.id,
+                'success': False
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get Orthanc configuration
+        pacs_config = PacsConfig.objects.first()
+        if not pacs_config:
+            return Response({'error': 'PACS configuration not found'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        orthanc_url = pacs_config.orthancurl
+        
+        # Fetch study metadata from Orthanc
+        find_response = requests.post(
+            f"{orthanc_url}/tools/find",
+            headers={'Content-Type': 'application/json'},
+            json={
+                'Level': 'Study',
+                'Query': {'StudyInstanceUID': study_uid},
+                'Expand': True,
+            },
+            timeout=30
+        )
+        
+        if not find_response.ok:
+            return Response({
+                'error': f'Failed to find study in PACS: {find_response.status_code}'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        find_result = find_response.json()
+        if not find_result:
+            return Response({'error': f'Study not found in PACS: {study_uid}'}, status=status.HTTP_404_NOT_FOUND)
+        
+        study_data = find_result[0]
+        main_tags = study_data.get('MainDicomTags', {})
+        patient_tags = study_data.get('PatientMainDicomTags', {})
+        
+        # Extract patient information
+        patient_name = patient_tags.get('PatientName', 'Unknown').replace('^', ' ')
+        patient_id = patient_tags.get('PatientID', '')
+        patient_birth_date = patient_tags.get('PatientBirthDate', '')
+        patient_sex = patient_tags.get('PatientSex', '')
+        
+        # Extract study information
+        study_date = main_tags.get('StudyDate', '')
+        study_time = main_tags.get('StudyTime', '')
+        study_description = main_tags.get('StudyDescription', 'Imported Legacy Study')
+        accession_number = main_tags.get('AccessionNumber', '')
+        modality = main_tags.get('ModalitiesInStudy', 'XR').split(',')[0]
+        institution_name = main_tags.get('InstitutionName', '')
+        referring_physician = main_tags.get('ReferringPhysicianName', '')
+        operators_name = main_tags.get('OperatorsName', '')
+        
+        # Parse dates
+        study_datetime = None
+        if study_date:
+            try:
+                if study_time:
+                    # Clean up time format
+                    time_str = study_time.split('.')[0]  # Remove fractional seconds
+                    if len(time_str) == 6:  # HHMMSS
+                        datetime_str = f"{study_date}{time_str}"
+                        study_datetime = datetime.strptime(datetime_str, '%Y%m%d%H%M%S')
+                    elif len(time_str) == 4:  # HHMM
+                        datetime_str = f"{study_date}{time_str}00"
+                        study_datetime = datetime.strptime(datetime_str, '%Y%m%d%H%M%S')
+                else:
+                    study_datetime = datetime.strptime(study_date, '%Y%m%d')
+            except ValueError:
+                study_datetime = datetime.now()
+        else:
+            study_datetime = datetime.now()
+        
+        # Parse patient birth date
+        patient_birth = None
+        if patient_birth_date:
+            try:
+                patient_birth = datetime.strptime(patient_birth_date, '%Y%m%d').date()
+            except ValueError:
+                pass
+        
+        with transaction.atomic():
+            # Find or create patient
+            patient = None
+            if create_patient and patient_id:
+                # Try to find existing patient by ID or name
+                from django.db import models as django_models
+                patient = Pesakit.objects.filter(
+                    django_models.Q(mrn=patient_id) | django_models.Q(nric=patient_id)
+                ).first()
+                
+                if not patient:
+                    # Create new patient
+                    patient = Pesakit.objects.create(
+                        nama=patient_name,
+                        mrn=patient_id,
+                        nric=patient_id if len(patient_id) == 12 else '',  # Assume NRIC if 12 digits
+                        jantina='L' if patient_sex == 'M' else 'P' if patient_sex == 'F' else 'L',
+                        jxr=request.user  # Required field for the user who created the record
+                    )
+            
+            if not patient:
+                return Response({
+                    'error': 'Patient creation disabled or patient information insufficient'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Find or create modality
+            modaliti, _ = Modaliti.objects.get_or_create(
+                nama=modality,
+                defaults={'singkatan': modality}
+            )
+            
+            # Create registration (Daftar)
+            daftar = Daftar.objects.create(
+                tarikh=study_datetime,
+                pesakit=patient,
+                study_instance_uid=study_uid,
+                parent_accession_number=accession_number or None,
+                accession_number=accession_number or None,
+                study_description=study_description,
+                modality=modality,
+                study_status='COMPLETED',  # Legacy studies are completed
+                pemohon=referring_physician or 'Legacy Import',
+                status='Completed',
+                jxr=request.user
+            )
+            
+            # Find or create examination type
+            exam, _ = Exam.objects.get_or_create(
+                exam=study_description,
+                modaliti=modaliti,
+                defaults={'catatan': 'Imported from legacy PACS'}
+            )
+            
+            # Create examination record (Pemeriksaan)
+            pemeriksaan = Pemeriksaan.objects.create(
+                daftar=daftar,
+                exam=exam,
+                accession_number=accession_number or None,
+                no_xray=accession_number or None,
+                jxr=request.user,
+                exam_status='COMPLETED'  # Use correct field name and value
+            )
+            
+            # Link to PACS study (if PacsExam model exists)
+            try:
+                from exam.models import PacsExam
+                PacsExam.objects.create(
+                    exam=pemeriksaan,  # OneToOneField to Pemeriksaan
+                    orthanc_id=study_data.get('ID', ''),  # Orthanc internal ID
+                    study_id=study_uid,  # Study Instance UID
+                    study_instance=study_uid  # Also store in study_instance field
+                )
+            except ImportError:
+                # PacsExam model doesn't exist, skip this step
+                pass
         
         return Response({
-            'message': 'Import functionality coming soon',
+            'message': 'Legacy study imported successfully',
             'studyInstanceUid': study_uid,
-            'success': False
-        }, status=status.HTTP_501_NOT_IMPLEMENTED)
+            'registrationId': daftar.id,
+            'examinationId': pemeriksaan.id,
+            'patientName': patient_name,
+            'accessionNumber': accession_number,
+            'success': True
+        }, status=status.HTTP_201_CREATED)
         
+    except requests.exceptions.RequestException as e:
+        return Response({'error': f'Network error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     except Exception as e:
-        return Response({'error': f'Server error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        import traceback
+        return Response({
+            'error': f'Server error: {str(e)}',
+            'traceback': traceback.format_exc()
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class DicomImageProxyView(APIView):

@@ -132,6 +132,18 @@ interface SimpleDicomViewerProps {
 
 type Tool = 'wwwc' | 'zoom' | 'pan' | 'length' | 'rectangle' | 'ellipse';
 
+// Interface for per-image settings
+interface ImageSettings {
+  windowLevel?: {
+    windowWidth: number;
+    windowCenter: number;
+  };
+  isInverted: boolean;
+  isFlippedHorizontal: boolean;
+  zoom?: number;
+  pan?: { x: number; y: number };
+}
+
 const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMetadata }) => {
   const mainViewportRef = useRef<HTMLDivElement>(null);
   const [renderingEngine, setRenderingEngine] = useState<RenderingEngine | null>(null);
@@ -151,9 +163,95 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
   const toolbarRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
 
+  // Store per-image settings
+  const imageSettingsRef = useRef<Map<number, ImageSettings>>(new Map());
+  const saveSettingsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // Track initialization state to prevent double loading
   const initializationRef = useRef(false);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
+
+  // Helper functions for per-image settings
+  const saveCurrentImageSettings = useCallback(() => {
+    if (!viewport) return;
+    
+    try {
+      const properties = viewport.getProperties();
+      const camera = viewport.getCamera();
+      
+      const settings: ImageSettings = {
+        windowLevel: {
+          windowWidth: properties.voiRange?.upper - properties.voiRange?.lower || 400,
+          windowCenter: (properties.voiRange?.upper + properties.voiRange?.lower) / 2 || 200
+        },
+        isInverted,
+        isFlippedHorizontal,
+        zoom: camera.parallelScale,
+        pan: {
+          x: camera.focalPoint[0],
+          y: camera.focalPoint[1]
+        }
+      };
+      
+      imageSettingsRef.current.set(currentImageIndex, settings);
+      console.log(`DEBUG: Saved settings for image ${currentImageIndex + 1}:`, settings);
+    } catch (error) {
+      console.warn('Failed to save image settings:', error);
+    }
+  }, [viewport, currentImageIndex, isInverted, isFlippedHorizontal]);
+  
+  const restoreImageSettings = useCallback((imageIndex: number) => {
+    if (!viewport) return;
+    
+    const settings = imageSettingsRef.current.get(imageIndex);
+    if (!settings) {
+      console.log(`DEBUG: No saved settings for image ${imageIndex + 1}, using defaults`);
+      return;
+    }
+    
+    try {
+      console.log(`DEBUG: Restoring settings for image ${imageIndex + 1}:`, settings);
+      
+      // Restore window/level
+      if (settings.windowLevel) {
+        const properties = viewport.getProperties();
+        const lowerBound = settings.windowLevel.windowCenter - settings.windowLevel.windowWidth / 2;
+        const upperBound = settings.windowLevel.windowCenter + settings.windowLevel.windowWidth / 2;
+        
+        viewport.setProperties({
+          ...properties,
+          voiRange: { lower: lowerBound, upper: upperBound },
+          invert: settings.isInverted
+        });
+      }
+      
+      // Restore zoom and pan
+      if (settings.zoom && settings.pan) {
+        const camera = viewport.getCamera();
+        viewport.setCamera({
+          ...camera,
+          parallelScale: settings.zoom,
+          focalPoint: [settings.pan.x, settings.pan.y, camera.focalPoint[2]]
+        });
+      }
+      
+      // Restore flip state
+      const element = viewport.element;
+      const canvas = element.querySelector('canvas');
+      if (canvas) {
+        canvas.style.transform = settings.isFlippedHorizontal ? 'scaleX(-1)' : 'scaleX(1)';
+      }
+      
+      // Update UI state
+      setIsInverted(settings.isInverted);
+      setIsFlippedHorizontal(settings.isFlippedHorizontal);
+      
+      safeRender(viewport);
+      
+    } catch (error) {
+      console.warn('Failed to restore image settings:', error);
+    }
+  }, [viewport]);
 
   // Safe render function to prevent VTK errors
   const safeRender = useCallback((viewportToRender: any) => {
@@ -436,6 +534,16 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
           throw new Error(`Tool activation failed: ${activationError.message}`);
         }
 
+        // Add event listener for window/level changes
+        const viewportElement = stackViewport.element;
+        viewportElement.addEventListener('cornerstoneimagerendered', () => {
+          // Debounce saving to avoid too frequent saves during dragging
+          clearTimeout(saveSettingsTimeoutRef.current);
+          saveSettingsTimeoutRef.current = setTimeout(() => {
+            saveCurrentImageSettings();
+          }, 500);
+        });
+
         console.log('DICOM viewer fully initialized');
         setLoading(false);
       } catch (err) {
@@ -547,29 +655,19 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
         setLoadingNavigation(true);
         console.log(`DEBUG: Navigating to image ${index + 1}/${imageIds.length} (index: ${index})`);
         
+        // Save current image settings before navigating
+        saveCurrentImageSettings();
+        
         // Use setImageIdIndex for direct navigation to specific image
         await viewport.setImageIdIndex(index);
         
-        // Reset all image manipulation properties when changing images
-        const properties = viewport.getProperties();
-        viewport.setProperties({
-          ...properties,
-          invert: true
-        });
-        
-        // Reset horizontal flip CSS transform
-        const element = viewport.element;
-        const canvas = element.querySelector('canvas');
-        if (canvas) {
-          canvas.style.transform = 'scaleX(1)';
-        }
-        
-        // Reset image manipulation states to defaults when changing images
-        setIsInverted(true);
-        setIsFlippedHorizontal(false);
-        
-        safeRender(viewport);
+        // Update current image index first
         setCurrentImageIndex(index);
+        
+        // Wait a moment for the image to load, then restore settings
+        setTimeout(() => {
+          restoreImageSettings(index);
+        }, 100);
         
         console.log(`DEBUG: Successfully navigated to image ${index + 1}/${imageIds.length}`);
         
@@ -580,7 +678,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
         setLoadingNavigation(false);
       }
     }
-  }, [viewport, imageIds, currentImageIndex]);
+  }, [viewport, imageIds, currentImageIndex, saveCurrentImageSettings, restoreImageSettings]);
   
   const nextImage = useCallback(() => {
     goToImage(currentImageIndex + 1);
@@ -691,11 +789,17 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
         } else {
           console.warn('Canvas element not found for flip operation');
         }
+        
+        // Save settings after flip
+        setTimeout(() => {
+          saveCurrentImageSettings();
+        }, 50);
+        
       } catch (error) {
         console.error('Error flipping image horizontally:', error);
       }
     }
-  }, [viewport, isFlippedHorizontal]);
+  }, [viewport, isFlippedHorizontal, saveCurrentImageSettings]);
 
   const invertImage = useCallback(() => {
     if (viewport) {
@@ -713,11 +817,17 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
         
         safeRender(viewport);
         console.log(`Image invert toggled: ${newInvertState}`);
+        
+        // Save settings after invert
+        setTimeout(() => {
+          saveCurrentImageSettings();
+        }, 50);
+        
       } catch (error) {
         console.error('Error inverting image:', error);
       }
     }
-  }, [viewport, isInverted]);
+  }, [viewport, isInverted, saveCurrentImageSettings]);
 
   const clearAnnotations = useCallback(() => {
     if (viewport) {

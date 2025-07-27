@@ -103,6 +103,14 @@ class DaftarViewSet(viewsets.ModelViewSet):
         if to_date:
             queryset = queryset.filter(tarikh__date__lte=to_date)
         
+        # Filter by study instance UID
+        study_instance_uid = self.request.query_params.get('study_instance_uid')
+        if study_instance_uid:
+            print(f"🔍 Filtering registrations by study_instance_uid: {study_instance_uid}")
+            filtered_queryset = queryset.filter(study_instance_uid=study_instance_uid)
+            print(f"📊 Found {filtered_queryset.count()} registrations with study_instance_uid: {study_instance_uid}")
+            queryset = filtered_queryset
+        
         return queryset
 
     @action(detail=True, methods=['get', 'post'])

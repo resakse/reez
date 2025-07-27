@@ -464,14 +464,27 @@ export default function PatientDetailPage() {
                                   </td>
                                   <td className="py-2 px-3 text-sm">
                                     <div className="flex space-x-1">
-                                      <Button 
-                                        variant="outline" 
-                                        size="sm"
-                                        onClick={() => router.push(`/viewer/${exam.id}`)}
-                                        className="text-xs"
-                                      >
-                                        View
-                                      </Button>
+                                      {registration.study_instance_uid ? (
+                                        <Button 
+                                          variant="outline" 
+                                          size="sm"
+                                          onClick={() => router.push(`/pacs-browser/${registration.study_instance_uid}`)}
+                                          className="text-xs"
+                                          title="View DICOM images"
+                                        >
+                                          View
+                                        </Button>
+                                      ) : (
+                                        <Button 
+                                          variant="outline" 
+                                          size="sm"
+                                          onClick={() => router.push(`/studies/${registration.id}`)}
+                                          className="text-xs"
+                                          title="View study details"
+                                        >
+                                          View
+                                        </Button>
+                                      )}
                                       <Button 
                                         variant="outline" 
                                         size="sm"

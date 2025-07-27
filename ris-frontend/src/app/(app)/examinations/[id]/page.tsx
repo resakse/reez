@@ -11,18 +11,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft, Calendar, User, Building2, Stethoscope, Settings, FileText, Edit, Eye, Monitor } from 'lucide-react';
 import AuthService from '@/lib/auth';
 
-// Dynamically import DicomViewer to avoid SSR issues
-const DicomViewer = dynamic(() => import('@/components/DicomViewer'), {
-  ssr: false,
-  loading: () => (
-    <div className="flex items-center justify-center h-96 bg-black rounded-lg">
-      <div className="text-center text-white">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
-        <p>Loading DICOM Viewer...</p>
-      </div>
-    </div>
-  ),
-});
 
 interface ExaminationDetail {
   id: number;
@@ -443,8 +431,21 @@ export default function ExaminationDetailPage() {
                     View DICOM images for study: {examination.daftar_info.study_instance_uid}
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="p-0">
-                  <DicomViewer studyId={examination.daftar_info.study_instance_uid} />
+                <CardContent>
+                  <div className="text-center py-8">
+                    <Monitor className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                    <p className="text-lg font-semibold mb-2">DICOM Viewer Available</p>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Click the button below to open the full DICOM viewer for this study.
+                    </p>
+                    <Button 
+                      onClick={() => router.push(`/pacs-browser/${examination.daftar_info.study_instance_uid}`)}
+                      size="lg"
+                    >
+                      <Eye className="w-4 h-4 mr-2" />
+                      Open DICOM Viewer
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             ) : (
