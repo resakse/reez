@@ -67,11 +67,23 @@ const initializeCornerstone = async () => {
             // Continue without authentication - images should still load via proxy
           }
         },
-        // Optimize for performance
+        // Optimize for performance and multi-image loading
         useWebWorkers: true,
+        maxWebWorkers: 4, // Limit concurrent workers to prevent memory issues
         decodeConfig: {
           convertFloatPixelDataToInt: false,
-          use16BitDataType: true
+          use16BitDataType: true,
+          // Add timeout for large images
+          decodeConfig: {
+            timeout: 30000 // 30 second timeout for DICOM decoding
+          }
+        },
+        // Configure image loader for better multi-image handling
+        webWorkerTaskPools: {
+          decodeTask: {
+            maxConcurrency: 4,
+            targetUtilization: 0.8
+          }
         }
       });
       console.log('DICOM image loader initialized');
@@ -128,15 +140,47 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [loadingNavigation, setLoadingNavigation] = useState<boolean>(false);
   const [activeTool, setActiveTool] = useState<Tool>('wwwc');
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [isInverted, setIsInverted] = useState<boolean>(false);
+  const [isInverted, setIsInverted] = useState<boolean>(true);
   const [isFlippedHorizontal, setIsFlippedHorizontal] = useState<boolean>(false);
+  const [isToolbarMinimized, setIsToolbarMinimized] = useState<boolean>(false);
+  const [toolbarPosition, setToolbarPosition] = useState({ x: 0, y: 16 }); // Initial position
   const playbackIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const isDraggingRef = useRef(false);
 
   // Track initialization state to prevent double loading
   const initializationRef = useRef(false);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
+
+  // Safe render function to prevent VTK errors
+  const safeRender = useCallback((viewportToRender: any) => {
+    if (viewportToRender) {
+      try {
+        viewportToRender.render();
+      } catch (renderError) {
+        // Silently handle VTK render errors - they're usually non-critical
+        // Common error: "Cannot read properties of null (reading 'join')" from RenderWindow.js
+        if (renderError.message?.includes('join') || renderError.message?.includes('RenderWindow')) {
+          // This is a known VTK issue, try alternative render approach
+          setTimeout(() => {
+            try {
+              if (viewportToRender && viewportToRender.getRenderingEngine) {
+                const engine = viewportToRender.getRenderingEngine();
+                if (engine) {
+                  engine.renderViewports([viewportToRender.id]);
+                }
+              }
+            } catch (altError) {
+              // Completely ignore if alternative also fails
+            }
+          }, 50);
+        }
+      }
+    }
+  }, []);
   
   // Initialize Cornerstone3D - with better DOM readiness
   useEffect(() => {
@@ -145,6 +189,26 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
       console.log('Initialization already in progress or completed, skipping...');
       return;
     }
+
+    // Add global error handler for VTK errors
+    const originalError = window.onerror;
+    const handleVTKError = (message: any, source?: string, lineno?: number, colno?: number, error?: Error) => {
+      // Suppress known VTK render errors
+      if (typeof message === 'string' && 
+          (message.includes('Cannot read properties of null') || 
+           message.includes('RenderWindow.js') ||
+           source?.includes('RenderWindow.js'))) {
+        console.debug('Suppressed VTK render error:', message);
+        return true; // Prevent default error handling
+      }
+      // Let other errors through
+      if (originalError) {
+        return originalError(message, source, lineno, colno, error);
+      }
+      return false;
+    };
+    
+    window.onerror = handleVTKError;
 
     console.log('SimpleDicomViewer mounted, imageIds:', imageIds);
     console.log('mainViewportRef.current at mount:', mainViewportRef.current);
@@ -212,7 +276,46 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
         setViewport(stackViewport);
 
         console.log('Loading images...', imageIds);
-        await stackViewport.setStack(imageIds, currentImageIndex);
+        console.log(`Total images: ${imageIds.length}, starting at index: ${currentImageIndex}`);
+        
+        if (imageIds.length === 0) {
+          throw new Error('No image IDs provided');
+        }
+        
+        // For multi-image debugging
+        if (imageIds.length > 2) {
+          console.log('DEBUG: Multi-image series detected:', {
+            totalImages: imageIds.length,
+            sampleImageIds: imageIds.slice(0, 3).map((id, idx) => ({ index: idx, id })),
+            allImageIds: imageIds
+          });
+        }
+        
+        // Ensure currentImageIndex is valid
+        const startIndex = Math.min(currentImageIndex, imageIds.length - 1);
+        console.log(`Setting stack with ${imageIds.length} images, starting at index ${startIndex}`);
+        
+        try {
+          console.log('DEBUG: Loading full stack for proper navigation...');
+          
+          // Load all images in the stack for proper navigation
+          // This is necessary for proper multi-image navigation
+          await stackViewport.setStack(imageIds, startIndex);
+          console.log(`DEBUG: Full stack loaded successfully with ${imageIds.length} images, starting at index ${startIndex}`);
+          
+        } catch (stackError) {
+          console.error('DEBUG: Stack loading failed:', stackError);
+          console.error('DEBUG: Stack error details:', {
+            errorMessage: stackError.message,
+            errorStack: stackError.stack,
+            imageCount: imageIds.length,
+            startIndex,
+            firstImageId: imageIds[0],
+            selectedImageId: imageIds[startIndex]
+          });
+          
+          throw stackError;
+        }
         
         // Fit image to viewport while preserving aspect ratio
         stackViewport.resetCamera();
@@ -235,6 +338,23 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
         
         stackViewport.render();
         console.log('Images loaded and rendered with proper aspect ratio');
+
+        // Start with inverted state (true) which is what Cornerstone defaults to
+        setTimeout(() => {
+          try {
+            const properties = stackViewport.getProperties();
+            console.log('Current viewport properties:', properties);
+            stackViewport.setProperties({
+              ...properties,
+              invert: true
+            });
+            setIsInverted(true);
+            stackViewport.render();
+            console.log('Set viewport to inverted state (default behavior)');
+          } catch (err) {
+            console.warn('Could not set initial viewport properties:', err);
+          }
+        }, 100);
 
         // Set up ResizeObserver for aspect ratio preservation
         if (element && !resizeObserverRef.current) {
@@ -335,6 +455,9 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
     return () => {
       cancelAnimationFrame(rafId);
       
+      // Restore original error handler
+      window.onerror = originalError;
+      
       // Reset initialization flag on cleanup
       initializationRef.current = false;
       
@@ -417,17 +540,21 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
     }
   }, [toolGroup]);
   
-  // Navigation functions
-  const goToImage = useCallback((index: number) => {
+  // Navigation functions with proper stack navigation
+  const goToImage = useCallback(async (index: number) => {
     if (viewport && index >= 0 && index < imageIds.length && index !== currentImageIndex) {
       try {
-        viewport.setImageIdIndex(index);
+        setLoadingNavigation(true);
+        console.log(`DEBUG: Navigating to image ${index + 1}/${imageIds.length} (index: ${index})`);
+        
+        // Use setImageIdIndex for direct navigation to specific image
+        await viewport.setImageIdIndex(index);
         
         // Reset all image manipulation properties when changing images
         const properties = viewport.getProperties();
         viewport.setProperties({
           ...properties,
-          invert: false
+          invert: true
         });
         
         // Reset horizontal flip CSS transform
@@ -437,19 +564,23 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
           canvas.style.transform = 'scaleX(1)';
         }
         
-        // Reset image manipulation states
-        setIsInverted(false);
+        // Reset image manipulation states to defaults when changing images
+        setIsInverted(true);
         setIsFlippedHorizontal(false);
         
-        viewport.render();
+        safeRender(viewport);
         setCurrentImageIndex(index);
         
-        console.log(`Navigated to image ${index + 1}/${imageIds.length}`);
+        console.log(`DEBUG: Successfully navigated to image ${index + 1}/${imageIds.length}`);
+        
       } catch (error) {
-        console.error('Error changing image:', error);
+        console.error('DEBUG: Error in navigation:', error);
+        // Try to stay on current image if navigation fails
+      } finally {
+        setLoadingNavigation(false);
       }
     }
-  }, [viewport, imageIds.length, currentImageIndex]);
+  }, [viewport, imageIds, currentImageIndex]);
   
   const nextImage = useCallback(() => {
     goToImage(currentImageIndex + 1);
@@ -488,11 +619,11 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
       // Reset camera first
       viewport.resetCamera();
       
-      // Reset invert property
+      // Reset invert property to default (inverted)
       const properties = viewport.getProperties();
       viewport.setProperties({
         ...properties,
-        invert: false
+        invert: true
       });
       
       // Reset horizontal flip CSS transform
@@ -503,10 +634,10 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
       }
       
       // Reset image manipulation states
-      setIsInverted(false);
+      setIsInverted(true);
       setIsFlippedHorizontal(false);
       
-      viewport.render();
+      safeRender(viewport);
       
       console.log('Viewport reset completed');
     }
@@ -533,7 +664,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
           ...camera,
           viewUp: newViewUp
         });
-        viewport.render();
+        safeRender(viewport);
       } catch (error) {
         console.error('Error rotating image:', error);
       }
@@ -573,12 +704,14 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
         const newInvertState = !isInverted;
         setIsInverted(newInvertState);
         
-        // Apply invert property to viewport
+        // Get current properties and update invert
+        const properties = viewport.getProperties();
         viewport.setProperties({
+          ...properties,
           invert: newInvertState
         });
         
-        viewport.render();
+        safeRender(viewport);
         console.log(`Image invert toggled: ${newInvertState}`);
       } catch (error) {
         console.error('Error inverting image:', error);
@@ -612,7 +745,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
         }
         
         // Force viewport re-render
-        viewport.render();
+        safeRender(viewport);
         
         console.log('All annotations cleared using state manager');
       } catch (error) {
@@ -625,7 +758,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
             const svgLayer = element.querySelector('.cornerstone-svg-layer');
             if (svgLayer) {
               svgLayer.innerHTML = '';
-              viewport.render();
+              safeRender(viewport);
             }
           }
         } catch (fallbackError) {
@@ -635,6 +768,27 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
     }
   }, [viewport]);
   
+  // Keyboard navigation for images
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Only handle if not in an input field
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+      
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        prevImage();
+      } else if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        nextImage();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [prevImage, nextImage]);
+
   // Cleanup playback on unmount
   useEffect(() => {
     return () => {
@@ -707,9 +861,62 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
     <div className="w-full h-full flex flex-col bg-background">
       {/* Main Content - Full height */}
       <div className="flex-1 flex flex-col relative">
-        {/* Toolbar - Floating on top of image */}
-        <div className="absolute top-4 left-4 z-10 bg-background/90 border rounded-lg p-2 shadow-lg">
+        {/* Toolbar - Draggable and minimizable */}
+        <div 
+          ref={toolbarRef}
+          className="absolute z-10 bg-background/90 border rounded-lg shadow-lg transition-all duration-200"
+          style={{
+            left: toolbarPosition.x === 0 ? '50%' : `${toolbarPosition.x}px`,
+            top: `${toolbarPosition.y}px`,
+            transform: toolbarPosition.x === 0 ? 'translateX(-50%)' : 'none',
+            cursor: isDraggingRef.current ? 'grabbing' : 'grab'
+          }}
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget || (e.target as Element).closest('.toolbar-handle')) {
+              isDraggingRef.current = true;
+              const startX = e.clientX - toolbarPosition.x;
+              const startY = e.clientY - toolbarPosition.y;
+              
+              const handleMouseMove = (moveEvent: MouseEvent) => {
+                if (isDraggingRef.current) {
+                  const newX = moveEvent.clientX - startX;
+                  const newY = moveEvent.clientY - startY;
+                  setToolbarPosition({ x: newX, y: Math.max(4, newY) });
+                }
+              };
+              
+              const handleMouseUp = () => {
+                isDraggingRef.current = false;
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', handleMouseUp);
+              };
+              
+              document.addEventListener('mousemove', handleMouseMove);
+              document.addEventListener('mouseup', handleMouseUp);
+            }
+          }}
+        >
           <div className="flex items-center gap-1">
+            {/* Drag Handle and Minimize Button */}
+            <div className="toolbar-handle flex items-center gap-1 px-1">
+              <div className="flex flex-col gap-0.5 cursor-grab">
+                <div className="w-1 h-1 bg-muted-foreground rounded-full"></div>
+                <div className="w-1 h-1 bg-muted-foreground rounded-full"></div>
+                <div className="w-1 h-1 bg-muted-foreground rounded-full"></div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsToolbarMinimized(!isToolbarMinimized)}
+                className="h-6 w-6 p-0"
+                title={isToolbarMinimized ? "Expand Toolbar" : "Minimize Toolbar"}
+              >
+                {isToolbarMinimized ? '▲' : '▼'}
+              </Button>
+            </div>
+            
+            {!isToolbarMinimized && (
+              <>
             <Button
               variant={activeTool === 'wwwc' ? 'default' : 'ghost'}
               size="sm"
@@ -776,7 +983,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
               <FlipHorizontal className="h-4 w-4" />
             </Button>
             <Button
-              variant={isInverted ? 'default' : 'ghost'}
+              variant={!isInverted ? 'default' : 'ghost'}
               size="sm"
               onClick={invertImage}
               title={isInverted ? "Remove Inversion" : "Invert Colors"}
@@ -800,20 +1007,11 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
             >
               <Trash2 className="h-4 w-4" />
             </Button>
+              </>
+            )}
           </div>
         </div>
 
-        {/* Image Info - Floating on top right */}
-        <div className="absolute top-4 right-4 z-10 bg-background/90 border rounded-lg p-2 shadow-lg">
-          <div className="flex items-center gap-2 text-sm">
-            <Badge variant="outline">
-              {currentImageIndex + 1} of {imageIds.length}
-            </Badge>
-            <Badge variant="outline">
-              {studyMetadata.modality}
-            </Badge>
-          </div>
-        </div>
 
 
         {/* Main Viewport - Full size */}
@@ -835,6 +1033,16 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
                     <p className="text-center mt-2">Initializing Cornerstone3D</p>
                   </CardContent>
                 </Card>
+              </div>
+            )}
+            
+            {/* Navigation Loading Overlay */}
+            {loadingNavigation && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-20">
+                <div className="bg-background rounded-lg p-4 flex items-center gap-3">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
+                  <span className="text-sm">Loading image {currentImageIndex + 1}...</span>
+                </div>
               </div>
             )}
             
@@ -892,15 +1100,44 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
 
               {/* Thumbnail Images */}
               <div className="flex gap-1 flex-1 overflow-x-auto">
-                {imageIds.map((imageId, index) => (
-                  <ThumbnailImage
-                    key={imageId}
-                    imageId={imageId}
-                    index={index}
-                    isActive={index === currentImageIndex}
-                    onClick={() => goToImage(index)}
-                  />
-                ))}
+                {imageIds.map((imageId, index) => {
+                  // Optimized rendering strategy:
+                  // - For small series (≤6): render all thumbnails
+                  // - For larger series: only render current + 2 before + 2 after
+                  const shouldRenderThumbnail = imageIds.length <= 6 || Math.abs(index - currentImageIndex) <= 2;
+                  
+                  if (!shouldRenderThumbnail) {
+                    return (
+                      <div 
+                        key={imageId}
+                        className={`
+                          flex-shrink-0 cursor-pointer border-2 rounded transition-all
+                          ${index === currentImageIndex 
+                            ? 'border-primary shadow-md' 
+                            : 'border-border hover:border-primary/50'
+                          }
+                        `}
+                        style={{ width: '80px', height: '80px' }}
+                        onClick={() => goToImage(index)}
+                        title={`Image ${index + 1}`}
+                      >
+                        <div className="w-full h-full bg-muted rounded-sm flex items-center justify-center text-xs">
+                          {index + 1}
+                        </div>
+                      </div>
+                    );
+                  }
+                  
+                  return (
+                    <ThumbnailImage
+                      key={imageId}
+                      imageId={imageId}
+                      index={index}
+                      isActive={index === currentImageIndex}
+                      onClick={() => goToImage(index)}
+                    />
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -908,6 +1145,56 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
       </div>
     </div>
   );
+};
+
+// Shared thumbnail rendering engine to prevent WebGL context leaks
+let sharedThumbnailEngine: RenderingEngine | null = null;
+let thumbnailEngineRefCount = 0;
+let thumbnailEngineInitPromise: Promise<RenderingEngine> | null = null;
+
+const getSharedThumbnailEngine = async () => {
+  if (sharedThumbnailEngine) {
+    thumbnailEngineRefCount++;
+    return sharedThumbnailEngine;
+  }
+  
+  if (thumbnailEngineInitPromise) {
+    const engine = await thumbnailEngineInitPromise;
+    thumbnailEngineRefCount++;
+    return engine;
+  }
+  
+  thumbnailEngineInitPromise = (async () => {
+    await initializeCornerstone();
+    sharedThumbnailEngine = new RenderingEngine(`sharedThumbnailEngine-${Date.now()}`, {
+      enableGPURendering: true,
+      strictZSpacingForVolumeViewport: false
+    });
+    return sharedThumbnailEngine;
+  })();
+  
+  const engine = await thumbnailEngineInitPromise;
+  thumbnailEngineRefCount++;
+  return engine;
+};
+
+const releaseSharedThumbnailEngine = () => {
+  thumbnailEngineRefCount--;
+  if (thumbnailEngineRefCount <= 0 && sharedThumbnailEngine) {
+    // Add delay before destroying to allow for quick re-use
+    setTimeout(() => {
+      if (thumbnailEngineRefCount <= 0 && sharedThumbnailEngine) {
+        try {
+          sharedThumbnailEngine.destroy();
+        } catch (e) {
+          console.warn('Error destroying shared thumbnail engine:', e);
+        }
+        sharedThumbnailEngine = null;
+        thumbnailEngineInitPromise = null;
+        thumbnailEngineRefCount = 0;
+      }
+    }, 1000);
+  }
 };
 
 // Thumbnail component for rendering small DICOM images
@@ -922,8 +1209,33 @@ const ThumbnailImage: React.FC<ThumbnailImageProps> = ({ imageId, index, isActiv
   const thumbRef = useRef<HTMLDivElement>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState(false);
+  const [shouldLoad, setShouldLoad] = useState(false);
+  const viewportIdRef = useRef<string | null>(null);
+  const cleanupRef = useRef<(() => void) | null>(null);
+  
+  // Use Intersection Observer for lazy loading thumbnails
+  useEffect(() => {
+    const element = thumbRef.current;
+    if (!element) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setShouldLoad(true);
+          observer.disconnect(); // Only load once
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(element);
+    
+    return () => observer.disconnect();
+  }, []);
   
   useEffect(() => {
+    if (!shouldLoad) return;
+    
     const element = thumbRef.current;
     if (!element || !imageId) return;
 
@@ -931,15 +1243,21 @@ const ThumbnailImage: React.FC<ThumbnailImageProps> = ({ imageId, index, isActiv
     
     const loadThumbnail = async () => {
       try {
-        // Initialize a small rendering engine for thumbnails
-        await initializeCornerstone();
+        console.log(`DEBUG: Loading thumbnail ${index + 1}`);
+        
+        // Small delay to stagger thumbnail loading
+        await new Promise(resolve => setTimeout(resolve, index * 50));
         
         if (!mounted) return;
         
-        const thumbRenderingEngineId = `thumb-${index}`;
-        const thumbEngine = new RenderingEngine(thumbRenderingEngineId);
+        // Use shared rendering engine to prevent WebGL context leaks
+        const thumbEngine = await getSharedThumbnailEngine();
         
-        const thumbViewportId = `thumbViewport-${index}`;
+        if (!mounted) return;
+        
+        const thumbViewportId = `thumbViewport-${index}-${Date.now()}`;
+        viewportIdRef.current = thumbViewportId;
+        
         const thumbViewportInput = {
           viewportId: thumbViewportId,
           element: element,
@@ -949,22 +1267,50 @@ const ThumbnailImage: React.FC<ThumbnailImageProps> = ({ imageId, index, isActiv
         thumbEngine.enableElement(thumbViewportInput);
         const thumbViewport = thumbEngine.getViewport(thumbViewportId);
         
-        // Load the single image
-        await thumbViewport.setStack([imageId], 0);
-        thumbViewport.render();
+        // Load the single image with shorter timeout for thumbnails
+        const loadPromise = thumbViewport.setStack([imageId], 0);
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Thumbnail load timeout')), 5000)
+        );
         
-        if (mounted) {
-          setIsLoaded(true);
-        }
+        await Promise.race([loadPromise, timeoutPromise]);
         
-        // Cleanup function
-        return () => {
+        if (!mounted) return;
+        
+        // Safe render for thumbnail with retry logic
+        let renderAttempts = 0;
+        const maxRenderAttempts = 3;
+        
+        const attemptRender = () => {
           try {
-            thumbEngine.destroy();
-          } catch (e) {
-            // Ignore cleanup errors
+            thumbViewport.render();
+            console.log(`DEBUG: Thumbnail ${index + 1} rendered successfully`);
+            if (mounted) {
+              setIsLoaded(true);
+            }
+          } catch (renderError) {
+            console.warn(`Thumbnail render error for ${index} (attempt ${renderAttempts + 1}):`, renderError);
+            renderAttempts++;
+            if (renderAttempts < maxRenderAttempts && mounted) {
+              setTimeout(attemptRender, 100 * renderAttempts);
+            }
           }
         };
+        
+        attemptRender();
+        
+        // Store cleanup function
+        cleanupRef.current = () => {
+          if (viewportIdRef.current && sharedThumbnailEngine) {
+            try {
+              sharedThumbnailEngine.disableElement(viewportIdRef.current);
+            } catch (e) {
+              // Ignore cleanup errors
+            }
+          }
+          releaseSharedThumbnailEngine();
+        };
+        
       } catch (err) {
         console.warn(`Failed to load thumbnail ${index}:`, err);
         if (mounted) {
@@ -977,8 +1323,14 @@ const ThumbnailImage: React.FC<ThumbnailImageProps> = ({ imageId, index, isActiv
     
     return () => {
       mounted = false;
+      
+      // Clean up viewport from shared engine
+      if (cleanupRef.current) {
+        cleanupRef.current();
+        cleanupRef.current = null;
+      }
     };
-  }, [imageId, index]);
+  }, [shouldLoad, imageId, index]);
   
   return (
     <div

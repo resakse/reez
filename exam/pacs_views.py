@@ -367,24 +367,33 @@ def get_study_image_ids(request, study_uid):
         
         study_data = find_result[0]
         image_ids = []
+        series_info = []
         
         # Step 2: Build image IDs using Django proxy URLs
         for series_id in study_data.get('Series', []):
             series_response = requests.get(f"{orthanc_url}/series/{series_id}", timeout=30)
             
             if not series_response.ok:
+                print(f"DEBUG: Failed to fetch series {series_id}: {series_response.status_code}")
                 continue
                 
             series_data = series_response.json()
             series_instance_uid = series_data.get('MainDicomTags', {}).get('SeriesInstanceUID')
+            series_description = series_data.get('MainDicomTags', {}).get('SeriesDescription', 'Unknown')
             
             if not series_instance_uid:
+                print(f"DEBUG: No SeriesInstanceUID for series {series_id}")
                 continue
             
-            for instance_id in series_data.get('Instances', []):
+            series_instances = series_data.get('Instances', [])
+            print(f"DEBUG: Series {series_id} ({series_description}) has {len(series_instances)} instances")
+            
+            series_image_ids = []
+            for instance_id in series_instances:
                 instance_response = requests.get(f"{orthanc_url}/instances/{instance_id}", timeout=30)
                 
                 if not instance_response.ok:
+                    print(f"DEBUG: Failed to fetch instance {instance_id}: {instance_response.status_code}")
                     continue
                     
                 instance_data = instance_response.json()
@@ -395,6 +404,24 @@ def get_study_image_ids(request, study_uid):
                     api_url = request.build_absolute_uri('/').rstrip('/')  # Get base URL
                     image_id = f"wadouri:{api_url}/api/pacs/instances/{instance_id}/file"
                     image_ids.append(image_id)
+                    series_image_ids.append(image_id)
+                else:
+                    print(f"DEBUG: Missing UIDs for instance {instance_id}: series={series_instance_uid}, sop={sop_instance_uid}")
+            
+            series_info.append({
+                'seriesId': series_id,
+                'seriesInstanceUID': series_instance_uid,
+                'seriesDescription': series_description,
+                'instanceCount': len(series_image_ids)
+            })
+        
+        print(f"DEBUG: Total image IDs generated: {len(image_ids)}")
+        print(f"DEBUG: Series breakdown: {series_info}")
+        
+        if len(image_ids) > 2:
+            print(f"DEBUG: Multi-image series detected - {len(image_ids)} total images")
+            print(f"DEBUG: First 3 image IDs: {image_ids[:3]}")
+            print(f"DEBUG: Last 3 image IDs: {image_ids[-3:]}")
         
         return Response({
             'imageIds': image_ids,

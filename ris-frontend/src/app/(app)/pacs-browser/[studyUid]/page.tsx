@@ -46,7 +46,10 @@ import {
   Archive,
   Eye,
   Clock,
-  Building
+  Building,
+  ChevronLeft,
+  ChevronRight,
+  Maximize2
 } from 'lucide-react';
 
 interface StudyMetadata {
@@ -76,6 +79,8 @@ export default function LegacyStudyViewerPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
+  const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
+  const [isFullWindow, setIsFullWindow] = useState(false);
   
   // Track fetched studies to prevent duplicate API calls
   const fetchedStudiesRef = useRef(new Set<string>());
@@ -121,6 +126,7 @@ export default function LegacyStudyViewerPage() {
 
       console.log('Study metadata:', studyMetadata);
       console.log('Study image IDs:', studyImageIds);
+      console.log(`Found ${studyImageIds.length} images for study ${studyUid}`);
 
       // Cache the fetched data
       studyDataCache.set(studyUid, {
@@ -154,6 +160,25 @@ export default function LegacyStudyViewerPage() {
       fetchStudyData();
     }
   }, [studyUid, user, fetchStudyData]);
+
+  // Keyboard shortcut for full window toggle (F key)
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'f' || event.key === 'F') {
+        if (!event.ctrlKey && !event.altKey && !event.metaKey) {
+          event.preventDefault();
+          setIsFullWindow(!isFullWindow);
+        }
+      }
+      if (event.key === 'Escape' && isFullWindow) {
+        event.preventDefault();
+        setIsFullWindow(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFullWindow]);
 
   const formatDate = (dateString: string): string => {
     if (!dateString || dateString.length !== 8) return dateString;
@@ -270,10 +295,65 @@ export default function LegacyStudyViewerPage() {
     );
   }
 
+  if (isFullWindow) {
+    return (
+      <div className="fixed inset-0 bg-black z-50">
+        {/* Full Window DICOM Viewer */}
+        <div className="relative h-full">
+          {imageIds.length > 0 ? (
+            <SimpleDicomViewer 
+              imageIds={imageIds}
+              studyMetadata={{
+                patientName: metadata.PatientName || 'Unknown',
+                patientId: metadata.PatientID || 'Unknown',
+                studyDate: metadata.StudyDate || '',
+                studyDescription: metadata.StudyDescription || '',
+                modality: metadata.Modality || 'Unknown'
+              }}
+            />
+          ) : (
+            <div className="h-full flex items-center justify-center">
+              <div className="text-center text-white">
+                <Eye className="mx-auto h-12 w-12 mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No Images Available</h3>
+                <p>This study contains no viewable images</p>
+              </div>
+            </div>
+          )}
+          
+          {/* Full Window Overlay Information */}
+          <div className="absolute top-4 left-4 text-white text-sm space-y-1 bg-black/50 p-3 rounded">
+            <div><strong>Patient:</strong> {metadata?.PatientName || 'Unknown'}</div>
+            <div><strong>ID:</strong> {metadata?.PatientID || 'Unknown'}</div>
+            <div><strong>Accession:</strong> {metadata?.AccessionNumber || 'N/A'}</div>
+            <div><strong>Clinic:</strong> {metadata?.InstitutionName || 'N/A'}</div>
+            <div><strong>Date:</strong> {formatDate(metadata?.StudyDate || '')} {formatTime(metadata?.StudyTime || '')}</div>
+            <div><strong>Radiographer:</strong> {metadata?.OperatorsName || 'N/A'}</div>
+            <div><strong>Position:</strong> AP/PA</div>
+          </div>
+          
+          {/* Keyboard shortcuts hint */}
+          <div className="absolute bottom-4 right-4 text-white text-xs bg-black/50 p-2 rounded">
+            Press F to toggle full window • ESC to exit
+          </div>
+          
+          {/* Exit Full Window Button */}
+          <Button
+            onClick={() => setIsFullWindow(false)}
+            className="absolute top-4 right-4 bg-black/50 hover:bg-black/70"
+            size="sm"
+          >
+            Exit Full Window
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full flex">
       {/* DICOM Viewer - Full Height */}
-      <div className="flex-1">
+      <div className="flex-1 relative">
         {imageIds.length > 0 ? (
           <SimpleDicomViewer 
             imageIds={imageIds}
@@ -296,10 +376,35 @@ export default function LegacyStudyViewerPage() {
             </div>
           </div>
         )}
+        
+        {/* Full Window Button */}
+        <Button
+          onClick={() => setIsFullWindow(true)}
+          className="absolute top-4 right-4 z-10"
+          size="sm"
+          variant="secondary"
+          title="Full Window View (Press F)"
+        >
+          <Maximize2 className="h-4 w-4 mr-2" />
+          Full Window
+        </Button>
       </div>
 
       {/* Collapsible Info Panel */}
-      <div className="w-80 border-l bg-muted/5 overflow-y-auto">
+      <div className={`${isPanelCollapsed ? 'w-12' : 'w-80'} border-l bg-muted/5 overflow-hidden transition-all duration-300 ease-in-out relative`}>
+        {/* Collapse Toggle Button */}
+        <Button
+          onClick={() => setIsPanelCollapsed(!isPanelCollapsed)}
+          className="absolute top-4 left-1 z-20 bg-background border shadow-sm"
+          size="sm"
+          variant="secondary"
+          title={isPanelCollapsed ? "Expand Panel" : "Collapse Panel"}
+        >
+          {isPanelCollapsed ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        </Button>
+        
+        {!isPanelCollapsed && (
+          <div className="overflow-y-auto h-full">
         <div className="p-4 space-y-4">
 
           {/* Import Button */}
@@ -448,6 +553,8 @@ export default function LegacyStudyViewerPage() {
             </CardContent>
           </Card>
         </div>
+          </div>
+        )}
       </div>
     </div>
   );
