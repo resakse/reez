@@ -14,6 +14,31 @@ interface StudyMetadata {
   InstitutionName?: string;
   SeriesCount?: number;
   ImageCount?: number;
+  AccessionNumber?: string;
+  ReferringPhysicianName?: string;
+  OperatorsName?: string;
+}
+
+// DICOM text decoder utility
+function decodeDicomText(text: string): string {
+  if (!text) return '';
+  
+  // Handle DICOM Person Name format (Family^Given^Middle^Prefix^Suffix)
+  if (text.includes('^')) {
+    const nameParts = text.split('^');
+    const family = nameParts[0] || '';
+    const given = nameParts[1] || '';
+    const middle = nameParts[2] || '';
+    
+    // Combine name parts with spaces
+    return [family, given, middle]
+      .filter(part => part.trim())
+      .join(' ')
+      .trim();
+  }
+  
+  // For other DICOM text, just return as-is (could add more formatting here)
+  return text.trim();
 }
 
 /**
@@ -88,9 +113,9 @@ export async function getStudyMetadata(studyInstanceUID: string): Promise<StudyM
 
     const study = searchResult.studies[0];
     
-    // Convert search result format to StudyMetadata format
+    // Convert search result format to StudyMetadata format with DICOM decoding
     const metadata: StudyMetadata = {
-      PatientName: study.patientName || 'Unknown',
+      PatientName: decodeDicomText(study.patientName || 'Unknown'),
       PatientID: study.patientId || 'Unknown',
       PatientBirthDate: study.patientBirthDate || undefined,
       PatientSex: study.patientSex || undefined,
@@ -98,9 +123,12 @@ export async function getStudyMetadata(studyInstanceUID: string): Promise<StudyM
       StudyTime: study.studyTime || undefined,
       StudyDescription: study.studyDescription || undefined,
       Modality: study.modality || undefined,
-      InstitutionName: study.institutionName || undefined,
+      InstitutionName: decodeDicomText(study.institutionName || ''),
       SeriesCount: study.seriesCount || 0,
-      ImageCount: study.imageCount || 0
+      ImageCount: study.imageCount || 0,
+      AccessionNumber: study.accessionNumber || undefined,
+      ReferringPhysicianName: decodeDicomText(study.referringPhysicianName || ''),
+      OperatorsName: decodeDicomText(study.operatorsName || '')
     };
 
     return metadata;

@@ -126,7 +126,10 @@ class PacsSearchView(APIView):
                     'modality': study.get('MainDicomTags', {}).get('ModalitiesInStudy', '').split(',')[0] if study.get('MainDicomTags', {}).get('ModalitiesInStudy') else 'Unknown',
                     'seriesCount': len(study.get('Series', [])),
                     'imageCount': 0,  # Could be calculated if needed
-                    'institutionName': study.get('MainDicomTags', {}).get('InstitutionName', '')
+                    'institutionName': study.get('MainDicomTags', {}).get('InstitutionName', ''),
+                    'accessionNumber': study.get('MainDicomTags', {}).get('AccessionNumber', ''),
+                    'referringPhysicianName': study.get('MainDicomTags', {}).get('ReferringPhysicianName', ''),
+                    'operatorsName': study.get('MainDicomTags', {}).get('OperatorsName', '')
                 }
                 formatted_studies.append(formatted_study)
             

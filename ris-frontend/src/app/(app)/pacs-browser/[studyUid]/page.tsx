@@ -1,8 +1,17 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+
+// Module-level cache to prevent duplicate API calls across component remounts
+const studyDataCache = new Map<string, {
+  metadata: any;
+  imageIds: string[];
+  timestamp: number;
+}>();
+
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -52,6 +61,9 @@ interface StudyMetadata {
   InstitutionName?: string;
   SeriesCount?: number;
   ImageCount?: number;
+  AccessionNumber?: string;
+  ReferringPhysicianName?: string;
+  OperatorsName?: string;
 }
 
 export default function LegacyStudyViewerPage() {
@@ -64,17 +76,42 @@ export default function LegacyStudyViewerPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
+  
+  // Track fetched studies to prevent duplicate API calls
+  const fetchedStudiesRef = useRef(new Set<string>());
 
   const studyUid = params?.studyUid as string;
 
   const fetchStudyData = useCallback(async () => {
     if (!studyUid) return;
+    
+    console.log(`Checking cache for study ${studyUid}...`);
+    
+    // Check if we have cached data that's still fresh
+    const cachedData = studyDataCache.get(studyUid);
+    const now = Date.now();
+    
+    if (cachedData && (now - cachedData.timestamp) < CACHE_DURATION) {
+      console.log(`Using cached data for study ${studyUid}`);
+      setMetadata(cachedData.metadata);
+      setImageIds(cachedData.imageIds);
+      setLoading(false);
+      return;
+    }
+
+    // Prevent duplicate fetches for the same study
+    if (fetchedStudiesRef.current.has(studyUid)) {
+      console.log(`Study ${studyUid} already being fetched, skipping...`);
+      return;
+    }
+
+    // Mark this study as being fetched
+    fetchedStudiesRef.current.add(studyUid);
+    console.log('Fetching study data for UID:', studyUid);
 
     try {
       setLoading(true);
       setError(null);
-
-      console.log('Fetching study data for UID:', studyUid);
 
       // Fetch study metadata and image IDs in parallel
       const [studyMetadata, studyImageIds] = await Promise.all([
@@ -84,6 +121,13 @@ export default function LegacyStudyViewerPage() {
 
       console.log('Study metadata:', studyMetadata);
       console.log('Study image IDs:', studyImageIds);
+
+      // Cache the fetched data
+      studyDataCache.set(studyUid, {
+        metadata: studyMetadata,
+        imageIds: studyImageIds,
+        timestamp: now
+      });
 
       setMetadata(studyMetadata);
       setImageIds(studyImageIds);
@@ -99,11 +143,14 @@ export default function LegacyStudyViewerPage() {
       toast.error('Failed to load legacy study');
     } finally {
       setLoading(false);
+      // Remove from fetching set after completion (success or failure)
+      fetchedStudiesRef.current.delete(studyUid);
     }
   }, [studyUid]);
 
   useEffect(() => {
     if (studyUid && user) {
+      console.log(`useEffect triggered for study: ${studyUid}`);
       fetchStudyData();
     }
   }, [studyUid, user, fetchStudyData]);
@@ -307,6 +354,12 @@ export default function LegacyStudyViewerPage() {
                   <p className="text-sm">{calculateAge(metadata.PatientBirthDate)}</p>
                 </div>
               )}
+              {metadata.InstitutionName && (
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Clinic</label>
+                  <p className="text-sm">{metadata.InstitutionName}</p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -341,6 +394,24 @@ export default function LegacyStudyViewerPage() {
                   {metadata.Modality}
                 </Badge>
               </div>
+              {metadata.AccessionNumber && (
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Accession Number</label>
+                  <p className="text-sm font-mono">{metadata.AccessionNumber}</p>
+                </div>
+              )}
+              {metadata.ReferringPhysicianName && (
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Referring Doctor</label>
+                  <p className="text-sm">{metadata.ReferringPhysicianName}</p>
+                </div>
+              )}
+              {metadata.OperatorsName && (
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Radiographer</label>
+                  <p className="text-sm">{metadata.OperatorsName}</p>
+                </div>
+              )}
               {metadata.StudyDescription && (
                 <div>
                   <label className="text-xs font-medium text-muted-foreground">Description</label>

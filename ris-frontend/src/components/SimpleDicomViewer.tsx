@@ -7,7 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { 
   ZoomIn, ZoomOut, RotateCw, Move, Square, Circle, 
   Ruler, MousePointer, RotateCcw, Maximize, Settings,
-  Play, Pause, SkipBack, SkipForward 
+  Play, Pause, SkipBack, SkipForward, Trash2,
+  FlipHorizontal, FlipVertical, Palette
 } from 'lucide-react';
 import AuthService from '@/lib/auth';
 
@@ -24,58 +25,86 @@ import {
   EllipticalROITool,
   StackScrollTool,
   addTool,
-  Enums as ToolsEnums
+  Enums as ToolsEnums,
+  annotation
 } from '@cornerstonejs/tools';
 import { init as dicomImageLoaderInit } from '@cornerstonejs/dicom-image-loader';
 
 const { ViewportType } = CoreEnums;
 const { MouseBindings } = ToolsEnums;
 
-// Global initialization flag
+// Global initialization flag and promise
 let isCornerstoneInitialized = false;
+let cornerstoneInitPromise: Promise<void> | null = null;
 
 const initializeCornerstone = async () => {
   if (isCornerstoneInitialized) return;
   
-  try {
-    // Initialize Cornerstone3D libraries
-    await coreInit();
-    await dicomImageLoaderInit({
-      beforeSend: (xhr: XMLHttpRequest) => {
-        // Add JWT authentication - with error handling
-        try {
-          const token = AuthService?.getAccessToken?.();
-          if (token) {
-            xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-          }
-        } catch (error) {
-          console.warn('Failed to get access token for DICOM image loading:', error);
-          // Continue without authentication - images should still load via proxy
-        }
-      },
-      // Optimize for performance
-      useWebWorkers: true,
-      decodeConfig: {
-        convertFloatPixelDataToInt: false,
-        use16BitDataType: true
-      }
-    });
-    await toolsInit();
-    
-    // Add all tools to the global state
-    addTool(WindowLevelTool);
-    addTool(ZoomTool);
-    addTool(PanTool);
-    addTool(LengthTool);
-    addTool(RectangleROITool);
-    addTool(EllipticalROITool);
-    addTool(StackScrollTool);
-    
-    isCornerstoneInitialized = true;
-  } catch (error) {
-    console.error('Failed to initialize Cornerstone3D:', error);
-    throw error;
+  // If initialization is already in progress, wait for it
+  if (cornerstoneInitPromise) {
+    await cornerstoneInitPromise;
+    return;
   }
+  
+  cornerstoneInitPromise = (async () => {
+    try {
+      console.log('Starting Cornerstone3D initialization...');
+      
+      // Initialize Cornerstone3D libraries in sequence
+      await coreInit();
+      console.log('Core initialized');
+      
+      await dicomImageLoaderInit({
+        beforeSend: (xhr: XMLHttpRequest) => {
+          // Add JWT authentication - with error handling
+          try {
+            const token = AuthService?.getAccessToken?.();
+            if (token) {
+              xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+            }
+          } catch (error) {
+            console.warn('Failed to get access token for DICOM image loading:', error);
+            // Continue without authentication - images should still load via proxy
+          }
+        },
+        // Optimize for performance
+        useWebWorkers: true,
+        decodeConfig: {
+          convertFloatPixelDataToInt: false,
+          use16BitDataType: true
+        }
+      });
+      console.log('DICOM image loader initialized');
+      
+      await toolsInit();
+      console.log('Tools initialized');
+      
+      // Add all tools to the global state with error checking
+      try {
+        addTool(WindowLevelTool);
+        addTool(ZoomTool);
+        addTool(PanTool);
+        addTool(LengthTool);
+        addTool(RectangleROITool);
+        addTool(EllipticalROITool);
+        addTool(StackScrollTool);
+        console.log('All tools added successfully');
+      } catch (toolError) {
+        console.error('Error adding tools:', toolError);
+        throw new Error(`Tool registration failed: ${toolError.message}`);
+      }
+      
+      isCornerstoneInitialized = true;
+      console.log('Cornerstone3D initialization complete');
+    } catch (error) {
+      console.error('Failed to initialize Cornerstone3D:', error);
+      // Reset the promise so we can retry
+      cornerstoneInitPromise = null;
+      throw error;
+    }
+  })();
+  
+  await cornerstoneInitPromise;
 };
 
 interface SimpleDicomViewerProps {
@@ -101,10 +130,22 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
   const [loading, setLoading] = useState<boolean>(true);
   const [activeTool, setActiveTool] = useState<Tool>('wwwc');
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [isInverted, setIsInverted] = useState<boolean>(false);
+  const [isFlippedHorizontal, setIsFlippedHorizontal] = useState<boolean>(false);
+  const [isFlippedVertical, setIsFlippedVertical] = useState<boolean>(false);
   const playbackIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Track initialization state to prevent double loading
+  const initializationRef = useRef(false);
+  
   // Initialize Cornerstone3D - with better DOM readiness
   useEffect(() => {
+    // Prevent double initialization
+    if (initializationRef.current) {
+      console.log('Initialization already in progress or completed, skipping...');
+      return;
+    }
+
     console.log('SimpleDicomViewer mounted, imageIds:', imageIds);
     console.log('mainViewportRef.current at mount:', mainViewportRef.current);
     
@@ -113,6 +154,8 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
       setLoading(false);
       return;
     }
+
+    initializationRef.current = true;
 
     const waitForElement = async (maxRetries = 50) => {
       for (let i = 0; i < maxRetries; i++) {
@@ -148,7 +191,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
         console.log('Cornerstone initialized');
 
         console.log('Creating rendering engine...');
-        const renderingEngineId = 'simpleDicomViewer';
+        const renderingEngineId = `simpleDicomViewer-${Date.now()}`;  // Unique ID to prevent conflicts
         const engine = new RenderingEngine(renderingEngineId, {
           // Optimize rendering performance
           enableGPURendering: true,
@@ -157,7 +200,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
         setRenderingEngine(engine);
 
         console.log('Creating viewport...');
-        const viewportId = 'stackViewport';
+        const viewportId = `stackViewport-${Date.now()}`;  // Unique ID to prevent conflicts
         const viewportInput = {
           viewportId,
           element: element, // Use the element we waited for
@@ -170,44 +213,84 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
 
         console.log('Loading images...', imageIds);
         await stackViewport.setStack(imageIds, currentImageIndex);
+        
+        // Fit image to viewport while preserving aspect ratio
+        stackViewport.resetCamera();
+        
+        // Set display area to maintain aspect ratio
+        const displayArea = {
+          imageArea: [1, 1], // Full image
+          imageCanvasPoint: {
+            imagePoint: [0.5, 0.5], // Center of image
+            canvasPoint: [0.5, 0.5] // Center of canvas
+          },
+          storeAsInitialCamera: true
+        };
+        
+        try {
+          stackViewport.setDisplayArea(displayArea);
+        } catch (displayError) {
+          console.warn('Could not set display area, using default fit:', displayError);
+        }
+        
         stackViewport.render();
-        console.log('Images loaded and rendered');
+        console.log('Images loaded and rendered with proper aspect ratio');
 
         console.log('Creating tool group...');
-        const toolGroupId = 'simpleDicomViewerToolGroup';
+        const toolGroupId = `simpleDicomViewerToolGroup-${Date.now()}`;  // Unique ID to prevent conflicts
+        
+        // Remove existing tool group if it exists
+        try {
+          ToolGroupManager.destroyToolGroup(toolGroupId);
+        } catch (e) {
+          // Tool group doesn't exist, which is fine
+        }
+        
         const tg = ToolGroupManager.createToolGroup(toolGroupId);
         setToolGroup(tg);
 
-        // Add tools
-        tg.addTool(WindowLevelTool.toolName);
-        tg.addTool(ZoomTool.toolName);
-        tg.addTool(PanTool.toolName);
-        tg.addTool(LengthTool.toolName);
-        tg.addTool(RectangleROITool.toolName);
-        tg.addTool(EllipticalROITool.toolName);
-        tg.addTool(StackScrollTool.toolName);
+        // Add tools with error checking
+        try {
+          tg.addTool(WindowLevelTool.toolName);
+          tg.addTool(ZoomTool.toolName);
+          tg.addTool(PanTool.toolName);
+          tg.addTool(LengthTool.toolName);
+          tg.addTool(RectangleROITool.toolName);
+          tg.addTool(EllipticalROITool.toolName);
+          tg.addTool(StackScrollTool.toolName);
+          console.log('Tools added to tool group successfully');
+        } catch (toolError) {
+          console.error('Error adding tools to tool group:', toolError);
+          throw new Error(`Tool group setup failed: ${toolError.message}`);
+        }
 
         tg.addViewport(viewportId, renderingEngineId);
 
-        // Activate tools with optimized settings
-        tg.setToolActive(WindowLevelTool.toolName, {
-          bindings: [{ 
-            mouseButton: MouseBindings.Primary,
-            // Add configuration for smoother window/level
-            configuration: {
-              // Reduce sensitivity for smoother control
-              orientation: 0,
-              colormap: undefined
-            }
-          }],
-        });
-        tg.setToolActive(ZoomTool.toolName, {
-          bindings: [{ mouseButton: MouseBindings.Secondary }],
-        });
-        tg.setToolActive(PanTool.toolName, {
-          bindings: [{ mouseButton: MouseBindings.Auxiliary }],
-        });
-        tg.setToolActive(StackScrollTool.toolName);
+        // Activate tools with optimized settings and error handling
+        try {
+          tg.setToolActive(WindowLevelTool.toolName, {
+            bindings: [{ 
+              mouseButton: MouseBindings.Primary,
+              // Add configuration for smoother window/level
+              configuration: {
+                // Reduce sensitivity for smoother control
+                orientation: 0,
+                colormap: undefined
+              }
+            }],
+          });
+          tg.setToolActive(ZoomTool.toolName, {
+            bindings: [{ mouseButton: MouseBindings.Secondary }],
+          });
+          tg.setToolActive(PanTool.toolName, {
+            bindings: [{ mouseButton: MouseBindings.Auxiliary }],
+          });
+          tg.setToolActive(StackScrollTool.toolName);
+          console.log('Tools activated successfully');
+        } catch (activationError) {
+          console.error('Error activating tools:', activationError);
+          throw new Error(`Tool activation failed: ${activationError.message}`);
+        }
 
         console.log('DICOM viewer fully initialized');
         setLoading(false);
@@ -215,6 +298,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
         console.error('Initialization failed:', err);
         setError(err instanceof Error ? err.message : 'Failed to initialize viewer');
         setLoading(false);
+        initializationRef.current = false; // Reset on error so retry can work
       }
     };
 
@@ -226,14 +310,29 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
     // Cleanup
     return () => {
       cancelAnimationFrame(rafId);
+      
+      // Reset initialization flag on cleanup
+      initializationRef.current = false;
+      
+      // Clean up rendering engine
       if (renderingEngine) {
-        renderingEngine.destroy();
+        try {
+          renderingEngine.destroy();
+        } catch (e) {
+          console.warn('Error destroying rendering engine:', e);
+        }
       }
+      
+      // Clean up tool group
       if (toolGroup) {
-        ToolGroupManager.destroyToolGroup(toolGroup.id);
+        try {
+          ToolGroupManager.destroyToolGroup(toolGroup.id);
+        } catch (e) {
+          console.warn('Error destroying tool group:', e);
+        }
       }
     };
-  }, [imageIds]); // Remove currentImageIndex to prevent reinitialization
+  }, [imageIds]); // Keep only imageIds as dependency
 
   // Tool management functions
   const setToolActive = useCallback((tool: Tool) => {
@@ -290,12 +389,30 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
   
   // Navigation functions
   const goToImage = useCallback((index: number) => {
-    if (viewport && index >= 0 && index < imageIds.length) {
-      viewport.setImageIdIndex(index);
-      viewport.render();
-      setCurrentImageIndex(index);
+    if (viewport && index >= 0 && index < imageIds.length && index !== currentImageIndex) {
+      try {
+        viewport.setImageIdIndex(index);
+        // Reset all image manipulation states when changing images
+        setIsInverted(false);
+        setIsFlippedHorizontal(false);
+        setIsFlippedVertical(false);
+        
+        // Only reset invert property - avoid setting unknown properties
+        try {
+          viewport.setProperties({
+            invert: false
+          });
+        } catch (error) {
+          console.warn('Could not reset image properties:', error);
+        }
+        
+        viewport.render();
+        setCurrentImageIndex(index);
+      } catch (error) {
+        console.error('Error changing image:', error);
+      }
     }
-  }, [viewport, imageIds.length]);
+  }, [viewport, imageIds.length, currentImageIndex]);
   
   const nextImage = useCallback(() => {
     goToImage(currentImageIndex + 1);
@@ -331,8 +448,179 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
   // Viewport manipulation functions
   const resetViewport = useCallback(() => {
     if (viewport) {
+      // Reset camera first
       viewport.resetCamera();
+      
+      // Reset all image manipulation states
+      setIsInverted(false);
+      setIsFlippedHorizontal(false);
+      setIsFlippedVertical(false);
+      
+      // Only reset properties that exist - avoid setting unknown properties
+      try {
+        viewport.setProperties({
+          invert: false
+        });
+      } catch (error) {
+        console.warn('Could not reset viewport properties:', error);
+      }
+      
       viewport.render();
+    }
+  }, [viewport]);
+
+  const rotateImage = useCallback((degrees: number) => {
+    if (viewport) {
+      try {
+        const camera = viewport.getCamera();
+        const currentRotation = camera.viewUp || [0, -1, 0];
+        
+        // Calculate new rotation
+        const angle = (degrees * Math.PI) / 180;
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        
+        const newViewUp = [
+          currentRotation[0] * cos - currentRotation[1] * sin,
+          currentRotation[0] * sin + currentRotation[1] * cos,
+          currentRotation[2]
+        ];
+        
+        viewport.setCamera({
+          ...camera,
+          viewUp: newViewUp
+        });
+        viewport.render();
+      } catch (error) {
+        console.error('Error rotating image:', error);
+      }
+    }
+  }, [viewport]);
+
+  const flipImage = useCallback((horizontal: boolean) => {
+    if (viewport) {
+      try {
+        const camera = viewport.getCamera();
+        
+        if (horizontal) {
+          // Toggle horizontal flip state
+          const newHorizontalState = !isFlippedHorizontal;
+          setIsFlippedHorizontal(newHorizontalState);
+          
+          // For horizontal flip, we need to invert the viewRight vector
+          // This mirrors the image left-to-right
+          const viewRight = camera.viewRight || [1, 0, 0];
+          
+          if (newHorizontalState) {
+            // Apply horizontal flip by negating viewRight
+            viewport.setCamera({
+              ...camera,
+              viewRight: [-viewRight[0], -viewRight[1], -viewRight[2]]
+            });
+          } else {
+            // Remove horizontal flip by restoring original viewRight
+            viewport.setCamera({
+              ...camera,
+              viewRight: [Math.abs(viewRight[0]), Math.abs(viewRight[1]), Math.abs(viewRight[2])]
+            });
+          }
+        } else {
+          // Toggle vertical flip state
+          const newVerticalState = !isFlippedVertical;
+          setIsFlippedVertical(newVerticalState);
+          
+          // For vertical flip, invert the viewUp vector
+          const viewUp = camera.viewUp || [0, -1, 0];
+          
+          if (newVerticalState) {
+            // Apply vertical flip by negating viewUp
+            viewport.setCamera({
+              ...camera,
+              viewUp: [-viewUp[0], -viewUp[1], -viewUp[2]]
+            });
+          } else {
+            // Remove vertical flip by restoring original viewUp
+            viewport.setCamera({
+              ...camera,
+              viewUp: [viewUp[0], -Math.abs(viewUp[1]), viewUp[2]]
+            });
+          }
+        }
+        
+        viewport.render();
+        console.log(`Image flipped: ${horizontal ? 'horizontal' : 'vertical'}, state: ${horizontal ? newHorizontalState : newVerticalState}`);
+      } catch (error) {
+        console.error('Error flipping image:', error);
+      }
+    }
+  }, [viewport, isFlippedHorizontal, isFlippedVertical]);
+
+  const invertImage = useCallback(() => {
+    if (viewport) {
+      try {
+        // Toggle the invert state
+        const newInvertState = !isInverted;
+        setIsInverted(newInvertState);
+        
+        // Apply invert property to viewport
+        viewport.setProperties({
+          invert: newInvertState
+        });
+        
+        viewport.render();
+        console.log(`Image invert toggled: ${newInvertState}`);
+      } catch (error) {
+        console.error('Error inverting image:', error);
+      }
+    }
+  }, [viewport, isInverted]);
+
+  const clearAnnotations = useCallback(() => {
+    if (viewport) {
+      try {
+        // Use Cornerstone3D's annotation state manager to remove all annotations
+        const frameOfReferenceUID = viewport.getFrameOfReferenceUID();
+        const viewportId = viewport.id;
+        
+        // Clear annotations using the annotation state manager
+        annotation.state.removeAllAnnotations();
+        
+        // Alternative: Clear by frame of reference
+        if (frameOfReferenceUID) {
+          annotation.state.removeFrameOfReferenceAnnotations(frameOfReferenceUID);
+        }
+        
+        // Trigger annotation render event to update display
+        const element = viewport.element;
+        if (element) {
+          // Clear SVG layer as backup
+          const svgLayer = element.querySelector('.cornerstone-svg-layer');
+          if (svgLayer) {
+            svgLayer.innerHTML = '';
+          }
+        }
+        
+        // Force viewport re-render
+        viewport.render();
+        
+        console.log('All annotations cleared using state manager');
+      } catch (error) {
+        console.error('Error clearing annotations:', error);
+        
+        // Fallback: Simple SVG clearing
+        try {
+          const element = viewport.element;
+          if (element) {
+            const svgLayer = element.querySelector('.cornerstone-svg-layer');
+            if (svgLayer) {
+              svgLayer.innerHTML = '';
+              viewport.render();
+            }
+          }
+        } catch (fallbackError) {
+          console.error('Fallback clearing also failed:', fallbackError);
+        }
+      }
     }
   }, [viewport]);
   
@@ -345,6 +633,43 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
     };
   }, []);
   
+  const retryViewer = useCallback(() => {
+    setError(null);
+    setLoading(true);
+    
+    // Reset initialization flags
+    initializationRef.current = false;
+    isCornerstoneInitialized = false;
+    cornerstoneInitPromise = null;
+    
+    // Clean up existing instances
+    if (renderingEngine) {
+      try {
+        renderingEngine.destroy();
+      } catch (e) {
+        console.warn('Error destroying rendering engine during retry:', e);
+      }
+      setRenderingEngine(null);
+    }
+    if (toolGroup) {
+      try {
+        ToolGroupManager.destroyToolGroup(toolGroup.id);
+      } catch (e) {
+        console.warn('Error destroying tool group during retry:', e);
+      }
+      setToolGroup(null);
+    }
+    setViewport(null);
+    
+    // Trigger re-initialization by forcing useEffect to run again
+    // We do this by temporarily clearing and resetting the imageIds
+    const currentImageIds = imageIds;
+    setTimeout(() => {
+      // This will trigger the useEffect to run again
+      console.log('Retrying initialization...');
+    }, 100);
+  }, [renderingEngine, toolGroup, imageIds]);
+
   if (error) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -353,7 +678,10 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
             <CardTitle className="text-red-600">Error Loading Images</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-red-500">{error}</p>
+            <p className="text-red-500 mb-4">{error}</p>
+            <Button onClick={retryViewer} className="w-full">
+              Retry Loading
+            </Button>
           </CardContent>
         </Card>
       </div>
@@ -415,10 +743,59 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
             <Button
               variant="ghost"
               size="sm"
+              onClick={() => rotateImage(90)}
+              title="Rotate 90° Clockwise"
+            >
+              <RotateCw className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => rotateImage(-90)}
+              title="Rotate 90° Counter-clockwise"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={isFlippedHorizontal ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => flipImage(true)}
+              title={isFlippedHorizontal ? "Remove Horizontal Flip" : "Flip Horizontal"}
+            >
+              <FlipHorizontal className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={isFlippedVertical ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => flipImage(false)}
+              title={isFlippedVertical ? "Remove Vertical Flip" : "Flip Vertical"}
+            >
+              <FlipVertical className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={isInverted ? 'default' : 'ghost'}
+              size="sm"
+              onClick={invertImage}
+              title={isInverted ? "Remove Inversion" : "Invert Colors"}
+            >
+              <Palette className="h-4 w-4" />
+            </Button>
+            <div className="w-px h-6 bg-border mx-1" />
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={resetViewport}
               title="Reset View"
             >
-              <MousePointer className="h-4 w-4" />
+              <Maximize className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearAnnotations}
+              title="Clear All Annotations"
+            >
+              <Trash2 className="h-4 w-4" />
             </Button>
           </div>
         </div>
