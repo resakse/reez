@@ -42,9 +42,11 @@ class Modaliti(models.Model):
         return self.nama
 
     def save(self, *args, **kwargs):
-        if not self.singkatan:
-            self.singkatan = self.nama
+        self.nama = self.nama.upper()
+        if self.singkatan:
             self.singkatan = self.singkatan.upper()
+        else:
+            self.singkatan = self.nama.upper()
 
         super(Modaliti, self).save(*args, **kwargs)
 

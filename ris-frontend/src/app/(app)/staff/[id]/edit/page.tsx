@@ -201,13 +201,12 @@ export default function EditStaffPage() {
               />
             </div>
             <div>
-              <Label htmlFor="last_name">Last Name *</Label>
+              <Label htmlFor="last_name">Last Name</Label>
               <Input
                 id="last_name"
                 type="text"
                 value={formData.last_name}
                 onChange={(e) => handleInputChange('last_name', e.target.value)}
-                required
               />
             </div>
           </div>

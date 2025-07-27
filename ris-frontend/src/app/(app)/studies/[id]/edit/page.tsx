@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import AuthService from '@/lib/auth';
 import { toast } from '@/lib/toast';
-import { ArrowLeft, Save, Calendar, User, MapPin, Stethoscope } from 'lucide-react';
+import { ArrowLeft, Save, Calendar, User, Stethoscope, MessageSquare } from 'lucide-react';
 
 interface Study {
   id: number;
@@ -77,10 +77,13 @@ const ambulatoriChoices = [
   { value: 'Troli', label: 'Troli' }
 ];
 
-const statusChoices = [
-  { value: 'Registered', label: 'Registered' },
-  { value: 'Performed', label: 'Performed' },
-  { value: 'Completed', label: 'Completed' }
+// Study status is now automatically derived from examination statuses
+
+const examStatusChoices = [
+  { value: 'SCHEDULED', label: 'Scheduled' },
+  { value: 'IN_PROGRESS', label: 'In Progress' },
+  { value: 'COMPLETED', label: 'Completed' },
+  { value: 'CANCELLED', label: 'Cancelled' }
 ];
 
 const priorityChoices = [
@@ -88,17 +91,6 @@ const priorityChoices = [
   { value: 'HIGH', label: 'High' },
   { value: 'MEDIUM', label: 'Medium' },
   { value: 'LOW', label: 'Low' }
-];
-
-const positionChoices = [
-  { value: 'HFS', label: 'Head First-Supine' },
-  { value: 'HFP', label: 'Head First-Prone' },
-  { value: 'HFDR', label: 'Head First-Decubitus Right' },
-  { value: 'HFDL', label: 'Head First-Decubitus Left' },
-  { value: 'FFS', label: 'Feet First-Supine' },
-  { value: 'FFP', label: 'Feet First-Prone' },
-  { value: 'FFDR', label: 'Feet First-Decubitus Right' },
-  { value: 'FFDL', label: 'Feet First-Decubitus Left' }
 ];
 
 export default function EditStudyPage() {
@@ -112,30 +104,27 @@ export default function EditStudyPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [expandedComments, setExpandedComments] = useState<Set<number>>(new Set());
 
   const studyId = params?.id;
 
   const [formData, setFormData] = useState({
     no_resit: '',
-    accession_number: '',
     pemohon: '',
     ambulatori: 'Berjalan',
     rujukan_id: '',
     hamil: false,
     lmp: '',
-    dcatatan: '',
-    status: 'Registered',
+    study_description: '',
     study_priority: 'MEDIUM',
-    scheduled_datetime: '',
-    requested_procedure_description: '',
-    study_comments: '',
-    patient_position: '',
-    modality: ''
+    study_status: 'SCHEDULED',
+    study_comments: ''
   });
 
   const [examinations, setExaminations] = useState<Array<{
     id: number;
     no_xray: string;
+    accession_number?: string;
     exam: {
       id: number;
       exam: string;
@@ -145,6 +134,10 @@ export default function EditStudyPage() {
       };
     };
     laterality?: string;
+    catatan?: string;
+    patient_position?: string;
+    body_position?: string;
+    exam_status?: string;
     kv?: number;
     mas?: number;
     mgy?: number;
@@ -156,13 +149,7 @@ export default function EditStudyPage() {
     };
   }>>([]);
 
-  useEffect(() => {
-    if (studyId && user) {
-      fetchStudyData();
-    }
-  }, [studyId, user]);
-
-  const fetchStudyData = async () => {
+  const fetchStudyData = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -181,20 +168,15 @@ export default function EditStudyPage() {
       // Set form data
       setFormData({
         no_resit: studyData.no_resit || '',
-        accession_number: studyData.accession_number || '',
         pemohon: studyData.pemohon || '',
         ambulatori: studyData.ambulatori || 'Berjalan',
         rujukan_id: studyData.rujukan?.id?.toString() || 'none',
         hamil: studyData.hamil || false,
         lmp: studyData.lmp || '',
-        dcatatan: studyData.dcatatan || '',
-        status: studyData.status || 'Registered',
+        study_description: studyData.study_description || '',
         study_priority: studyData.study_priority || 'MEDIUM',
-        scheduled_datetime: studyData.scheduled_datetime || '',
-        requested_procedure_description: studyData.requested_procedure_description || '',
-        study_comments: studyData.study_comments || '',
-        patient_position: studyData.patient_position || '',
-        modality: studyData.modality || ''
+        study_status: studyData.study_status || 'SCHEDULED',
+        study_comments: studyData.study_comments || ''
       });
 
       // Set examinations data for editable table
@@ -225,7 +207,13 @@ export default function EditStudyPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [studyId]);
+
+  useEffect(() => {
+    if (studyId && user) {
+      fetchStudyData();
+    }
+  }, [studyId, user, fetchStudyData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -234,21 +222,17 @@ export default function EditStudyPage() {
       setSaving(true);
       
       const updateData = {
+        pesakit_id: study.pesakit.id,
         no_resit: formData.no_resit || null,
-        accession_number: formData.accession_number || null,
         pemohon: formData.pemohon || null,
         ambulatori: formData.ambulatori,
         rujukan_id: formData.rujukan_id ? parseInt(formData.rujukan_id) : null,
         hamil: formData.hamil,
         lmp: formData.lmp || null,
-        dcatatan: formData.dcatatan || null,
-        status: formData.status,
+        study_description: formData.study_description || null,
         study_priority: formData.study_priority,
-        scheduled_datetime: formData.scheduled_datetime || null,
-        requested_procedure_description: formData.requested_procedure_description || null,
-        study_comments: formData.study_comments || null,
-        patient_position: formData.patient_position || null,
-        modality: formData.modality || null
+        study_status: formData.study_status,
+        study_comments: formData.study_comments || null
       };
 
       const response = await AuthService.authenticatedFetch(
@@ -315,7 +299,28 @@ export default function EditStudyPage() {
     });
   };
 
-  const handleSaveExamination = async (examId: number, examData: any) => {
+  // Calculate derived study status from examination statuses
+  const calculateStudyStatus = (examinations: typeof examinations): string => {
+    if (!examinations || examinations.length === 0) return 'SCHEDULED';
+    
+    const statuses = examinations.map(exam => exam.exam_status || 'SCHEDULED');
+    
+    // If all examinations are cancelled, study is cancelled
+    if (statuses.every(status => status === 'CANCELLED')) return 'CANCELLED';
+    
+    // If all examinations are completed or cancelled, study is completed
+    if (statuses.every(status => status === 'COMPLETED' || status === 'CANCELLED')) return 'COMPLETED';
+    
+    // If any examination is in progress, study is in progress
+    if (statuses.some(status => status === 'IN_PROGRESS')) return 'IN_PROGRESS';
+    
+    // Default to scheduled
+    return 'SCHEDULED';
+  };
+
+  const derivedStudyStatus = calculateStudyStatus(examinations);
+
+  const handleSaveExamination = async (examId: number, examData: { catatan?: string; kv?: number; mas?: number; mgy?: number; exam_status?: string; jxr_id?: number | null }) => {
     try {
       const response = await AuthService.authenticatedFetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/examinations/${examId}/`,
@@ -325,9 +330,11 @@ export default function EditStudyPage() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
+            catatan: examData.catatan,
             kv: examData.kv,
             mas: examData.mas,
             mgy: examData.mgy,
+            exam_status: examData.exam_status,
             jxr_id: examData.jxr_id
           })
         }
@@ -428,15 +435,6 @@ export default function EditStudyPage() {
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="accession_number">Accession Number *</Label>
-                    <Input
-                      id="accession_number"
-                      value={formData.accession_number}
-                      onChange={(e) => handleInputChange('accession_number', e.target.value)}
-                      placeholder="Enter accession number"
-                    />
-                  </div>
 
                   <div>
                     <Label htmlFor="no_resit">Receipt Number</Label>
@@ -497,53 +495,6 @@ export default function EditStudyPage() {
                     </Select>
                   </div>
 
-                  <div>
-                    <Label htmlFor="status">Status</Label>
-                    <Select 
-                      value={formData.status} 
-                      onValueChange={(value) => handleInputChange('status', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {statusChoices.map((choice) => (
-                          <SelectItem key={choice.value} value={choice.value}>
-                            {choice.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="study_priority">Priority</Label>
-                    <Select 
-                      value={formData.study_priority} 
-                      onValueChange={(value) => handleInputChange('study_priority', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select priority" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {priorityChoices.map((choice) => (
-                          <SelectItem key={choice.value} value={choice.value}>
-                            {choice.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="modality">Modality</Label>
-                    <Input
-                      id="modality"
-                      value={formData.modality}
-                      onChange={(e) => handleInputChange('modality', e.target.value)}
-                      placeholder="e.g., CR, DX, CT"
-                    />
-                  </div>
 
                   {study.pesakit.jantina === 'P' && (
                     <div>
@@ -576,56 +527,6 @@ export default function EditStudyPage() {
                   )}
                 </div>
 
-                <div>
-                  <Label htmlFor="scheduled_datetime">Scheduled Date & Time</Label>
-                  <Input
-                    id="scheduled_datetime"
-                    type="datetime-local"
-                    value={formData.scheduled_datetime}
-                    onChange={(e) => handleInputChange('scheduled_datetime', e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="patient_position">Patient Position</Label>
-                  <Select 
-                    value={formData.patient_position} 
-                    onValueChange={(value) => handleInputChange('patient_position', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select position" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      {positionChoices.map((choice) => (
-                        <SelectItem key={choice.value} value={choice.value}>
-                          {choice.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="requested_procedure_description">Procedure Description</Label>
-                  <Input
-                    id="requested_procedure_description"
-                    value={formData.requested_procedure_description}
-                    onChange={(e) => handleInputChange('requested_procedure_description', e.target.value)}
-                    placeholder="Description of the requested procedure"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="dcatatan">Comments</Label>
-                  <Textarea
-                    id="dcatatan"
-                    value={formData.dcatatan}
-                    onChange={(e) => handleInputChange('dcatatan', e.target.value)}
-                    placeholder="Enter any additional comments or notes..."
-                    rows={2}
-                  />
-                </div>
 
                 <div>
                   <Label htmlFor="study_comments">Study Comments</Label>
@@ -633,9 +534,12 @@ export default function EditStudyPage() {
                     id="study_comments"
                     value={formData.study_comments}
                     onChange={(e) => handleInputChange('study_comments', e.target.value)}
-                    placeholder="Additional comments for the study"
+                    placeholder="Clinical information, special instructions, study-level notes..."
                     rows={3}
                   />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Study-level comments for clinical information and general notes
+                  </p>
                 </div>
 
                 {error && <p className="text-sm text-red-500">{error}</p>}
@@ -726,10 +630,41 @@ export default function EditStudyPage() {
                   </div>
                 )}
                 <div>
+                  <label className="text-sm font-medium">Study Status (Auto-calculated)</label>
+                  <div className="mt-1">
+                    <Badge 
+                      variant={derivedStudyStatus === 'CANCELLED' ? 'destructive' : 
+                              derivedStudyStatus === 'COMPLETED' ? 'default' : 
+                              derivedStudyStatus === 'IN_PROGRESS' ? 'secondary' : 'outline'}
+                      className="text-xs"
+                    >
+                      {derivedStudyStatus === 'SCHEDULED' && '📅 Scheduled'}
+                      {derivedStudyStatus === 'IN_PROGRESS' && '⚡ In Progress'}
+                      {derivedStudyStatus === 'COMPLETED' && '✅ Completed'}
+                      {derivedStudyStatus === 'CANCELLED' && '❌ Cancelled'}
+                    </Badge>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Auto-calculated from examinations
+                    </p>
+                  </div>
+                </div>
+                <div>
                   <label className="text-sm font-medium">Priority</label>
-                  <Badge variant="outline" className="text-xs">
-                    {study.study_priority || 'MEDIUM'}
-                  </Badge>
+                  <Select 
+                    value={formData.study_priority} 
+                    onValueChange={(value) => handleInputChange('study_priority', value)}
+                  >
+                    <SelectTrigger className="h-8">
+                      <SelectValue placeholder="Select priority" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {priorityChoices.map((choice) => (
+                        <SelectItem key={choice.value} value={choice.value}>
+                          {choice.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </CardContent>
@@ -744,6 +679,14 @@ export default function EditStudyPage() {
             <span className="flex items-center gap-2">
               <Stethoscope className="h-5 w-5" />
               Examinations ({examinations.length})
+              <Badge 
+                variant={derivedStudyStatus === 'CANCELLED' ? 'destructive' : 
+                        derivedStudyStatus === 'COMPLETED' ? 'default' : 
+                        derivedStudyStatus === 'IN_PROGRESS' ? 'secondary' : 'outline'}
+                className="text-xs ml-2"
+              >
+                Study: {derivedStudyStatus}
+              </Badge>
             </span>
             <Button 
               variant="outline" 
@@ -754,22 +697,25 @@ export default function EditStudyPage() {
             </Button>
           </CardTitle>
           <CardDescription>
-            Manage individual examinations within this study
+            Manage individual examinations within this study. Study status is automatically calculated from examination statuses.
           </CardDescription>
         </CardHeader>
         <CardContent>
           {examinations.length > 0 ? (
+            <>
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left py-3 px-4 font-semibold text-sm">X-Ray No</th>
+                    <th className="text-left py-3 px-4 font-semibold text-sm">Accession No</th>
                     <th className="text-left py-3 px-4 font-semibold text-sm">Exam Type</th>
-                    <th className="text-left py-3 px-4 font-semibold text-sm">Laterality</th>
+                    <th className="text-left py-3 px-4 font-semibold text-sm">Position</th>
                     <th className="text-left py-3 px-4 font-semibold text-sm">kVp</th>
                     <th className="text-left py-3 px-4 font-semibold text-sm">mAs</th>
                     <th className="text-left py-3 px-4 font-semibold text-sm">mGy</th>
+                    <th className="text-left py-3 px-4 font-semibold text-sm">Status</th>
                     <th className="text-left py-3 px-4 font-semibold text-sm">Radiographer</th>
+                    <th className="text-left py-3 px-4 font-semibold text-sm">Comments</th>
                     <th className="text-left py-3 px-4 font-semibold text-sm">Actions</th>
                   </tr>
                 </thead>
@@ -777,13 +723,30 @@ export default function EditStudyPage() {
                   {examinations.map((exam, index) => (
                     <tr key={exam.id} className="border-b hover:bg-muted/50 transition-colors">
                       <td className="py-3 px-4 text-sm">
-                        <p className="text-sm font-mono font-semibold">{exam.no_xray}</p>
+                        <p className="text-sm font-mono font-semibold">{exam.accession_number || exam.no_xray}</p>
                       </td>
                       <td className="py-3 px-4 text-sm">
                         <p className="text-sm">{exam.exam.exam}</p>
+                        {exam.laterality && (
+                          <Badge variant="outline" className="text-xs mt-1">
+                            {exam.laterality}
+                          </Badge>
+                        )}
                       </td>
                       <td className="py-3 px-4 text-sm">
-                        <p className="text-sm">{exam.laterality || '-'}</p>
+                        <div className="space-y-1">
+                          {exam.patient_position && (
+                            <Badge variant="outline" className="text-xs block">
+                              {exam.patient_position}
+                            </Badge>
+                          )}
+                          {exam.body_position && (
+                            <Badge variant="outline" className="text-xs block">
+                              {exam.body_position}
+                            </Badge>
+                          )}
+                          {!exam.patient_position && !exam.body_position && '-'}
+                        </div>
                       </td>
                       <td className="py-3 px-4 text-sm">
                         <Input 
@@ -814,6 +777,23 @@ export default function EditStudyPage() {
                       </td>
                       <td className="py-3 px-4 text-sm">
                         <Select
+                          value={exam.exam_status || 'SCHEDULED'}
+                          onValueChange={(value) => handleExaminationChange(index, 'exam_status', value)}
+                        >
+                          <SelectTrigger className="w-28 h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {examStatusChoices.map((choice) => (
+                              <SelectItem key={choice.value} value={choice.value}>
+                                {choice.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </td>
+                      <td className="py-3 px-4 text-sm">
+                        <Select
                           value={exam.jxr?.id?.toString() || ''}
                           onValueChange={(value) => handleExaminationChange(index, 'jxr', value === 'none' ? undefined : parseInt(value))}
                         >
@@ -831,17 +811,46 @@ export default function EditStudyPage() {
                         </Select>
                       </td>
                       <td className="py-3 px-4 text-sm">
+                        <div className="relative">
+                          <Textarea
+                            className="w-32 text-xs resize-none"
+                            placeholder="Technical notes..."
+                            value={exam.catatan || ''}
+                            onChange={(e) => handleExaminationChange(index, 'catatan', e.target.value)}
+                            rows={expandedComments.has(exam.id) ? 4 : 1}
+                            onFocus={() => {
+                              setExpandedComments(prev => new Set([...prev, exam.id]));
+                            }}
+                            onBlur={() => {
+                              if (!exam.catatan || exam.catatan.trim() === '') {
+                                setExpandedComments(prev => {
+                                  const newSet = new Set(prev);
+                                  newSet.delete(exam.id);
+                                  return newSet;
+                                });
+                              }
+                            }}
+                            title="Examination-level technical notes and radiographer comments"
+                          />
+                          {(exam.catatan && exam.catatan.trim() !== '') && (
+                            <Badge variant="secondary" className="absolute -top-2 -right-2 text-xs">
+                              <MessageSquare className="h-3 w-3" />
+                            </Badge>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-sm">
                         <div className="flex space-x-1">
                           <Button 
                             variant="outline" 
                             size="sm"
                             className="text-xs"
                             onClick={() => handleSaveExamination(exam.id, {
-                              no_xray: exam.no_xray,
-                              laterality: exam.laterality,
+                              catatan: exam.catatan,
                               kv: exam.kv,
                               mas: exam.mas,
                               mgy: exam.mgy,
+                              exam_status: exam.exam_status,
                               jxr_id: exam.jxr?.id || null
                             })}
                           >
@@ -854,9 +863,34 @@ export default function EditStudyPage() {
                 </tbody>
               </table>
             </div>
+            
+            <div className="mt-4 p-4 bg-muted/20 rounded-lg">
+              <h4 className="text-sm font-semibold mb-2">📊 Status Calculation Logic</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                <div>
+                  <Badge variant="outline" className="text-xs mb-1">📅 SCHEDULED</Badge>
+                  <p>When at least one exam is scheduled</p>
+                </div>
+                <div>
+                  <Badge variant="secondary" className="text-xs mb-1">⚡ IN_PROGRESS</Badge>
+                  <p>When any exam is in progress</p>
+                </div>
+                <div>
+                  <Badge variant="default" className="text-xs mb-1">✅ COMPLETED</Badge>
+                  <p>When all exams are completed/cancelled</p>
+                </div>
+                <div>
+                  <Badge variant="destructive" className="text-xs mb-1">❌ CANCELLED</Badge>
+                  <p>When all exams are cancelled</p>
+                </div>
+              </div>
+            </div>
+            </>
           ) : (
             <div className="text-center py-8">
               <p className="text-muted-foreground mb-4">No examinations found for this study</p>
+              <Badge variant="outline" className="mb-4">Study Status: {derivedStudyStatus}</Badge>
+              <br />
               <Button 
                 variant="outline"
                 onClick={() => alert('Add first examination - implementation needed')}
