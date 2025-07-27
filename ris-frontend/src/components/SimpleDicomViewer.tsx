@@ -1101,33 +1101,8 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
               {/* Thumbnail Images */}
               <div className="flex gap-1 flex-1 overflow-x-auto">
                 {imageIds.map((imageId, index) => {
-                  // Optimized rendering strategy:
-                  // - For small series (≤6): render all thumbnails
-                  // - For larger series: only render current + 2 before + 2 after
-                  const shouldRenderThumbnail = imageIds.length <= 6 || Math.abs(index - currentImageIndex) <= 2;
-                  
-                  if (!shouldRenderThumbnail) {
-                    return (
-                      <div 
-                        key={imageId}
-                        className={`
-                          flex-shrink-0 cursor-pointer border-2 rounded transition-all
-                          ${index === currentImageIndex 
-                            ? 'border-primary shadow-md' 
-                            : 'border-border hover:border-primary/50'
-                          }
-                        `}
-                        style={{ width: '80px', height: '80px' }}
-                        onClick={() => goToImage(index)}
-                        title={`Image ${index + 1}`}
-                      >
-                        <div className="w-full h-full bg-muted rounded-sm flex items-center justify-center text-xs">
-                          {index + 1}
-                        </div>
-                      </div>
-                    );
-                  }
-                  
+                  // Always render ThumbnailImage component for all images
+                  // Let the component handle its own lazy loading via Intersection Observer
                   return (
                     <ThumbnailImage
                       key={imageId}
@@ -1211,7 +1186,7 @@ const ThumbnailImage: React.FC<ThumbnailImageProps> = ({ imageId, index, isActiv
   const [error, setError] = useState(false);
   const [shouldLoad, setShouldLoad] = useState(false);
   const viewportIdRef = useRef<string | null>(null);
-  const cleanupRef = useRef<(() => void) | null>(null);
+  const isLoadingRef = useRef(false);
   
   // Use Intersection Observer for lazy loading thumbnails
   useEffect(() => {
@@ -1220,7 +1195,7 @@ const ThumbnailImage: React.FC<ThumbnailImageProps> = ({ imageId, index, isActiv
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) {
+        if (entry.isIntersecting && !isLoadingRef.current && !isLoaded) {
           setShouldLoad(true);
           observer.disconnect(); // Only load once
         }
@@ -1231,14 +1206,15 @@ const ThumbnailImage: React.FC<ThumbnailImageProps> = ({ imageId, index, isActiv
     observer.observe(element);
     
     return () => observer.disconnect();
-  }, []);
+  }, [isLoaded]);
   
   useEffect(() => {
-    if (!shouldLoad) return;
+    if (!shouldLoad || isLoadingRef.current || isLoaded) return;
     
     const element = thumbRef.current;
     if (!element || !imageId) return;
 
+    isLoadingRef.current = true;
     let mounted = true;
     
     const loadThumbnail = async () => {
@@ -1246,7 +1222,7 @@ const ThumbnailImage: React.FC<ThumbnailImageProps> = ({ imageId, index, isActiv
         console.log(`DEBUG: Loading thumbnail ${index + 1}`);
         
         // Small delay to stagger thumbnail loading
-        await new Promise(resolve => setTimeout(resolve, index * 50));
+        await new Promise(resolve => setTimeout(resolve, index * 100));
         
         if (!mounted) return;
         
@@ -1255,7 +1231,7 @@ const ThumbnailImage: React.FC<ThumbnailImageProps> = ({ imageId, index, isActiv
         
         if (!mounted) return;
         
-        const thumbViewportId = `thumbViewport-${index}-${Date.now()}`;
+        const thumbViewportId = `thumbViewport-${index}-persistent`;
         viewportIdRef.current = thumbViewportId;
         
         const thumbViewportInput = {
@@ -1270,7 +1246,7 @@ const ThumbnailImage: React.FC<ThumbnailImageProps> = ({ imageId, index, isActiv
         // Load the single image with shorter timeout for thumbnails
         const loadPromise = thumbViewport.setStack([imageId], 0);
         const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Thumbnail load timeout')), 5000)
+          setTimeout(() => reject(new Error('Thumbnail load timeout')), 8000)
         );
         
         await Promise.race([loadPromise, timeoutPromise]);
@@ -1287,34 +1263,26 @@ const ThumbnailImage: React.FC<ThumbnailImageProps> = ({ imageId, index, isActiv
             console.log(`DEBUG: Thumbnail ${index + 1} rendered successfully`);
             if (mounted) {
               setIsLoaded(true);
+              isLoadingRef.current = false;
             }
           } catch (renderError) {
             console.warn(`Thumbnail render error for ${index} (attempt ${renderAttempts + 1}):`, renderError);
             renderAttempts++;
             if (renderAttempts < maxRenderAttempts && mounted) {
-              setTimeout(attemptRender, 100 * renderAttempts);
+              setTimeout(attemptRender, 200 * renderAttempts);
+            } else {
+              isLoadingRef.current = false;
             }
           }
         };
         
         attemptRender();
         
-        // Store cleanup function
-        cleanupRef.current = () => {
-          if (viewportIdRef.current && sharedThumbnailEngine) {
-            try {
-              sharedThumbnailEngine.disableElement(viewportIdRef.current);
-            } catch (e) {
-              // Ignore cleanup errors
-            }
-          }
-          releaseSharedThumbnailEngine();
-        };
-        
       } catch (err) {
         console.warn(`Failed to load thumbnail ${index}:`, err);
         if (mounted) {
           setError(true);
+          isLoadingRef.current = false;
         }
       }
     };
@@ -1323,14 +1291,24 @@ const ThumbnailImage: React.FC<ThumbnailImageProps> = ({ imageId, index, isActiv
     
     return () => {
       mounted = false;
-      
-      // Clean up viewport from shared engine
-      if (cleanupRef.current) {
-        cleanupRef.current();
-        cleanupRef.current = null;
-      }
+      isLoadingRef.current = false;
     };
-  }, [shouldLoad, imageId, index]);
+  }, [shouldLoad, imageId, index, isLoaded]);
+  
+  // Only cleanup on unmount, not on navigation
+  useEffect(() => {
+    return () => {
+      // Only clean up when component is actually unmounting
+      if (viewportIdRef.current && sharedThumbnailEngine) {
+        try {
+          sharedThumbnailEngine.disableElement(viewportIdRef.current);
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+      }
+      releaseSharedThumbnailEngine();
+    };
+  }, []);
   
   return (
     <div
@@ -1343,12 +1321,28 @@ const ThumbnailImage: React.FC<ThumbnailImageProps> = ({ imageId, index, isActiv
         }
       `}
       style={{ width: '80px', height: '80px' }}
+      title={`Image ${index + 1}`}
     >
       <div
         ref={thumbRef}
         className="w-full h-full bg-black rounded-sm"
       />
       
+      {/* Loading state */}
+      {!isLoaded && !error && shouldLoad && (
+        <div className="absolute inset-0 flex items-center justify-center bg-muted/80 rounded-sm">
+          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+        </div>
+      )}
+      
+      {/* Placeholder for not-yet-loaded thumbnails */}
+      {!isLoaded && !error && !shouldLoad && (
+        <div className="absolute inset-0 flex items-center justify-center bg-muted rounded-sm">
+          <div className="text-xs text-muted-foreground font-medium">
+            {index + 1}
+          </div>
+        </div>
+      )}
       
       {/* Error state */}
       {error && (
