@@ -10,7 +10,7 @@ from .views import (
 )
 from .settings_views import PacsConfigListCreateAPIView, PacsConfigDetailAPIView, get_current_pacs_config, get_pacs_orthanc_url
 from .examination_views import ExaminationListAPIView, ExaminationDetailAPIView
-from .pacs_views import PacsSearchView, pacs_stats, import_legacy_study, DicomImageProxyView, dicom_instance_proxy, get_study_image_ids
+from .pacs_views import PacsSearchView, pacs_stats, import_legacy_study, DicomImageProxyView, dicom_instance_proxy, get_study_image_ids, get_enhanced_study_metadata
 
 from . import api
 # from .export import export_xls
@@ -94,4 +94,5 @@ urlpatterns = [
          DicomImageProxyView.as_view(), name='dicom-image-proxy'),
     path('pacs/instances/<str:orthanc_id>/file', dicom_instance_proxy, name='dicom-instance-proxy'),
     path('pacs/studies/<str:study_uid>/image-ids/', get_study_image_ids, name='get-study-image-ids'),
+    path('pacs/studies/<str:study_uid>/enhanced-metadata/', get_enhanced_study_metadata, name='get-enhanced-study-metadata'),
 ]

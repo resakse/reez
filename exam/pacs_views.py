@@ -252,6 +252,34 @@ def import_legacy_study(request):
         main_tags = study_data.get('MainDicomTags', {})
         patient_tags = study_data.get('PatientMainDicomTags', {})
         
+        # Get detailed series information for proper examination mapping
+        series_details = []
+        for series_id in study_data.get('Series', []):
+            try:
+                series_response = requests.get(f"{orthanc_url}/series/{series_id}", timeout=30)
+                if series_response.ok:
+                    series_data = series_response.json()
+                    series_tags = series_data.get('MainDicomTags', {})
+                    
+                    # Get first instance for additional metadata
+                    instances = series_data.get('Instances', [])
+                    instance_tags = {}
+                    if instances:
+                        instance_response = requests.get(f"{orthanc_url}/instances/{instances[0]}", timeout=30)
+                        if instance_response.ok:
+                            instance_data = instance_response.json()
+                            instance_tags = instance_data.get('MainDicomTags', {})
+                    
+                    series_details.append({
+                        'series_id': series_id,
+                        'series_tags': series_tags,
+                        'instance_tags': instance_tags,
+                        'instance_count': len(instances)
+                    })
+            except Exception as e:
+                print(f"Error fetching series {series_id}: {e}")
+                continue
+        
         # Extract patient information
         patient_name = patient_tags.get('PatientName', 'Unknown').replace('^', ' ')
         patient_id = patient_tags.get('PatientID', '')
@@ -296,6 +324,61 @@ def import_legacy_study(request):
             except ValueError:
                 pass
         
+        # Helper function to parse examination details from DICOM tags
+        def parse_examination_details(series_detail):
+            series_tags = series_detail['series_tags']
+            instance_tags = series_detail['instance_tags']
+            
+            # Extract DICOM fields
+            operators_name = instance_tags.get('OperatorsName', '') or series_tags.get('OperatorsName', '')
+            modality = series_tags.get('Modality', 'CR')
+            body_part = instance_tags.get('BodyPartExamined', '') or series_tags.get('BodyPartExamined', '')
+            
+            # Parse AcquisitionDeviceProcessingDescription for exam type and position
+            acquisition_desc = instance_tags.get('AcquisitionDeviceProcessingDescription', '') or series_tags.get('AcquisitionDeviceProcessingDescription', '')
+            series_description = series_tags.get('SeriesDescription', '')
+            
+            # Try to extract exam type and position from acquisition description
+            exam_type = ''
+            position = ''
+            
+            if acquisition_desc:
+                # Split by comma and parse (e.g., "SKULL,LAT" -> exam_type="SKULL", position="LAT")
+                parts = [part.strip() for part in acquisition_desc.split(',')]
+                if len(parts) >= 1:
+                    exam_type = parts[0]
+                if len(parts) >= 2:
+                    position = parts[1]
+            elif series_description:
+                # Fallback to series description
+                exam_type = series_description
+            
+            # If no exam type found, use body part
+            if not exam_type and body_part:
+                exam_type = body_part
+            
+            # Fallback exam type
+            if not exam_type:
+                exam_type = 'General Radiography'
+            
+            # Parse radiographer name (format: "LAST^FIRST^MIDDLE")
+            radiographer_name = ''
+            if operators_name:
+                name_parts = operators_name.split('^')
+                if len(name_parts) >= 2:
+                    radiographer_name = f"{name_parts[1]} {name_parts[0]}".strip()
+                elif len(name_parts) == 1:
+                    radiographer_name = name_parts[0].strip()
+            
+            return {
+                'exam_type': exam_type,
+                'position': position,
+                'modality': modality,
+                'body_part': body_part,
+                'radiographer_name': radiographer_name,
+                'instance_count': series_detail['instance_count']
+            }
+
         with transaction.atomic():
             # Find or create patient
             patient = None
@@ -342,41 +425,112 @@ def import_legacy_study(request):
                 jxr=request.user
             )
             
-            # Find or create examination type
-            exam, _ = Exam.objects.get_or_create(
-                exam=study_description,
-                modaliti=modaliti,
-                defaults={'catatan': 'Imported from legacy PACS'}
-            )
+            # Create examinations for each series
+            created_examinations = []
             
-            # Create examination record (Pemeriksaan)
-            pemeriksaan = Pemeriksaan.objects.create(
-                daftar=daftar,
-                exam=exam,
-                accession_number=accession_number or None,
-                no_xray=accession_number or None,
-                jxr=request.user,
-                exam_status='COMPLETED'  # Use correct field name and value
-            )
-            
-            # Link to PACS study (if PacsExam model exists)
-            try:
-                from exam.models import PacsExam
-                PacsExam.objects.create(
-                    exam=pemeriksaan,  # OneToOneField to Pemeriksaan
-                    orthanc_id=study_data.get('ID', ''),  # Orthanc internal ID
-                    study_id=study_uid,  # Study Instance UID
-                    study_instance=study_uid  # Also store in study_instance field
+            for series_detail in series_details:
+                exam_details = parse_examination_details(series_detail)
+                
+                # Find or create modality for this series
+                series_modaliti, _ = Modaliti.objects.get_or_create(
+                    nama=exam_details['modality'],
+                    defaults={'singkatan': exam_details['modality']}
                 )
-            except ImportError:
-                # PacsExam model doesn't exist, skip this step
-                pass
+                
+                # Find or create body part if specified
+                part = None
+                if exam_details['body_part']:
+                    from exam.models import Part
+                    part, _ = Part.objects.get_or_create(
+                        part=exam_details['body_part'].upper()
+                    )
+                
+                # Find or create examination type
+                exam, _ = Exam.objects.get_or_create(
+                    exam=exam_details['exam_type'],
+                    modaliti=series_modaliti,
+                    part=part,
+                    defaults={'catatan': 'Imported from legacy PACS'}
+                )
+                
+                # Map position to patient_position
+                patient_position = None
+                if exam_details['position']:
+                    position_map = {
+                        'AP': 'AP',
+                        'PA': 'PA', 
+                        'LAT': 'LAT',
+                        'LATERAL': 'LAT',
+                        'LEFT': 'LATERAL_LEFT',
+                        'RIGHT': 'LATERAL_RIGHT',
+                        'OBL': 'OBLIQUE',
+                        'OBLIQUE': 'OBLIQUE'
+                    }
+                    patient_position = position_map.get(exam_details['position'].upper(), exam_details['position'])
+                
+                # Find or create radiographer user
+                radiographer = request.user  # Default to importing user
+                if exam_details['radiographer_name']:
+                    try:
+                        from django.contrib.auth import get_user_model
+                        User = get_user_model()
+                        # Try to find user by name parts
+                        name_parts = exam_details['radiographer_name'].split()
+                        if len(name_parts) >= 2:
+                            radiographer = User.objects.filter(
+                                first_name__icontains=name_parts[0],
+                                last_name__icontains=name_parts[1]
+                            ).first() or request.user
+                    except:
+                        pass
+                
+                # Create examination record (Pemeriksaan)
+                pemeriksaan = Pemeriksaan.objects.create(
+                    daftar=daftar,
+                    exam=exam,
+                    accession_number=f"{accession_number}_{len(created_examinations)+1}" if accession_number else None,
+                    no_xray=f"{accession_number}_{len(created_examinations)+1}" if accession_number else None,
+                    patient_position=patient_position,
+                    catatan=f"Series: {series_detail['series_id']}, Images: {exam_details['instance_count']}",
+                    jxr=radiographer,
+                    exam_status='COMPLETED'
+                )
+                
+                created_examinations.append(pemeriksaan)
+            
+            # Link to PACS study for the first examination (main reference)
+            if created_examinations:
+                try:
+                    from exam.models import PacsExam
+                    PacsExam.objects.create(
+                        exam=created_examinations[0],  # OneToOneField to first Pemeriksaan
+                        orthanc_id=study_data.get('ID', ''),  # Orthanc internal ID
+                        study_id=study_uid,  # Study Instance UID
+                        study_instance=study_uid  # Also store in study_instance field
+                    )
+                except ImportError:
+                    # PacsExam model doesn't exist, skip this step
+                    pass
+        
+        # Prepare examination details for response
+        examination_details = []
+        for pemeriksaan in created_examinations:
+            examination_details.append({
+                'id': pemeriksaan.id,
+                'exam_type': pemeriksaan.exam.exam,
+                'modality': pemeriksaan.exam.modaliti.nama,
+                'body_part': pemeriksaan.exam.part.part if pemeriksaan.exam.part else None,
+                'position': pemeriksaan.patient_position,
+                'accession_number': pemeriksaan.accession_number,
+                'radiographer': f"{pemeriksaan.jxr.first_name} {pemeriksaan.jxr.last_name}".strip() if pemeriksaan.jxr else None
+            })
         
         return Response({
             'message': 'Legacy study imported successfully',
             'studyInstanceUid': study_uid,
             'registrationId': daftar.id,
-            'examinationId': pemeriksaan.id,
+            'examinationCount': len(created_examinations),
+            'examinations': examination_details,
             'patientName': patient_name,
             'accessionNumber': accession_number,
             'success': True
@@ -613,3 +767,117 @@ def get_study_image_ids(request, study_uid):
         import traceback
         print(f"DEBUG: Traceback: {traceback.format_exc()}")
         return Response({'error': error_msg}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_enhanced_study_metadata(request, study_uid):
+    """
+    Get enhanced DICOM metadata with detailed series and instance information
+    """
+    try:
+        # Get Orthanc URL from configuration
+        pacs_config = PacsConfig.objects.first()
+        if not pacs_config:
+            return Response({'error': 'PACS configuration not found'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        orthanc_url = pacs_config.orthancurl
+        
+        # Find the study
+        find_response = requests.post(
+            f"{orthanc_url}/tools/find",
+            headers={'Content-Type': 'application/json'},
+            json={
+                'Level': 'Study',
+                'Query': {'StudyInstanceUID': study_uid},
+                'Expand': True,
+            },
+            timeout=30
+        )
+        
+        if not find_response.ok or not find_response.json():
+            return Response({'error': f'Study not found: {study_uid}'}, status=status.HTTP_404_NOT_FOUND)
+        
+        study_data = find_response.json()[0]
+        
+        # Get detailed series information
+        series_details = []
+        for series_id in study_data.get('Series', []):
+            try:
+                series_response = requests.get(f"{orthanc_url}/series/{series_id}", timeout=30)
+                if series_response.ok:
+                    series_data = series_response.json()
+                    series_tags = series_data.get('MainDicomTags', {})
+                    
+                    # Get first instance for additional metadata
+                    instances = series_data.get('Instances', [])
+                    instance_tags = {}
+                    if instances:
+                        instance_response = requests.get(f"{orthanc_url}/instances/{instances[0]}", timeout=30)
+                        if instance_response.ok:
+                            instance_data = instance_response.json()
+                            instance_tags = instance_data.get('MainDicomTags', {})
+                    
+                    # Parse examination details
+                    operators_name = instance_tags.get('OperatorsName', '') or series_tags.get('OperatorsName', '')
+                    modality = series_tags.get('Modality', 'CR')
+                    body_part = instance_tags.get('BodyPartExamined', '') or series_tags.get('BodyPartExamined', '')
+                    
+                    # Parse AcquisitionDeviceProcessingDescription
+                    acquisition_desc = instance_tags.get('AcquisitionDeviceProcessingDescription', '') or series_tags.get('AcquisitionDeviceProcessingDescription', '')
+                    series_description = series_tags.get('SeriesDescription', '')
+                    
+                    # Extract exam type and position
+                    exam_type = ''
+                    position = ''
+                    
+                    if acquisition_desc:
+                        parts = [part.strip() for part in acquisition_desc.split(',')]
+                        if len(parts) >= 1:
+                            exam_type = parts[0]
+                        if len(parts) >= 2:
+                            position = parts[1]
+                    elif series_description:
+                        exam_type = series_description
+                    
+                    if not exam_type and body_part:
+                        exam_type = body_part
+                    
+                    if not exam_type:
+                        exam_type = 'General Radiography'
+                    
+                    # Parse radiographer name
+                    radiographer_name = ''
+                    if operators_name:
+                        name_parts = operators_name.split('^')
+                        if len(name_parts) >= 2:
+                            radiographer_name = f"{name_parts[1]} {name_parts[0]}".strip()
+                        elif len(name_parts) == 1:
+                            radiographer_name = name_parts[0].strip()
+                    
+                    series_details.append({
+                        'series_id': series_id,
+                        'exam_type': exam_type,
+                        'position': position,
+                        'modality': modality,
+                        'body_part': body_part,
+                        'radiographer_name': radiographer_name,
+                        'instance_count': len(instances),
+                        'series_description': series_description,
+                        'acquisition_description': acquisition_desc
+                    })
+            except Exception as e:
+                print(f"Error processing series {series_id}: {e}")
+                continue
+        
+        return Response({
+            'study_uid': study_uid,
+            'series': series_details,
+            'total_series': len(series_details),
+            'success': True
+        })
+        
+    except requests.exceptions.RequestException as e:
+        return Response({'error': f'Network error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    except Exception as e:
+        return Response({'error': f'Server error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

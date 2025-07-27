@@ -47,6 +47,10 @@ interface Study {
         id: number;
         nama: string;
       };
+      part?: {
+        id: number;
+        part: string;
+      };
     };
     laterality?: string;
     catatan?: string;
@@ -404,6 +408,7 @@ export default function StudyDetailsPage() {
                   <tr className="border-b">
                     <th className="text-left py-3 px-4 font-semibold text-sm">Accession No</th>
                     <th className="text-left py-3 px-4 font-semibold text-sm">Exam Type</th>
+                    <th className="text-left py-3 px-4 font-semibold text-sm">Body Part & Position</th>
                     <th className="text-left py-3 px-4 font-semibold text-sm">Status</th>
                     <th className="text-left py-3 px-4 font-semibold text-sm">Technical Params</th>
                     <th className="text-left py-3 px-4 font-semibold text-sm">Radiographer</th>
@@ -415,15 +420,32 @@ export default function StudyDetailsPage() {
                     <tr key={exam.id} className="border-b hover:bg-muted/50 transition-colors">
                       <td className="py-3 px-4 text-sm">
                         <p className="text-sm font-mono font-semibold">{exam.accession_number || exam.no_xray}</p>
-                        {exam.laterality && (
-                          <Badge variant="outline" className="text-xs mt-1">
-                            {exam.laterality}
-                          </Badge>
-                        )}
                       </td>
                       <td className="py-3 px-4 text-sm">
                         <p className="font-medium">{exam.exam.exam}</p>
                         <p className="text-xs text-muted-foreground">{exam.exam.modaliti.nama}</p>
+                      </td>
+                      <td className="py-3 px-4 text-sm">
+                        <div className="space-y-1">
+                          {exam.exam.part && (
+                            <Badge variant="secondary" className="text-xs">
+                              {exam.exam.part.part}
+                            </Badge>
+                          )}
+                          {exam.patient_position && (
+                            <Badge variant="outline" className="text-xs">
+                              {exam.patient_position}
+                            </Badge>
+                          )}
+                          {exam.laterality && (
+                            <Badge variant="outline" className="text-xs">
+                              {exam.laterality}
+                            </Badge>
+                          )}
+                          {!exam.exam.part && !exam.patient_position && !exam.laterality && (
+                            <span className="text-muted-foreground text-xs">-</span>
+                          )}
+                        </div>
                       </td>
                       <td className="py-3 px-4 text-sm">
                         <Badge 

@@ -84,6 +84,8 @@ export default function LegacyStudyViewerPage() {
   const [isFullWindow, setIsFullWindow] = useState(false);
   const [isImportedToRis, setIsImportedToRis] = useState(false);
   const [risStudyId, setRisStudyId] = useState<number | null>(null);
+  const [risExaminations, setRisExaminations] = useState<any[]>([]);
+  const [enhancedDicomData, setEnhancedDicomData] = useState<any[]>([]);
   
   // Track fetched studies to prevent duplicate API calls
   const fetchedStudiesRef = useRef(new Set<string>());
@@ -108,9 +110,23 @@ export default function LegacyStudyViewerPage() {
         if (Array.isArray(results) && results.length > 0) {
           setIsImportedToRis(true);
           setRisStudyId(results[0].id);
+          
+          // Fetch examination details for this study
+          try {
+            const examResponse = await AuthService.authenticatedFetch(
+              `${process.env.NEXT_PUBLIC_API_URL}/api/registrations/${results[0].id}/examinations/`
+            );
+            if (examResponse.ok) {
+              const examData = await examResponse.json();
+              setRisExaminations(examData);
+            }
+          } catch (err) {
+            console.error('Error fetching examination details:', err);
+          }
         } else {
           setIsImportedToRis(false);
           setRisStudyId(null);
+          setRisExaminations([]);
         }
       } else {
         setIsImportedToRis(false);
@@ -120,6 +136,31 @@ export default function LegacyStudyViewerPage() {
       console.error('Error checking RIS import status:', err);
       // Don't set error state for this check, just assume not imported
       setIsImportedToRis(false);
+    }
+  }, [studyUid]);
+
+  const fetchEnhancedDicomData = useCallback(async () => {
+    if (!studyUid) return;
+    
+    try {
+      console.log('🔍 Fetching enhanced DICOM data for study:', studyUid);
+      // Fetch detailed metadata from our enhanced endpoint
+      const response = await AuthService.authenticatedFetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/pacs/studies/${studyUid}/enhanced-metadata/`
+      );
+      
+      console.log('📡 Enhanced metadata response status:', response.status);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('📋 Enhanced metadata response data:', data);
+        setEnhancedDicomData(data.series || []);
+        console.log('📊 Enhanced DICOM data set to:', data.series || []);
+      } else {
+        console.error('❌ Enhanced metadata request failed:', response.status, response.statusText);
+      }
+    } catch (err) {
+      console.error('Error fetching enhanced DICOM data:', err);
     }
   }, [studyUid]);
 
@@ -195,8 +236,9 @@ export default function LegacyStudyViewerPage() {
       console.log(`useEffect triggered for study: ${studyUid}`);
       fetchStudyData();
       checkRisImportStatus();
+      fetchEnhancedDicomData();
     }
-  }, [studyUid, user, fetchStudyData, checkRisImportStatus]);
+  }, [studyUid, user, fetchStudyData, checkRisImportStatus, fetchEnhancedDicomData]);
 
   // Keyboard shortcut for full window toggle (F key)
   useEffect(() => {
@@ -269,11 +311,24 @@ export default function LegacyStudyViewerPage() {
       const result = await response.json();
 
       if (response.ok && result.success) {
-        toast.success(`Study imported successfully! Registration ID: ${result.registrationId}`);
+        const examCount = result.examinationCount || 1;
+        const examDetails = result.examinations || [];
+        
+        // Show detailed success message
+        if (examCount > 1) {
+          toast.success(`Study imported successfully! Created ${examCount} examinations: ${examDetails.map(e => e.exam_type).join(', ')}`);
+        } else {
+          toast.success(`Study imported successfully! Registration ID: ${result.registrationId}`);
+        }
         
         // Update the RIS status immediately
         setIsImportedToRis(true);
         setRisStudyId(result.registrationId);
+        
+        // Set the examination details from the import response
+        if (result.examinations) {
+          setRisExaminations(result.examinations);
+        }
         
         // Optionally redirect to the imported study in RIS
         setTimeout(() => {
@@ -400,8 +455,30 @@ export default function LegacyStudyViewerPage() {
             <div><strong>Accession:</strong> {metadata?.AccessionNumber || 'N/A'}</div>
             <div><strong>Clinic:</strong> {metadata?.InstitutionName || 'N/A'}</div>
             <div><strong>Date:</strong> {formatDate(metadata?.StudyDate || '')} {formatTime(metadata?.StudyTime || '')}</div>
-            <div><strong>Radiographer:</strong> {metadata?.OperatorsName || 'N/A'}</div>
-            <div><strong>Position:</strong> AP/PA</div>
+            <div><strong>Radiographer:</strong> {
+              (() => {
+                // Get radiographer from RIS data or enhanced DICOM data
+                if (isImportedToRis && risExaminations.length > 0 && risExaminations[0].jxr) {
+                  return `${risExaminations[0].jxr.first_name} ${risExaminations[0].jxr.last_name}`;
+                }
+                if (enhancedDicomData.length > 0 && enhancedDicomData[0].radiographer_name) {
+                  return enhancedDicomData[0].radiographer_name;
+                }
+                return metadata?.OperatorsName || 'N/A';
+              })()
+            }</div>
+            <div><strong>Position:</strong> {
+              (() => {
+                // Get position from RIS data or enhanced DICOM data
+                if (isImportedToRis && risExaminations.length > 0 && risExaminations[0].patient_position) {
+                  return risExaminations[0].patient_position;
+                }
+                if (enhancedDicomData.length > 0 && enhancedDicomData[0].position) {
+                  return enhancedDicomData[0].position;
+                }
+                return 'N/A';
+              })()
+            }</div>
           </div>
           
           {/* Keyboard shortcuts hint */}
@@ -562,60 +639,173 @@ export default function LegacyStudyViewerPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Study Date</label>
-                <div className="flex items-center gap-2 mt-1">
-                  <Calendar className="h-3 w-3 text-muted-foreground" />
-                  <p className="text-sm">{formatDate(metadata.StudyDate || '')}</p>
-                </div>
-              </div>
-              {metadata.StudyTime && (
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground">Study Time</label>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Clock className="h-3 w-3 text-muted-foreground" />
-                    <p className="text-sm">{formatTime(metadata.StudyTime)}</p>
+              {(() => {
+                console.log('🎯 Rendering Study Details - isImportedToRis:', isImportedToRis, 'risExaminations.length:', risExaminations.length, 'enhancedDicomData.length:', enhancedDicomData.length);
+                return null;
+              })()}
+              {isImportedToRis && risExaminations.length > 0 ? (
+                // Show enhanced RIS examination details
+                <>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">Study Date</label>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Calendar className="h-3 w-3 text-muted-foreground" />
+                      <p className="text-sm">{formatDate(metadata.StudyDate || '')}</p>
+                    </div>
                   </div>
-                </div>
+                  
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">Examinations ({risExaminations.length})</label>
+                    <div className="mt-2 space-y-2">
+                      {risExaminations.map((exam, index) => (
+                        <div key={index} className="bg-muted/30 p-2 rounded text-xs">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge variant="secondary" className="text-xs">
+                              {exam.exam.exam}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">
+                              {exam.exam.modaliti.nama}
+                            </Badge>
+                          </div>
+                          <div className="flex gap-2 text-xs text-muted-foreground">
+                            {exam.exam.part && (
+                              <span>• {exam.exam.part.part}</span>
+                            )}
+                            {exam.patient_position && (
+                              <span>• {exam.patient_position}</span>
+                            )}
+                            {exam.laterality && (
+                              <span>• {exam.laterality}</span>
+                            )}
+                          </div>
+                          {exam.jxr && (
+                            <div className="text-xs text-muted-foreground mt-1">
+                              Radiographer: {exam.jxr.first_name} {exam.jxr.last_name}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">Images</label>
+                    <Badge variant="outline" className="mt-1 text-xs">
+                      {imageIds.length} images
+                    </Badge>
+                  </div>
+                </>
+              ) : enhancedDicomData.length > 0 ? (
+                // Show enhanced DICOM metadata for legacy studies
+                <>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">Study Date</label>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Calendar className="h-3 w-3 text-muted-foreground" />
+                      <p className="text-sm">{formatDate(metadata.StudyDate || '')}</p>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">Examinations ({enhancedDicomData.length})</label>
+                    <div className="mt-2 space-y-2">
+                      {enhancedDicomData.map((exam, index) => (
+                        <div key={index} className="bg-muted/30 p-2 rounded text-xs">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge variant="secondary" className="text-xs">
+                              {exam.exam_type}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">
+                              {exam.modality}
+                            </Badge>
+                          </div>
+                          <div className="flex gap-2 text-xs text-muted-foreground">
+                            {exam.body_part && (
+                              <span>• {exam.body_part}</span>
+                            )}
+                            {exam.position && (
+                              <span>• {exam.position}</span>
+                            )}
+                          </div>
+                          {exam.radiographer_name && (
+                            <div className="text-xs text-muted-foreground mt-1">
+                              Radiographer: {exam.radiographer_name}
+                            </div>
+                          )}
+                          <div className="text-xs text-muted-foreground mt-1">
+                            Images: {exam.instance_count}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">Total Images</label>
+                    <Badge variant="outline" className="mt-1 text-xs">
+                      {imageIds.length} images
+                    </Badge>
+                  </div>
+                </>
+              ) : (
+                // Show basic DICOM metadata fallback
+                <>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">Study Date</label>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Calendar className="h-3 w-3 text-muted-foreground" />
+                      <p className="text-sm">{formatDate(metadata.StudyDate || '')}</p>
+                    </div>
+                  </div>
+                  {metadata.StudyTime && (
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground">Study Time</label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Clock className="h-3 w-3 text-muted-foreground" />
+                        <p className="text-sm">{formatTime(metadata.StudyTime)}</p>
+                      </div>
+                    </div>
+                  )}
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">Modality</label>
+                    <Badge variant="secondary" className="mt-1 text-xs">
+                      {metadata.Modality}
+                    </Badge>
+                  </div>
+                  {metadata.AccessionNumber && (
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground">Accession Number</label>
+                      <p className="text-sm font-mono">{metadata.AccessionNumber}</p>
+                    </div>
+                  )}
+                  {metadata.ReferringPhysicianName && (
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground">Referring Doctor</label>
+                      <p className="text-sm">{metadata.ReferringPhysicianName}</p>
+                    </div>
+                  )}
+                  {metadata.OperatorsName && (
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground">Radiographer</label>
+                      <p className="text-sm">{metadata.OperatorsName}</p>
+                    </div>
+                  )}
+                  {metadata.StudyDescription && (
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground">Description</label>
+                      <p className="text-xs mt-1 p-2 bg-muted/50 rounded">
+                        {metadata.StudyDescription}
+                      </p>
+                    </div>
+                  )}
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">Images</label>
+                    <Badge variant="outline" className="mt-1 text-xs">
+                      {imageIds.length} images
+                    </Badge>
+                  </div>
+                </>
               )}
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Modality</label>
-                <Badge variant="secondary" className="mt-1 text-xs">
-                  {metadata.Modality}
-                </Badge>
-              </div>
-              {metadata.AccessionNumber && (
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground">Accession Number</label>
-                  <p className="text-sm font-mono">{metadata.AccessionNumber}</p>
-                </div>
-              )}
-              {metadata.ReferringPhysicianName && (
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground">Referring Doctor</label>
-                  <p className="text-sm">{metadata.ReferringPhysicianName}</p>
-                </div>
-              )}
-              {metadata.OperatorsName && (
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground">Radiographer</label>
-                  <p className="text-sm">{metadata.OperatorsName}</p>
-                </div>
-              )}
-              {metadata.StudyDescription && (
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground">Description</label>
-                  <p className="text-xs mt-1 p-2 bg-muted/50 rounded">
-                    {metadata.StudyDescription}
-                  </p>
-                </div>
-              )}
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Images</label>
-                <Badge variant="outline" className="mt-1 text-xs">
-                  {imageIds.length} images
-                </Badge>
-              </div>
             </CardContent>
           </Card>
 
