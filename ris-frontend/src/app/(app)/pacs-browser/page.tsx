@@ -13,6 +13,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { getOrthancUrl } from '@/lib/pacs';
 import { toast } from '@/lib/toast';
+import AuthService from '@/lib/auth';
 import { 
   Search, 
   Calendar, 
@@ -43,7 +44,7 @@ interface LegacyStudy {
 }
 
 const modalityOptions = [
-  { value: '', label: 'All Modalities' },
+  { value: 'ALL', label: 'All Modalities' },
   { value: 'CT', label: 'CT Scan' },
   { value: 'MR', label: 'MRI' },
   { value: 'CR', label: 'X-Ray (CR)' },
@@ -69,7 +70,7 @@ export default function PacsBrowserPage() {
   const [patientId, setPatientId] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [modality, setModality] = useState('');
+  const [modality, setModality] = useState('ALL');
   const [studyDescription, setStudyDescription] = useState('');
 
   const formatDate = (dateString: string): string => {
@@ -87,82 +88,85 @@ export default function PacsBrowserPage() {
       setSearching(true);
       setError(null);
       
-      const orthancUrl = await getOrthancUrl();
+      console.log('🔍 Starting PACS search via backend API...');
       
-      // Build query object
-      const query: Record<string, string> = {};
-      
-      if (patientName.trim()) {
-        query.PatientName = `*${patientName.trim()}*`;
-      }
-      
-      if (patientId.trim()) {
-        query.PatientID = `*${patientId.trim()}*`;
-      }
-      
-      if (dateFrom || dateTo) {
-        if (dateFrom && dateTo) {
-          query.StudyDate = `${dateFrom.replace(/-/g, '')}-${dateTo.replace(/-/g, '')}`;
-        } else if (dateFrom) {
-          query.StudyDate = `${dateFrom.replace(/-/g, '')}-`;
-        } else if (dateTo) {
-          query.StudyDate = `-${dateTo.replace(/-/g, '')}`;
-        }
-      }
-      
-      if (modality) {
-        query.ModalitiesInStudy = modality;
-      }
-      
-      if (studyDescription.trim()) {
-        query.StudyDescription = `*${studyDescription.trim()}*`;
-      }
+      // Build search parameters
+      const searchParams = {
+        patientName: patientName.trim() || undefined,
+        patientId: patientId.trim() || undefined,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+        modality: (modality && modality !== 'ALL') ? modality : undefined,
+        studyDescription: studyDescription.trim() || undefined,
+        limit: 100
+      };
 
-      // Query Orthanc
-      const response = await fetch(`${orthancUrl}/tools/find`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          Level: 'Study',
-          Query: query,
-          Expand: true,
-          Limit: 100 // Limit results for performance
-        }),
-      });
+      // Remove undefined values
+      Object.keys(searchParams).forEach(key => 
+        searchParams[key] === undefined && delete searchParams[key]
+      );
+
+      console.log('📤 Sending search params:', searchParams);
+
+      // Use Django API endpoint instead of direct Orthanc connection
+      const response = await AuthService.authenticatedFetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/pacs/search/`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(searchParams)
+        }
+      );
+
+      console.log('📥 Response status:', response.status);
 
       if (!response.ok) {
-        throw new Error(`Failed to search PACS: ${response.statusText}`);
+        const errorData = await response.json();
+        console.error('❌ Response error:', errorData);
+        throw new Error(errorData.error || `Failed to search PACS: ${response.statusText}`);
       }
 
-      const results = await response.json();
+      const data = await response.json();
+      console.log('📊 API response:', data);
       
-      // Process and format results
-      const formattedStudies: LegacyStudy[] = results.map((study: any) => ({
-        ID: study.ID,
-        StudyInstanceUID: study.MainDicomTags?.StudyInstanceUID || '',
-        PatientName: study.PatientMainDicomTags?.PatientName || 'Unknown',
-        PatientID: study.PatientMainDicomTags?.PatientID || 'Unknown',
-        PatientBirthDate: study.PatientMainDicomTags?.PatientBirthDate || '',
-        PatientSex: study.PatientMainDicomTags?.PatientSex || '',
-        StudyDate: study.MainDicomTags?.StudyDate || '',
-        StudyTime: study.MainDicomTags?.StudyTime || '',
-        StudyDescription: study.MainDicomTags?.StudyDescription || '',
-        Modality: study.MainDicomTags?.ModalitiesInStudy?.split(',')[0] || 'Unknown',
-        SeriesCount: study.Series?.length || 0,
-        ImageCount: 0, // We'll calculate this if needed
-        InstitutionName: study.MainDicomTags?.InstitutionName || ''
+      if (!data.success) {
+        throw new Error(data.error || 'Search failed');
+      }
+
+      // Map backend response to frontend format
+      const formattedStudies: LegacyStudy[] = data.studies.map((study: any) => ({
+        ID: study.id,
+        StudyInstanceUID: study.studyInstanceUid,
+        PatientName: study.patientName,
+        PatientID: study.patientId,
+        PatientBirthDate: study.patientBirthDate,
+        PatientSex: study.patientSex,
+        StudyDate: study.studyDate,
+        StudyTime: study.studyTime,
+        StudyDescription: study.studyDescription,
+        Modality: study.modality,
+        SeriesCount: study.seriesCount,
+        ImageCount: study.imageCount,
+        InstitutionName: study.institutionName
       }));
+
+      console.log('✅ Formatted studies count:', formattedStudies.length);
+      console.log('✅ First formatted study:', formattedStudies[0]);
 
       setStudies(formattedStudies);
       setTotalStudies(formattedStudies.length);
       
       if (formattedStudies.length === 0) {
+        console.log('ℹ️ No studies found');
         toast.success('Search completed - no studies found matching criteria');
       } else {
+        console.log(`✅ Found ${formattedStudies.length} studies`);
         toast.success(`Found ${formattedStudies.length} legacy studies`);
       }
     } catch (err) {
-      console.error('Error searching legacy studies:', err);
+      console.error('❌ Error searching legacy studies:', err);
       setError(err instanceof Error ? err.message : 'Failed to search legacy studies');
       toast.error('Failed to search legacy studies');
     } finally {
@@ -175,7 +179,7 @@ export default function PacsBrowserPage() {
     setPatientId('');
     setDateFrom('');
     setDateTo('');
-    setModality('');
+    setModality('ALL');
     setStudyDescription('');
     setStudies([]);
     setTotalStudies(0);

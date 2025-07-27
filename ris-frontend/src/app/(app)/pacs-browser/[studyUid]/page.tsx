@@ -8,7 +8,24 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { DicomViewer } from '@/components/DicomViewer';
+import dynamic from 'next/dynamic';
+
+const SimpleDicomViewer = dynamic(() => import('@/components/SimpleDicomViewer'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-96">
+      <Card className="w-96">
+        <CardHeader>
+          <CardTitle>Loading DICOM Viewer...</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="text-center mt-2">Initializing Cornerstone3D</p>
+        </CardContent>
+      </Card>
+    </div>
+  ),
+});
 import { getStudyMetadata, getStudyImageIds } from '@/lib/orthanc';
 import { toast } from '@/lib/toast';
 import { 
@@ -57,16 +74,25 @@ export default function LegacyStudyViewerPage() {
       setLoading(true);
       setError(null);
 
+      console.log('Fetching study data for UID:', studyUid);
+
       // Fetch study metadata and image IDs in parallel
       const [studyMetadata, studyImageIds] = await Promise.all([
         getStudyMetadata(studyUid),
         getStudyImageIds(studyUid)
       ]);
 
+      console.log('Study metadata:', studyMetadata);
+      console.log('Study image IDs:', studyImageIds);
+
       setMetadata(studyMetadata);
       setImageIds(studyImageIds);
       
-      toast.success(`Loaded ${studyImageIds.length} images from legacy study`);
+      if (studyImageIds.length === 0) {
+        toast.warning('No DICOM images found in this study');
+      } else {
+        toast.success(`Loaded ${studyImageIds.length} images from legacy study`);
+      }
     } catch (err) {
       console.error('Error loading legacy study:', err);
       setError(err instanceof Error ? err.message : 'Failed to load legacy study');
@@ -198,214 +224,156 @@ export default function LegacyStudyViewerPage() {
   }
 
   return (
-    <div className="container-fluid px-4 py-8">
-      <div className="mb-6">
-        <Button 
-          onClick={() => router.back()} 
-          variant="outline"
-          className="mb-4"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to PACS Browser
-        </Button>
-        
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2">
-              <Archive className="h-8 w-8" />
-              Legacy Study Viewer
-            </h1>
-            <p className="mt-2 text-muted-foreground">
-              {metadata.PatientName} - {formatDate(metadata.StudyDate || '')}
-            </p>
+    <div className="h-full flex">
+      {/* DICOM Viewer - Full Height */}
+      <div className="flex-1">
+        {imageIds.length > 0 ? (
+          <SimpleDicomViewer 
+            imageIds={imageIds}
+            studyMetadata={{
+              patientName: metadata.PatientName || 'Unknown',
+              patientId: metadata.PatientID || 'Unknown',
+              studyDate: metadata.StudyDate || '',
+              studyDescription: metadata.StudyDescription || '',
+              modality: metadata.Modality || 'Unknown'
+            }}
+          />
+        ) : (
+          <div className="h-full flex items-center justify-center bg-background">
+            <div className="text-center">
+              <Eye className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No Images Available</h3>
+              <p className="text-muted-foreground">
+                This study contains no viewable images
+              </p>
+            </div>
           </div>
-          <div className="flex space-x-2">
-            <Button 
-              onClick={handleImportStudy}
-              disabled={importing}
-              variant="outline"
-            >
-              {importing ? (
-                <>
-                  <div className="w-4 h-4 mr-2 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
-                  Importing...
-                </>
-              ) : (
-                <>
-                  <Download className="w-4 h-4 mr-2" />
-                  Import to RIS
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* DICOM Viewer */}
-        <div className="lg:col-span-3">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Eye className="h-5 w-5" />
-                DICOM Images ({imageIds.length} images)
-              </CardTitle>
-              <CardDescription>
-                Legacy DICOM study from PACS archive
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {imageIds.length > 0 ? (
-                <div className="h-[600px]">
-                  <DicomViewer 
-                    imageIds={imageIds}
-                    studyMetadata={{
-                      patientName: metadata.PatientName || 'Unknown',
-                      patientId: metadata.PatientID || 'Unknown',
-                      studyDate: metadata.StudyDate || '',
-                      studyDescription: metadata.StudyDescription || '',
-                      modality: metadata.Modality || 'Unknown'
-                    }}
-                  />
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <Eye className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No Images Available</h3>
-                  <p className="text-muted-foreground">
-                    This study contains no viewable images
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+      {/* Collapsible Info Panel */}
+      <div className="w-80 border-l bg-muted/5 overflow-y-auto">
+        <div className="p-4 space-y-4">
 
-        {/* Study Information Sidebar */}
-        <div>
+          {/* Import Button */}
+          <Button 
+            onClick={handleImportStudy}
+            disabled={importing}
+            className="w-full"
+          >
+            {importing ? (
+              <>
+                <div className="w-4 h-4 mr-2 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
+                Importing...
+              </>
+            ) : (
+              <>
+                <Download className="w-4 h-4 mr-2" />
+                Import to RIS
+              </>
+            )}
+          </Button>
+
           {/* Patient Information */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User className="h-5 w-5" />
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <User className="h-4 w-4" />
                 Patient Information
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Name</label>
-                  <p className="text-lg font-semibold">{metadata.PatientName}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Patient ID</label>
-                  <p className="text-lg font-mono">{metadata.PatientID}</p>
-                </div>
-                {metadata.PatientSex && (
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Gender</label>
-                    <p className="text-lg">
-                      {metadata.PatientSex === 'M' ? 'Male' : 
-                       metadata.PatientSex === 'F' ? 'Female' : 
-                       metadata.PatientSex}
-                    </p>
-                  </div>
-                )}
-                {metadata.PatientBirthDate && (
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Age</label>
-                    <p className="text-lg">{calculateAge(metadata.PatientBirthDate)}</p>
-                  </div>
-                )}
+            <CardContent className="space-y-3">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Name</label>
+                <p className="text-sm font-semibold">{metadata.PatientName}</p>
               </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Patient ID</label>
+                <p className="text-sm font-mono">{metadata.PatientID}</p>
+              </div>
+              {metadata.PatientSex && (
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Gender</label>
+                  <p className="text-sm">
+                    {metadata.PatientSex === 'M' ? 'Male' : 
+                     metadata.PatientSex === 'F' ? 'Female' : 
+                     metadata.PatientSex}
+                  </p>
+                </div>
+              )}
+              {metadata.PatientBirthDate && (
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Age</label>
+                  <p className="text-sm">{calculateAge(metadata.PatientBirthDate)}</p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
           {/* Study Details */}
-          <Card className="mt-4">
+          <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Stethoscope className="h-5 w-5" />
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <Stethoscope className="h-4 w-4" />
                 Study Details
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
+            <CardContent className="space-y-3">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Study Date</label>
+                <div className="flex items-center gap-2 mt-1">
+                  <Calendar className="h-3 w-3 text-muted-foreground" />
+                  <p className="text-sm">{formatDate(metadata.StudyDate || '')}</p>
+                </div>
+              </div>
+              {metadata.StudyTime && (
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground">Study Date</label>
+                  <label className="text-xs font-medium text-muted-foreground">Study Time</label>
                   <div className="flex items-center gap-2 mt-1">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <p className="text-lg">{formatDate(metadata.StudyDate || '')}</p>
+                    <Clock className="h-3 w-3 text-muted-foreground" />
+                    <p className="text-sm">{formatTime(metadata.StudyTime)}</p>
                   </div>
                 </div>
-                {metadata.StudyTime && (
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Study Time</label>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Clock className="h-4 w-4 text-muted-foreground" />
-                      <p className="text-lg">{formatTime(metadata.StudyTime)}</p>
-                    </div>
-                  </div>
-                )}
+              )}
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Modality</label>
+                <Badge variant="secondary" className="mt-1 text-xs">
+                  {metadata.Modality}
+                </Badge>
+              </div>
+              {metadata.StudyDescription && (
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground">Modality</label>
-                  <Badge variant="secondary" className="mt-1">
-                    {metadata.Modality}
-                  </Badge>
+                  <label className="text-xs font-medium text-muted-foreground">Description</label>
+                  <p className="text-xs mt-1 p-2 bg-muted/50 rounded">
+                    {metadata.StudyDescription}
+                  </p>
                 </div>
-                {metadata.StudyDescription && (
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Description</label>
-                    <p className="text-sm mt-1 p-2 bg-muted/50 rounded">
-                      {metadata.StudyDescription}
-                    </p>
-                  </div>
-                )}
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Series Count</label>
-                  <Badge variant="outline" className="mt-1">
-                    {metadata.SeriesCount} series
-                  </Badge>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Image Count</label>
-                  <Badge variant="outline" className="mt-1">
-                    {imageIds.length} images
-                  </Badge>
-                </div>
-                {metadata.InstitutionName && (
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Institution</label>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Building className="h-4 w-4 text-muted-foreground" />
-                      <p className="text-sm">{metadata.InstitutionName}</p>
-                    </div>
-                  </div>
-                )}
+              )}
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Images</label>
+                <Badge variant="outline" className="mt-1 text-xs">
+                  {imageIds.length} images
+                </Badge>
               </div>
             </CardContent>
           </Card>
 
           {/* DICOM Technical Info */}
-          <Card className="mt-4">
+          <Card>
             <CardHeader>
-              <CardTitle className="text-sm">DICOM Information</CardTitle>
+              <CardTitle className="text-xs">DICOM Information</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2">
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground">Study Instance UID</label>
-                  <p className="text-xs font-mono break-all bg-muted/50 p-2 rounded mt-1">
-                    {studyUid}
-                  </p>
-                </div>
-                <div className="pt-2">
-                  <Badge variant="outline" className="text-xs">
-                    <Archive className="h-3 w-3 mr-1" />
-                    Legacy Study
-                  </Badge>
-                </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Study Instance UID</label>
+                <p className="text-xs font-mono break-all bg-muted/50 p-2 rounded mt-1">
+                  {studyUid}
+                </p>
               </div>
+              <Badge variant="outline" className="text-xs mt-2">
+                <Archive className="h-3 w-3 mr-1" />
+                Legacy Study
+              </Badge>
             </CardContent>
           </Card>
         </div>

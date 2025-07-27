@@ -1,5 +1,6 @@
 import { OrthancStudy, OrthancSeries, OrthancInstance } from '@/types/orthanc';
 import { getOrthancUrl } from './pacs';
+import AuthService from './auth';
 
 interface StudyMetadata {
   PatientName?: string;
@@ -20,59 +21,35 @@ interface StudyMetadata {
  * including all series and instances, and constructs the necessary
  * image IDs for the Cornerstone viewer.
  *
- * This function uses the standard Orthanc REST API, not the OHIF plugin.
+ * This function uses the Django proxy API to avoid CORS issues.
  *
  * @param studyInstanceUID The DICOM Study Instance UID.
  * @returns A promise that resolves to an array of Cornerstone image IDs (wadouri).
  */
 export async function getStudyImageIds(studyInstanceUID: string): Promise<string[]> {
-  const ORTHANC_URL = await getOrthancUrl();
+  try {
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    
+    console.log('Fetching image IDs for study:', studyInstanceUID);
+    
+    const response = await AuthService.authenticatedFetch(
+      `${API_URL}/api/pacs/studies/${studyInstanceUID}/image-ids/`
+    );
 
-  // Step 1: Find the Orthanc internal ID for the study
-  const findResponse = await fetch(`${ORTHANC_URL}/tools/find`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      Level: 'Study',
-      Query: {
-        StudyInstanceUID: studyInstanceUID,
-      },
-      Expand: true, // Ask Orthanc to expand the details in the response
-    }),
-  });
-
-  if (!findResponse.ok) {
-    throw new Error(`Failed to find study ${studyInstanceUID}. Status: ${findResponse.statusText}`);
-  }
-
-  const findResult: OrthancStudy[] = await findResponse.json();
-
-  if (!findResult || findResult.length === 0) {
-    throw new Error(`Study not found: ${studyInstanceUID}`);
-  }
-
-  const studyData = findResult[0];
-  const imageIds: string[] = [];
-
-  // Step 2: Iterate through each series and instance to build the image IDs
-  for (const series of studyData.Series) {
-    // The 'Expand' flag in the initial query gives us most of what we need.
-    // However, we need to fetch each series individually to get its instances.
-    const seriesResponse = await fetch(`${ORTHANC_URL}/series/${series.ID}`);
-    const seriesData: OrthancSeries = await seriesResponse.json();
-    const seriesInstanceUID = seriesData.MainDicomTags.SeriesInstanceUID;
-
-    for (const instance of seriesData.Instances) {
-        const instanceResponse = await fetch(`${ORTHANC_URL}/instances/${instance.ID}`);
-        const instanceData: OrthancInstance = await instanceResponse.json();
-        const sopInstanceUID = instanceData.MainDicomTags.SOPInstanceUID;
-
-        const imageId = `wadouri:${ORTHANC_URL}/dicom-web/studies/${studyInstanceUID}/series/${seriesInstanceUID}/instances/${sopInstanceUID}`;
-        imageIds.push(imageId);
+    if (!response.ok) {
+      console.warn('API endpoint not available, returning empty array');
+      return [];
     }
-  }
 
-  return imageIds;
+    const result = await response.json();
+    console.log('Received image IDs:', result);
+
+    return result.imageIds || [];
+  } catch (error) {
+    console.error('Error fetching image IDs:', error);
+    // Return empty array instead of throwing to prevent infinite loading
+    return [];
+  }
 }
 
 /**
@@ -83,64 +60,48 @@ export async function getStudyImageIds(studyInstanceUID: string): Promise<string
  * @returns A promise that resolves to study metadata object.
  */
 export async function getStudyMetadata(studyInstanceUID: string): Promise<StudyMetadata> {
-  const ORTHANC_URL = await getOrthancUrl();
+  // Use Django API proxy to avoid CORS issues
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
   try {
-    // Step 1: Find the Orthanc internal ID for the study
-    const findResponse = await fetch(`${ORTHANC_URL}/tools/find`, {
+    // Search for the study using Django PACS search API
+    const response = await AuthService.authenticatedFetch(`${API_URL}/api/pacs/search/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify({
-        Level: 'Study',
-        Query: {
-          StudyInstanceUID: studyInstanceUID,
-        },
-        Expand: true,
+        // Search by exact Study Instance UID
+        studyInstanceUid: studyInstanceUID
       }),
     });
 
-    if (!findResponse.ok) {
-      throw new Error(`Failed to find study ${studyInstanceUID}. Status: ${findResponse.statusText}`);
+    if (!response.ok) {
+      throw new Error(`Failed to find study ${studyInstanceUID}. Status: ${response.statusText}`);
     }
 
-    const findResult: OrthancStudy[] = await findResponse.json();
+    const searchResult = await response.json();
 
-    if (!findResult || findResult.length === 0) {
+    if (!searchResult.success || !searchResult.studies || searchResult.studies.length === 0) {
       throw new Error(`Study not found: ${studyInstanceUID}`);
     }
 
-    const studyData = findResult[0];
+    const study = searchResult.studies[0];
     
-    // Extract metadata from the study
+    // Convert search result format to StudyMetadata format
     const metadata: StudyMetadata = {
-      PatientName: studyData.PatientMainDicomTags?.PatientName || 'Unknown',
-      PatientID: studyData.PatientMainDicomTags?.PatientID || 'Unknown',
-      PatientBirthDate: studyData.PatientMainDicomTags?.PatientBirthDate || undefined,
-      PatientSex: studyData.PatientMainDicomTags?.PatientSex || undefined,
-      StudyDate: studyData.MainDicomTags?.StudyDate || undefined,
-      StudyTime: studyData.MainDicomTags?.StudyTime || undefined,
-      StudyDescription: studyData.MainDicomTags?.StudyDescription || undefined,
-      InstitutionName: studyData.MainDicomTags?.InstitutionName || undefined,
-      SeriesCount: studyData.Series?.length || 0,
-      ImageCount: 0
+      PatientName: study.patientName || 'Unknown',
+      PatientID: study.patientId || 'Unknown',
+      PatientBirthDate: study.patientBirthDate || undefined,
+      PatientSex: study.patientSex || undefined,
+      StudyDate: study.studyDate || undefined,
+      StudyTime: study.studyTime || undefined,
+      StudyDescription: study.studyDescription || undefined,
+      Modality: study.modality || undefined,
+      InstitutionName: study.institutionName || undefined,
+      SeriesCount: study.seriesCount || 0,
+      ImageCount: study.imageCount || 0
     };
-
-    // Calculate total image count across all series
-    let totalImages = 0;
-    for (const series of studyData.Series || []) {
-      const seriesResponse = await fetch(`${ORTHANC_URL}/series/${series.ID}`);
-      if (seriesResponse.ok) {
-        const seriesData: OrthancSeries = await seriesResponse.json();
-        totalImages += seriesData.Instances?.length || 0;
-        
-        // Get modality from first series if not in study level
-        if (!metadata.Modality && seriesData.MainDicomTags?.Modality) {
-          metadata.Modality = seriesData.MainDicomTags.Modality;
-        }
-      }
-    }
-    
-    metadata.ImageCount = totalImages;
 
     return metadata;
   } catch (error) {

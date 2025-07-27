@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Users, Settings, BarChart, Home, Stethoscope, X, Bone, FileText, ClipboardList, ListChecks, UserCog } from "lucide-react";
+import { LayoutDashboard, Users, Settings, BarChart, Home, Stethoscope, X, Bone, FileText, ClipboardList, ListChecks, UserCog, Archive } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -39,6 +39,12 @@ export default function Sidebar({ className, isCollapsed }: SidebarProps) {
             <Link href="/examinations" className="flex items-center p-2 rounded hover:bg-white/10">
               <Stethoscope className="h-5 w-5 mr-2" />
               {!isCollapsed && "Examinations"}
+            </Link>
+          </li>
+          <li>
+            <Link href="/pacs-browser" className="flex items-center p-2 rounded hover:bg-white/10">
+              <Archive className="h-5 w-5 mr-2" />
+              {!isCollapsed && "PACS Browser"}
             </Link>
           </li>
           
