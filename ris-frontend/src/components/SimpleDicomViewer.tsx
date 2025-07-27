@@ -8,7 +8,7 @@ import {
   ZoomIn, ZoomOut, RotateCw, Move, Square, Circle, 
   Ruler, MousePointer, RotateCcw, Maximize, Settings,
   Play, Pause, SkipBack, SkipForward, Trash2,
-  FlipHorizontal, FlipVertical, Palette
+  FlipHorizontal, Palette
 } from 'lucide-react';
 import AuthService from '@/lib/auth';
 
@@ -132,7 +132,6 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [isInverted, setIsInverted] = useState<boolean>(false);
   const [isFlippedHorizontal, setIsFlippedHorizontal] = useState<boolean>(false);
-  const [isFlippedVertical, setIsFlippedVertical] = useState<boolean>(false);
   const playbackIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Track initialization state to prevent double loading
@@ -424,12 +423,24 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
       try {
         viewport.setImageIdIndex(index);
         
-        // Reset all image manipulation states when changing images
+        // Reset all image manipulation properties when changing images
+        const properties = viewport.getProperties();
+        viewport.setProperties({
+          ...properties,
+          invert: false
+        });
+        
+        // Reset horizontal flip CSS transform
+        const element = viewport.element;
+        const canvas = element.querySelector('canvas');
+        if (canvas) {
+          canvas.style.transform = 'scaleX(1)';
+        }
+        
+        // Reset image manipulation states
         setIsInverted(false);
         setIsFlippedHorizontal(false);
-        setIsFlippedVertical(false);
         
-        // Just render - don't set any properties
         viewport.render();
         setCurrentImageIndex(index);
         
@@ -474,15 +485,27 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
   // Viewport manipulation functions
   const resetViewport = useCallback(() => {
     if (viewport) {
-      // Just reset camera and states - don't set any properties
+      // Reset camera first
       viewport.resetCamera();
       
-      // Reset all image manipulation states
+      // Reset invert property
+      const properties = viewport.getProperties();
+      viewport.setProperties({
+        ...properties,
+        invert: false
+      });
+      
+      // Reset horizontal flip CSS transform
+      const element = viewport.element;
+      const canvas = element.querySelector('canvas');
+      if (canvas) {
+        canvas.style.transform = 'scaleX(1)';
+      }
+      
+      // Reset image manipulation states
       setIsInverted(false);
       setIsFlippedHorizontal(false);
-      setIsFlippedVertical(false);
       
-      // Force render without setting any properties
       viewport.render();
       
       console.log('Viewport reset completed');
@@ -517,65 +540,31 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
     }
   }, [viewport]);
 
-  const flipImage = useCallback((horizontal: boolean) => {
+  const flipHorizontal = useCallback(() => {
     if (viewport) {
       try {
-        if (horizontal) {
-          // Toggle horizontal flip state
-          const newHorizontalState = !isFlippedHorizontal;
-          setIsFlippedHorizontal(newHorizontalState);
-          
-          // For horizontal flip: use 180 degree rotation + flip to achieve left-right mirror
-          const currentPresentation = viewport.getViewPresentation();
-          const currentRotation = currentPresentation.rotation || 0;
-          
-          if (newHorizontalState) {
-            // Apply horizontal flip by adding 180 degrees rotation
-            viewport.setViewPresentation({
-              ...currentPresentation,
-              rotation: currentRotation + 180
-            });
-          } else {
-            // Remove horizontal flip by subtracting 180 degrees rotation
-            viewport.setViewPresentation({
-              ...currentPresentation,
-              rotation: currentRotation - 180
-            });
-          }
-          
-          console.log(`Horizontal flip: ${newHorizontalState}, rotation: ${currentRotation + (newHorizontalState ? 180 : -180)}`);
-        } else {
-          // Toggle vertical flip state
-          const newVerticalState = !isFlippedVertical;
-          setIsFlippedVertical(newVerticalState);
-          
-          // For vertical flip: manipulate the camera viewUp vector
-          const camera = viewport.getCamera();
-          const viewUp = camera.viewUp || [0, -1, 0];
-          
-          if (newVerticalState) {
-            // Apply vertical flip by negating viewUp
-            viewport.setCamera({
-              ...camera,
-              viewUp: [-viewUp[0], -viewUp[1], -viewUp[2]]
-            });
-          } else {
-            // Reset vertical flip to default viewUp
-            viewport.setCamera({
-              ...camera,
-              viewUp: [0, -1, 0] // Reset to default
-            });
-          }
-          
-          console.log(`Vertical flip: ${newVerticalState}, viewUp: ${newVerticalState ? 'inverted' : 'normal'}`);
-        }
+        // Toggle horizontal flip state
+        const newHorizontalState = !isFlippedHorizontal;
+        setIsFlippedHorizontal(newHorizontalState);
         
-        viewport.render();
+        // Use CSS transform on the canvas element for horizontal flip
+        const element = viewport.element;
+        const canvas = element.querySelector('canvas');
+        if (canvas) {
+          if (newHorizontalState) {
+            canvas.style.transform = 'scaleX(-1)';
+          } else {
+            canvas.style.transform = 'scaleX(1)';
+          }
+          console.log(`Horizontal flip: ${newHorizontalState}`);
+        } else {
+          console.warn('Canvas element not found for flip operation');
+        }
       } catch (error) {
-        console.error('Error flipping image:', error);
+        console.error('Error flipping image horizontally:', error);
       }
     }
-  }, [viewport, isFlippedHorizontal, isFlippedVertical]);
+  }, [viewport, isFlippedHorizontal]);
 
   const invertImage = useCallback(() => {
     if (viewport) {
@@ -781,18 +770,10 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
             <Button
               variant={isFlippedHorizontal ? 'default' : 'ghost'}
               size="sm"
-              onClick={() => flipImage(true)}
+              onClick={flipHorizontal}
               title={isFlippedHorizontal ? "Remove Horizontal Flip" : "Flip Horizontal"}
             >
               <FlipHorizontal className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={isFlippedVertical ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => flipImage(false)}
-              title={isFlippedVertical ? "Remove Vertical Flip" : "Flip Vertical"}
-            >
-              <FlipVertical className="h-4 w-4" />
             </Button>
             <Button
               variant={isInverted ? 'default' : 'ghost'}
