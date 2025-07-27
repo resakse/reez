@@ -137,6 +137,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
 
   // Track initialization state to prevent double loading
   const initializationRef = useRef(false);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
   
   // Initialize Cornerstone3D - with better DOM readiness
   useEffect(() => {
@@ -236,6 +237,30 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
         stackViewport.render();
         console.log('Images loaded and rendered with proper aspect ratio');
 
+        // Set up ResizeObserver for aspect ratio preservation
+        if (element && !resizeObserverRef.current) {
+          resizeObserverRef.current = new ResizeObserver(() => {
+            if (engine && stackViewport) {
+              // Store current presentation before resize
+              const currentPresentation = stackViewport.getViewPresentation();
+              
+              // Resize the rendering engine
+              engine.resize(true, false);
+              
+              // Restore the presentation to maintain zoom/pan
+              if (currentPresentation) {
+                stackViewport.setViewPresentation(currentPresentation);
+              }
+              
+              stackViewport.render();
+              console.log('Viewport resized while maintaining aspect ratio');
+            }
+          });
+          
+          resizeObserverRef.current.observe(element);
+          console.log('ResizeObserver setup for aspect ratio preservation');
+        }
+
         console.log('Creating tool group...');
         const toolGroupId = `simpleDicomViewerToolGroup-${Date.now()}`;  // Unique ID to prevent conflicts
         
@@ -313,6 +338,12 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
       
       // Reset initialization flag on cleanup
       initializationRef.current = false;
+      
+      // Clean up ResizeObserver
+      if (resizeObserverRef.current) {
+        resizeObserverRef.current.disconnect();
+        resizeObserverRef.current = null;
+      }
       
       // Clean up rendering engine
       if (renderingEngine) {
@@ -392,22 +423,17 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
     if (viewport && index >= 0 && index < imageIds.length && index !== currentImageIndex) {
       try {
         viewport.setImageIdIndex(index);
+        
         // Reset all image manipulation states when changing images
         setIsInverted(false);
         setIsFlippedHorizontal(false);
         setIsFlippedVertical(false);
         
-        // Only reset invert property - avoid setting unknown properties
-        try {
-          viewport.setProperties({
-            invert: false
-          });
-        } catch (error) {
-          console.warn('Could not reset image properties:', error);
-        }
-        
+        // Just render - don't set any properties
         viewport.render();
         setCurrentImageIndex(index);
+        
+        console.log(`Navigated to image ${index + 1}/${imageIds.length}`);
       } catch (error) {
         console.error('Error changing image:', error);
       }
@@ -448,7 +474,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
   // Viewport manipulation functions
   const resetViewport = useCallback(() => {
     if (viewport) {
-      // Reset camera first
+      // Just reset camera and states - don't set any properties
       viewport.resetCamera();
       
       // Reset all image manipulation states
@@ -456,16 +482,10 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
       setIsFlippedHorizontal(false);
       setIsFlippedVertical(false);
       
-      // Only reset properties that exist - avoid setting unknown properties
-      try {
-        viewport.setProperties({
-          invert: false
-        });
-      } catch (error) {
-        console.warn('Could not reset viewport properties:', error);
-      }
-      
+      // Force render without setting any properties
       viewport.render();
+      
+      console.log('Viewport reset completed');
     }
   }, [viewport]);
 
@@ -500,36 +520,37 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
   const flipImage = useCallback((horizontal: boolean) => {
     if (viewport) {
       try {
-        const camera = viewport.getCamera();
-        
         if (horizontal) {
           // Toggle horizontal flip state
           const newHorizontalState = !isFlippedHorizontal;
           setIsFlippedHorizontal(newHorizontalState);
           
-          // For horizontal flip, we need to invert the viewRight vector
-          // This mirrors the image left-to-right
-          const viewRight = camera.viewRight || [1, 0, 0];
+          // For horizontal flip: use 180 degree rotation + flip to achieve left-right mirror
+          const currentPresentation = viewport.getViewPresentation();
+          const currentRotation = currentPresentation.rotation || 0;
           
           if (newHorizontalState) {
-            // Apply horizontal flip by negating viewRight
-            viewport.setCamera({
-              ...camera,
-              viewRight: [-viewRight[0], -viewRight[1], -viewRight[2]]
+            // Apply horizontal flip by adding 180 degrees rotation
+            viewport.setViewPresentation({
+              ...currentPresentation,
+              rotation: currentRotation + 180
             });
           } else {
-            // Remove horizontal flip by restoring original viewRight
-            viewport.setCamera({
-              ...camera,
-              viewRight: [Math.abs(viewRight[0]), Math.abs(viewRight[1]), Math.abs(viewRight[2])]
+            // Remove horizontal flip by subtracting 180 degrees rotation
+            viewport.setViewPresentation({
+              ...currentPresentation,
+              rotation: currentRotation - 180
             });
           }
+          
+          console.log(`Horizontal flip: ${newHorizontalState}, rotation: ${currentRotation + (newHorizontalState ? 180 : -180)}`);
         } else {
           // Toggle vertical flip state
           const newVerticalState = !isFlippedVertical;
           setIsFlippedVertical(newVerticalState);
           
-          // For vertical flip, invert the viewUp vector
+          // For vertical flip: manipulate the camera viewUp vector
+          const camera = viewport.getCamera();
           const viewUp = camera.viewUp || [0, -1, 0];
           
           if (newVerticalState) {
@@ -539,16 +560,17 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
               viewUp: [-viewUp[0], -viewUp[1], -viewUp[2]]
             });
           } else {
-            // Remove vertical flip by restoring original viewUp
+            // Reset vertical flip to default viewUp
             viewport.setCamera({
               ...camera,
-              viewUp: [viewUp[0], -Math.abs(viewUp[1]), viewUp[2]]
+              viewUp: [0, -1, 0] // Reset to default
             });
           }
+          
+          console.log(`Vertical flip: ${newVerticalState}, viewUp: ${newVerticalState ? 'inverted' : 'normal'}`);
         }
         
         viewport.render();
-        console.log(`Image flipped: ${horizontal ? 'horizontal' : 'vertical'}, state: ${horizontal ? newHorizontalState : newVerticalState}`);
       } catch (error) {
         console.error('Error flipping image:', error);
       }
