@@ -93,41 +93,31 @@ export default function LegacyStudyViewerPage() {
   const checkRisImportStatus = useCallback(async () => {
     if (!studyUid) return;
     
-    console.log(`🔍 Checking RIS import status for Study UID: ${studyUid}`);
-    
     try {
       // Check if study exists in RIS by searching for study_instance_uid
-      const apiUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/registrations/?study_instance_uid=${studyUid}`;
-      console.log(`📡 Making API call to: ${apiUrl}`);
-      
-      const response = await AuthService.authenticatedFetch(apiUrl);
-      
-      console.log(`📥 API Response status: ${response.status}`);
+      const response = await AuthService.authenticatedFetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/registrations/?study_instance_uid=${studyUid}`
+      );
       
       if (response.ok) {
         const data = await response.json();
-        console.log('📋 API Response data:', data);
         
         // Handle both paginated and direct array responses
         const results = data.results || data;
-        console.log(`📊 Found ${Array.isArray(results) ? results.length : 0} results`);
         
         if (Array.isArray(results) && results.length > 0) {
-          console.log('✅ Study found in RIS:', results[0]);
           setIsImportedToRis(true);
           setRisStudyId(results[0].id);
         } else {
-          console.log('❌ Study not found in RIS');
           setIsImportedToRis(false);
           setRisStudyId(null);
         }
       } else {
-        console.log(`❌ API call failed with status: ${response.status}`);
         setIsImportedToRis(false);
         setRisStudyId(null);
       }
     } catch (err) {
-      console.error('💥 Error checking RIS import status:', err);
+      console.error('Error checking RIS import status:', err);
       // Don't set error state for this check, just assume not imported
       setIsImportedToRis(false);
     }
