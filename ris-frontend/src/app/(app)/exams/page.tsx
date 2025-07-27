@@ -105,7 +105,7 @@ export default function ExamsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Exam Name</TableHead>
-                <TableHead>Code</TableHead>
+                <TableHead>Short</TableHead>
                 <TableHead>Modality</TableHead>
                 <TableHead>Body Part</TableHead>
                 <TableHead>Contrast</TableHead>
@@ -125,8 +125,8 @@ export default function ExamsPage() {
                   <TableRow key={exam.id}>
                     <TableCell className="font-medium">{exam.exam}</TableCell>
                     <TableCell>
-                      {exam.exam_code ? (
-                        <Badge variant="outline">{exam.exam_code}</Badge>
+                      {exam.short_desc ? (
+                        <Badge variant="outline">{exam.short_desc}</Badge>
                       ) : (
                         <span className="text-muted-foreground">-</span>
                       )}
