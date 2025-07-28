@@ -258,7 +258,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
   const [isStackLoading, setIsStackLoading] = useState<boolean>(false);
   const [activeTool, setActiveTool] = useState<Tool>('wwwc');
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [isInverted, setIsInverted] = useState<boolean>(true);  // Default to inverted for X-rays
+  const [isInverted, setIsInverted] = useState<boolean>(false);  // Will be set automatically based on PhotometricInterpretation
   const [isFlippedHorizontal, setIsFlippedHorizontal] = useState<boolean>(false);
   const [isToolbarMinimized, setIsToolbarMinimized] = useState<boolean>(false);
   const [toolbarPosition, setToolbarPosition] = useState({ x: 0, y: 16 }); // Initial position
@@ -492,12 +492,33 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
         
         try {
           // Pre-register WADO-RS metadata BEFORE any viewport operations
-          // This prevents Cornerstone from trying to access undefined metadata
           await preRegisterWadorsMetadata(imageIds);
+          
+          // Check PhotometricInterpretation from metadata BEFORE loading image
+          let shouldInvert = false;
+          try {
+            const { metaData } = await import('@cornerstonejs/core');
+            const imagePixelModule = metaData.get('imagePixelModule', imageIds[startIndex]);
+            if (imagePixelModule?.photometricInterpretation === 'MONOCHROME1') {
+              shouldInvert = true;
+            }
+            setIsInverted(shouldInvert);
+          } catch (metaErr) {
+            // Ignore metadata errors, use default
+          }
           
           // Try WADO-RS first, then fallback if it fails
           try {
             await stackViewport.setStack([imageIds[startIndex]], 0);
+            
+            // Set inversion immediately after stack is loaded
+            if (shouldInvert) {
+              const properties = stackViewport.getProperties();
+              stackViewport.setProperties({
+                ...properties,
+                invert: shouldInvert
+              });
+            }
           } catch (wadorsError) {
             // TEMPORARY: Create fallback wadouri image ID for debugging
             const fallbackImageId = imageIds[startIndex].replace('wadors:', 'wadouri:').replace('/frames/1', '/file');
@@ -583,24 +604,6 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
         
         stackViewport.render();
 
-        // Set proper inversion based on PhotometricInterpretation
-        setTimeout(() => {
-          try {
-            const properties = stackViewport.getProperties();
-            
-            // For most medical images, MONOCHROME2 should NOT be inverted by default
-            // MONOCHROME1 typically needs inversion
-            // Try starting with non-inverted state first
-            stackViewport.setProperties({
-              ...properties,
-              invert: false
-            });
-            setIsInverted(false);
-            stackViewport.render();
-          } catch (err) {
-            // Ignore property setting errors
-          }
-        }, 100);
 
         // Set up ResizeObserver for aspect ratio preservation
         if (element && !resizeObserverRef.current) {
