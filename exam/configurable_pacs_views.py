@@ -49,7 +49,6 @@ def configurable_dicom_metadata(request, orthanc_id):
         
         orthanc_url = pacs_config.orthancurl
         
-        print(f"DEBUG: Getting DICOM metadata for instance {orthanc_id}")
         
         # Get metadata from Orthanc in standard DICOM tag format
         metadata_response = requests.get(f"{orthanc_url}/instances/{orthanc_id}/tags", timeout=30)
@@ -85,8 +84,7 @@ def configurable_dicom_metadata(request, orthanc_id):
                         try:
                             tag_value = int(tag_value)
                         except:
-                            print(f"WARNING: Could not convert {formatted_tag} to int: {tag_value}")
-                
+                            pass
                 # Ensure Value is always an array
                 if not isinstance(tag_value, list):
                     tag_value = [tag_value]
@@ -103,17 +101,14 @@ def configurable_dicom_metadata(request, orthanc_id):
         stats_response = requests.get(f"{orthanc_url}/instances/{orthanc_id}/statistics", timeout=10)
         if stats_response.ok:
             stats = stats_response.json()
-            print(f"DEBUG: Instance statistics: {stats}")
             
             # Try to calculate expected dimensions from uncompressed size
             if 'UncompressedSize' in stats:
                 uncompressed_size = int(stats['UncompressedSize'])
-                print(f"DEBUG: Uncompressed size: {uncompressed_size} bytes")
                 
                 # For 16-bit images (2 bytes per pixel), calculate possible dimensions
                 if uncompressed_size > 0:
                     pixels = uncompressed_size // 2  # Assuming 16-bit
-                    print(f"DEBUG: Calculated pixels (16-bit): {pixels}")
                     
                     # Calculate all possible dimension combinations for this pixel count
                     possible_dimensions = []
@@ -122,8 +117,6 @@ def configurable_dicom_metadata(request, orthanc_id):
                             height = pixels // width
                             if 100 <= height <= 4000:  # Reasonable range for medical images
                                 possible_dimensions.append((height, width))  # (rows, cols)
-                    
-                    print(f"DEBUG: All possible dimensions for {pixels} pixels: {possible_dimensions[:10]}")
                     
                     # Try common medical image dimensions first
                     common_dims = [
@@ -134,10 +127,8 @@ def configurable_dicom_metadata(request, orthanc_id):
                     
                     for rows, cols in common_dims:
                         if rows * cols == pixels:
-                            print(f"DEBUG: EXACT match from file size: {rows}x{cols}")
                             actual_rows = rows
                             actual_cols = cols
-                            print(f"DEBUG: Using EXACT file-size calculated dimensions: {rows}x{cols}")
                             break
                     
                     # Store the file-size calculated dimensions for later use
@@ -169,16 +160,14 @@ def configurable_dicom_metadata(request, orthanc_id):
             if 'Rows' in main_tags:
                 try:
                     actual_rows = int(main_tags['Rows'])
-                    print(f"DEBUG: Got rows from MainDicomTags: {actual_rows}")
-                except Exception as e:
-                    print(f"WARNING: Could not parse rows from MainDicomTags: {main_tags['Rows']} - {e}")
+                except Exception:
+                    pass
             
             if 'Columns' in main_tags:
                 try:
                     actual_cols = int(main_tags['Columns'])
-                    print(f"DEBUG: Got columns from MainDicomTags: {actual_cols}")
-                except Exception as e:
-                    print(f"WARNING: Could not parse columns from MainDicomTags: {main_tags['Columns']} - {e}")
+                except Exception:
+                    pass
         
         # Fallback: Try to get rows/columns from raw metadata if MainDicomTags failed
         if actual_rows is None and '0028,0010' in metadata:  # Rows
@@ -190,9 +179,8 @@ def configurable_dicom_metadata(request, orthanc_id):
                         actual_rows = int(rows_value[0])
                     else:
                         actual_rows = int(rows_value)
-                    print(f"DEBUG: Got rows from raw metadata: {actual_rows}")
-                except Exception as e:
-                    print(f"WARNING: Could not parse rows from raw metadata: {rows_value} - {e}")
+                except Exception:
+                    pass
         
         if actual_cols is None and '0028,0011' in metadata:  # Columns
             cols_value = metadata['0028,0011'].get('Value')
@@ -203,11 +191,9 @@ def configurable_dicom_metadata(request, orthanc_id):
                         actual_cols = int(cols_value[0])
                     else:
                         actual_cols = int(cols_value)
-                    print(f"DEBUG: Got columns from raw metadata: {actual_cols}")
-                except Exception as e:
-                    print(f"WARNING: Could not parse columns from raw metadata: {cols_value} - {e}")
+                except Exception:
+                    pass
         
-        print(f"DEBUG: Final detected dimensions - Rows: {actual_rows}, Columns: {actual_cols}")
         
         # Store original metadata dimensions as backup
         original_rows = actual_rows
@@ -219,24 +205,21 @@ def configurable_dicom_metadata(request, orthanc_id):
             simplified_response = requests.get(f"{orthanc_url}/instances/{orthanc_id}/simplified-tags", timeout=10)
             if simplified_response.ok:
                 simplified_tags = simplified_response.json()
-                print(f"DEBUG: Simplified tags: Rows={simplified_tags.get('Rows')}, Columns={simplified_tags.get('Columns')}")
                 
                 # Use simplified tags if our previous detection failed
                 if actual_rows is None and 'Rows' in simplified_tags:
                     try:
                         actual_rows = int(simplified_tags['Rows'])
-                        print(f"DEBUG: Using simplified tags for rows: {actual_rows}")
                     except:
                         pass
                         
                 if actual_cols is None and 'Columns' in simplified_tags:
                     try:
                         actual_cols = int(simplified_tags['Columns'])
-                        print(f"DEBUG: Using simplified tags for columns: {actual_cols}")
                     except:
                         pass
-        except Exception as e:
-            print(f"DEBUG: Could not get simplified tags: {e}")
+        except Exception:
+            pass
         
         # CRITICAL: Use file size calculation if it provides better accuracy
         # Check if metadata dimensions don't match the actual pixel count
@@ -246,12 +229,8 @@ def configurable_dicom_metadata(request, orthanc_id):
             metadata_pixel_count = actual_rows * actual_cols if (actual_rows and actual_cols) else 0
             file_pixel_count = int(stats.get('UncompressedSize', 0)) // 2 if 'stats' in locals() else 0
             
-            print(f"DEBUG: Comparing pixel counts - Metadata: {metadata_pixel_count}, File: {file_pixel_count}")
-            
             # If file size gives us exact dimensions, prefer those over metadata
             if file_pixel_count > 0 and abs(metadata_pixel_count - file_pixel_count) > 100:
-                print(f"DEBUG: Metadata dimensions don't match file size! Using file-calculated dimensions.")
-                
                 # Choose the orientation that makes most sense based on original metadata
                 # Medical images are often taller than wide, so prefer the orientation that matches
                 original_ratio = actual_rows / actual_cols if (actual_rows and actual_cols and actual_cols != 0) else 1
@@ -262,7 +241,6 @@ def configurable_dicom_metadata(request, orthanc_id):
                 for rows, cols in file_size_dimensions:
                     new_ratio = rows / cols
                     ratio_diff = abs(original_ratio - new_ratio)
-                    print(f"DEBUG: Testing {rows}x{cols}, ratio={new_ratio:.3f}, diff={ratio_diff:.3f}")
                     
                     if ratio_diff < best_ratio_diff:
                         best_ratio_diff = ratio_diff
@@ -270,32 +248,24 @@ def configurable_dicom_metadata(request, orthanc_id):
                 
                 if best_match:
                     actual_rows, actual_cols = best_match
-                    print(f"DEBUG: CORRECTED dimensions (best ratio match): {actual_rows}x{actual_cols}")
                 else:
                     # Fallback to first option
                     actual_rows, actual_cols = file_size_dimensions[0]
-                    print(f"DEBUG: CORRECTED dimensions (fallback): {actual_rows}x{actual_cols}")
         
         # Use file size calculation if metadata extraction failed completely
         elif (actual_rows is None or actual_cols is None) and 'exact_file_match' in locals() and exact_file_match:
             actual_rows, actual_cols = exact_file_match
-            print(f"DEBUG: Using EXACT file-size match: {actual_rows}x{actual_cols}")
         elif (actual_rows is None or actual_cols is None) and 'file_size_dimensions' in locals() and file_size_dimensions:
             # Use the first reasonable dimension from file size
             actual_rows, actual_cols = file_size_dimensions[0]
-            print(f"DEBUG: Using first file-size dimension: {actual_rows}x{actual_cols}")
         
-        # Use reasonable defaults if dimensions still not found (but warn about it)
+        # Use reasonable defaults if dimensions still not found
         if actual_rows is None:
             actual_rows = 512
-            print("WARNING: Could not determine rows, using default: 512")
         if actual_cols is None:
             actual_cols = 512
-            print("WARNING: Could not determine columns, using default: 512")
             
         # DISABLED PADDING ANALYSIS: Let Cornerstone handle the padding
-        print(f"DEBUG: Using original metadata dimensions: {actual_rows} x {actual_cols}")
-        print(f"DEBUG: Trusting DICOM metadata over file size calculations")
         
         # Essential tags with proper values
         essential_tags = {
@@ -330,7 +300,6 @@ def configurable_dicom_metadata(request, orthanc_id):
             if photo_value:
                 # Extract the actual value if it's in a list
                 actual_photo = photo_value if isinstance(photo_value, str) else photo_value[0] if isinstance(photo_value, list) else photo_value
-                print(f"DEBUG: Original PhotometricInterpretation: {actual_photo}")
                 essential_tags['00280004']['Value'] = [actual_photo]
         
         if '00280002' in metadata:  # SamplesPerPixel - CRITICAL for avoiding the error
@@ -376,7 +345,6 @@ def configurable_dicom_metadata(request, orthanc_id):
         formatted_metadata['00280010'] = {'Value': [actual_rows], 'vr': 'US'}
         formatted_metadata['00280011'] = {'Value': [actual_cols], 'vr': 'US'}
         
-        print(f"DEBUG: FINAL DIMENSIONS SET: {actual_rows} x {actual_cols}")
         
         # CRITICAL: Add BulkDataURI for pixel data - this is the key to WADO-RS working!
         api_url = request.build_absolute_uri('/').rstrip('/')
@@ -388,27 +356,10 @@ def configurable_dicom_metadata(request, orthanc_id):
             "BulkDataURI": bulk_data_uri
         }
         
-        print(f"DEBUG: Set BulkDataURI: {bulk_data_uri}")
-        print(f"DEBUG: This tells Cornerstone where to fetch the actual pixel data")
         
-        print(f"DEBUG: Final metadata - Rows: {formatted_metadata['00280010']['Value'][0]}, Columns: {formatted_metadata['00280011']['Value'][0]}")
-        print(f"DEBUG: PhotometricInterpretation: {formatted_metadata.get('00280004', {}).get('Value')}")
-        print(f"DEBUG: BitsAllocated: {formatted_metadata.get('00280100', {}).get('Value')}")
         
-        # Final verification
-        print(f"DEBUG: FINAL WADO-RS METADATA:")
-        print(f"DEBUG: Rows (00280010): {formatted_metadata['00280010']['Value'][0]}")
-        print(f"DEBUG: Columns (00280011): {formatted_metadata['00280011']['Value'][0]}")
-        print(f"DEBUG: SamplesPerPixel (00280002): {formatted_metadata.get('00280002', {}).get('Value', ['Unknown'])[0]}")
-        print(f"DEBUG: PhotometricInterpretation (00280004): {formatted_metadata.get('00280004', {}).get('Value', ['Unknown'])[0]}")
-        print(f"DEBUG: BitsAllocated (00280100): {formatted_metadata.get('00280100', {}).get('Value', ['Unknown'])[0]}")
         
         # Note: Some padding in pixel data is normal and Cornerstone should handle it
-        if 'stats' in locals() and 'UncompressedSize' in stats:
-            actual_bytes = int(stats['UncompressedSize'])
-            expected_bytes = actual_rows * actual_cols * 2  # Assuming 16-bit
-            padding_bytes = actual_bytes - expected_bytes
-            print(f"DEBUG: File has {padding_bytes} bytes of padding (normal for DICOM)")
         
         # Return metadata as JSON array (WADO-RS format)
         response_data = json.dumps([formatted_metadata])
@@ -420,9 +371,6 @@ def configurable_dicom_metadata(request, orthanc_id):
         return response
         
     except Exception as e:
-        print(f"DEBUG: Metadata failed with error: {e}")
-        import traceback
-        traceback.print_exc()
         return JsonResponse({'error': f'DICOM metadata failed: {str(e)}'}, status=500)
 
 
@@ -469,7 +417,6 @@ def configurable_dicom_frames(request, orthanc_id, frame_number):
         
         orthanc_url = pacs_config.orthancurl
         
-        print(f"DEBUG: Getting frame data for instance {orthanc_id}, frame {frame_number}")
         
         # First check if this is a multi-frame image and get image dimensions
         instance_info = requests.get(f"{orthanc_url}/instances/{orthanc_id}", timeout=10)
@@ -478,14 +425,6 @@ def configurable_dicom_frames(request, orthanc_id, frame_number):
             main_tags = instance_data.get('MainDicomTags', {})
             number_of_frames = int(main_tags.get('NumberOfFrames', '1'))
             
-            # Log critical image information
-            rows = main_tags.get('Rows', 'Unknown')
-            cols = main_tags.get('Columns', 'Unknown')
-            bits_allocated = main_tags.get('BitsAllocated', 'Unknown')
-            photometric = main_tags.get('PhotometricInterpretation', 'Unknown')
-            
-            print(f"DEBUG: Instance has {number_of_frames} frames")
-            print(f"DEBUG: Image dimensions: {rows}x{cols}, BitsAllocated: {bits_allocated}, Photometric: {photometric}")
         else:
             number_of_frames = 1
         
@@ -501,7 +440,6 @@ def configurable_dicom_frames(request, orthanc_id, frame_number):
                 )
                 
                 if frames_response.ok:
-                    print(f"DEBUG: Successfully got frame {frame_number} from multi-frame image")
                     response = StreamingHttpResponse(
                         frames_response.iter_content(chunk_size=32768),
                         content_type='application/octet-stream'
@@ -510,11 +448,10 @@ def configurable_dicom_frames(request, orthanc_id, frame_number):
                     response['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
                     response['Access-Control-Allow-Headers'] = '*'
                     return response
-            except Exception as e:
-                print(f"DEBUG: Multi-frame endpoint failed: {e}")
+            except Exception:
+                pass
         
-        # For single-frame images, try to get raw pixel data first  
-        print(f"DEBUG: Trying raw pixel data endpoint for single-frame image")
+        # For single-frame images, try to get raw pixel data first
         
         try:
             # Try Orthanc's raw pixel data endpoint (this gives us JUST the pixel data)
@@ -525,9 +462,6 @@ def configurable_dicom_frames(request, orthanc_id, frame_number):
             )
             
             if raw_response.ok:
-                print(f"DEBUG: Successfully got raw pixel data for single-frame image")
-                print(f"DEBUG: Raw pixel data content-length: {raw_response.headers.get('content-length', 'unknown')}")
-                
                 response = StreamingHttpResponse(
                     raw_response.iter_content(chunk_size=32768),
                     content_type='application/octet-stream'
@@ -537,12 +471,11 @@ def configurable_dicom_frames(request, orthanc_id, frame_number):
                 response['Access-Control-Allow-Headers'] = '*'
                 return response
             else:
-                print(f"DEBUG: Raw pixel data endpoint failed with status {raw_response.status_code}")
-        except Exception as e:
-            print(f"DEBUG: Raw pixel data endpoint exception: {e}")
+                pass
+        except Exception:
+            pass
         
         # If raw pixel data fails, fall back to full DICOM file
-        print(f"DEBUG: Falling back to full DICOM file")
         
         dicom_response = requests.get(
             f"{orthanc_url}/instances/{orthanc_id}/file",
@@ -579,9 +512,9 @@ def configurable_dicom_frames(request, orthanc_id, frame_number):
                                         dicom_response = requests.get(dicomweb_url, stream=True, timeout=60)
                                         
                                         if dicom_response.ok:
-                                            print(f"DEBUG: Using DICOMweb endpoint for frame data")
-            except Exception as e:
-                print(f"DEBUG: DICOMweb fallback failed: {e}")
+                                            pass
+            except Exception:
+                pass
             
             if not dicom_response.ok:
                 return HttpResponse(f'Failed to get DICOM file: {dicom_response.status_code}', status=404)
@@ -598,9 +531,6 @@ def configurable_dicom_frames(request, orthanc_id, frame_number):
         return response
         
     except Exception as e:
-        print(f"DEBUG: Frame data failed with error: {e}")
-        import traceback
-        traceback.print_exc()
         return HttpResponse(f'DICOM frame failed: {str(e)}', status=500)
 
 
@@ -621,7 +551,6 @@ def configurable_dicom_instance_proxy(request, orthanc_id):
         orthanc_url = pacs_config.orthancurl
         endpoint_style = pacs_config.endpoint_style
         
-        print(f"DEBUG: Using {endpoint_style} endpoint style for instance {orthanc_id}")
         
         # Strategy selection based on configuration
         if endpoint_style == 'file':
@@ -637,17 +566,14 @@ def configurable_dicom_instance_proxy(request, orthanc_id):
             return _try_dicomweb_endpoint(orthanc_url, orthanc_id)
             
     except Exception as e:
-        print(f"DEBUG: Proxy failed with error: {e}")
         return Response({'error': f'DICOM proxy failed: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 def _try_file_endpoint(orthanc_url, orthanc_id):
     """Direct /file endpoint (may not work with PostgreSQL storage)"""
     try:
-        print(f"DEBUG: Trying /file endpoint")
         file_response = requests.get(f"{orthanc_url}/instances/{orthanc_id}/file", stream=True, timeout=30)
         if file_response.ok:
-            print(f"DEBUG: /file endpoint success")
             response = StreamingHttpResponse(
                 file_response.iter_content(chunk_size=32768),
                 content_type='application/dicom'
@@ -667,11 +593,9 @@ def _try_file_endpoint(orthanc_url, orthanc_id):
 def _try_attachment_endpoint(orthanc_url, orthanc_id):
     """Raw attachment data endpoint"""
     try:
-        print(f"DEBUG: Trying attachment endpoint")
         attachment_url = f"{orthanc_url}/instances/{orthanc_id}/attachments/1/data"
         attachment_response = requests.get(attachment_url, stream=True, timeout=30)
         if attachment_response.ok:
-            print(f"DEBUG: Attachment endpoint success")
             response = StreamingHttpResponse(
                 attachment_response.iter_content(chunk_size=32768),
                 content_type='application/dicom'
@@ -691,7 +615,6 @@ def _try_attachment_endpoint(orthanc_url, orthanc_id):
 def _try_dicomweb_endpoint(orthanc_url, orthanc_id):
     """OHIF-style DICOMweb endpoint (cleanest, most reliable)"""
     try:
-        print(f"DEBUG: Getting instance metadata for DICOMweb URL construction")
         instance_response = requests.get(f"{orthanc_url}/instances/{orthanc_id}", timeout=10)
         if not instance_response.ok:
             return Response({'error': f'Instance metadata not found: {instance_response.status_code}'}, status=status.HTTP_404_NOT_FOUND)
@@ -724,9 +647,6 @@ def _try_dicomweb_endpoint(orthanc_url, orthanc_id):
         study_uid = study_data.get('MainDicomTags', {}).get('StudyInstanceUID')
         series_uid = series_data.get('MainDicomTags', {}).get('SeriesInstanceUID')
         sop_uid = instance_data.get('MainDicomTags', {}).get('SOPInstanceUID')
-        print(f'Study : {study_uid}')
-        print(f'Series : {series_uid}')
-        print(f'instance : {sop_uid}')
         if not all([study_uid, series_uid, sop_uid]):
             return Response({'error': 'Missing required DICOM UIDs'}, status=status.HTTP_404_NOT_FOUND)
             
@@ -736,7 +656,6 @@ def _try_dicomweb_endpoint(orthanc_url, orthanc_id):
         
         # Get the full DICOM file from DICOMweb instance endpoint (not frames)
         instance_url = f"{orthanc_url}/dicom-web/studies/{study_uid}/series/{series_uid}/instances/{sop_uid}"
-        print(f"DEBUG: Getting full DICOM file from DICOMweb instance endpoint: {instance_url}")
         
         # Use headers that request DICOM file format
         headers = {
@@ -752,7 +671,6 @@ def _try_dicomweb_endpoint(orthanc_url, orthanc_id):
         # Get response info
         content_type = dicom_response.headers.get('Content-Type', 'application/dicom')
         content_length = dicom_response.headers.get('Content-Length')
-        print(f"DEBUG: Got DICOM response - Content-Type: {content_type}, Content-Length: {content_length}")
         
         # Return the full DICOM file that Cornerstone can parse
         response = StreamingHttpResponse(
@@ -776,7 +694,6 @@ def _try_auto_detect_endpoint(orthanc_url, orthanc_id):
     try:
         response = _try_dicomweb_endpoint(orthanc_url, orthanc_id)
         if response.status_code == 200:
-            print(f"DEBUG: Auto-detect chose DICOMweb endpoint")
             return response
     except:
         pass
@@ -785,7 +702,6 @@ def _try_auto_detect_endpoint(orthanc_url, orthanc_id):
     try:
         response = _try_attachment_endpoint(orthanc_url, orthanc_id)
         if response.status_code == 200:
-            print(f"DEBUG: Auto-detect chose attachment endpoint")
             return response
     except:
         pass
@@ -794,7 +710,6 @@ def _try_auto_detect_endpoint(orthanc_url, orthanc_id):
     try:
         response = _try_file_endpoint(orthanc_url, orthanc_id)
         if response.status_code == 200:
-            print(f"DEBUG: Auto-detect chose file endpoint")
             return response
     except:
         pass

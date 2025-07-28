@@ -38,13 +38,10 @@ const { MouseBindings } = ToolsEnums;
 // Fixed WADO-RS metadata pre-registration for proper image loading
 async function preRegisterWadorsMetadata(imageIds: string[]): Promise<void> {
   try {
-    console.log('DEBUG: Pre-registering WADO-RS metadata for', imageIds.length, 'images');
-    
     // Get the DICOM image loader from window or import
     const dicomImageLoader = (window as any).cornerstoneDICOMImageLoader || cornerstoneDICOMImageLoader;
     
     if (!dicomImageLoader?.wadors?.metaDataManager) {
-      console.warn('DEBUG: WADO-RS metadata manager not available, skipping pre-registration');
       return;
     }
     
@@ -64,13 +61,10 @@ async function preRegisterWadorsMetadata(imageIds: string[]): Promise<void> {
           const framesUrl = imageId.replace('wadors:', '');
           const metadataUrl = framesUrl.replace('/frames/1', '/metadata');
           
-          console.log(`DEBUG: Fetching metadata ${i + batchIndex + 1}/${imageIds.length}`);
-          
           // Fetch metadata from our endpoint
           const response = await AuthService.authenticatedFetch(metadataUrl);
           
           if (!response.ok) {
-            console.warn(`Failed to fetch metadata for image ${i + batchIndex + 1}: ${response.status}`);
             return;
           }
           
@@ -79,7 +73,6 @@ async function preRegisterWadorsMetadata(imageIds: string[]): Promise<void> {
           
           // Validate metadata structure
           if (!metadata || typeof metadata !== 'object') {
-            console.warn(`Invalid metadata structure for image ${i + batchIndex + 1}`);
             return;
           }
           
@@ -89,34 +82,18 @@ async function preRegisterWadorsMetadata(imageIds: string[]): Promise<void> {
           
           for (const tag of criticalTags) {
             if (!metadata[tag]?.Value || !Array.isArray(metadata[tag].Value)) {
-              console.warn(`Missing or invalid critical tag ${tag} in image ${i + batchIndex + 1}`);
               isValid = false;
             }
           }
           
           if (!isValid) {
-            console.warn(`Skipping registration of image ${i + batchIndex + 1} due to invalid metadata`);
             return;
           }
           
-          // CRITICAL: Register metadata with Cornerstone WADO-RS metadata manager
-          // This follows the exact pattern from Cornerstone3D documentation
-          console.log(`DEBUG: Registering metadata for imageId: ${imageId}`);
-          console.log(`DEBUG: BulkDataURI: ${metadata["7fe00010"]?.BulkDataURI}`);
-          
+          // Register metadata with Cornerstone WADO-RS metadata manager
           dicomImageLoader.wadors.metaDataManager.add(imageId, metadata);
           
-          // Verify registration worked
-          const retrievedMetadata = dicomImageLoader.wadors.metaDataManager.get(imageId);
-          if (retrievedMetadata) {
-            console.log(`DEBUG: ✅ Successfully registered metadata for image ${i + batchIndex + 1}`);
-            console.log(`DEBUG: Verified BulkDataURI: ${retrievedMetadata["7fe00010"]?.BulkDataURI}`);
-          } else {
-            console.warn(`DEBUG: ❌ Failed to verify metadata registration for image ${i + batchIndex + 1}`);
-          }
-          
         } catch (error) {
-          console.warn(`Error pre-registering metadata for image ${i + batchIndex + 1}:`, error);
           // Continue with other images even if one fails
         }
       }));
@@ -127,10 +104,7 @@ async function preRegisterWadorsMetadata(imageIds: string[]): Promise<void> {
       }
     }
     
-    console.log('DEBUG: Completed WADO-RS metadata pre-registration');
-    
   } catch (error) {
-    console.error('DEBUG: Critical error in WADO-RS metadata pre-registration:', error);
     throw error; // Re-throw to handle at higher level
   }
 }
@@ -151,11 +125,8 @@ const initializeCornerstone = async () => {
   
   cornerstoneInitPromise = (async () => {
     try {
-      console.log('Starting Cornerstone3D initialization...');
-      
       // Initialize Cornerstone3D libraries in sequence
       await coreInit();
-      console.log('Core initialized');
       
       await dicomImageLoaderInit({
         beforeSend: (xhr: XMLHttpRequest) => {
@@ -166,7 +137,6 @@ const initializeCornerstone = async () => {
               xhr.setRequestHeader('Authorization', `Bearer ${token}`);
             }
           } catch (error) {
-            console.warn('Failed to get access token for DICOM image loading:', error);
             // Continue without authentication - images should still load via proxy
           }
         },
@@ -177,19 +147,11 @@ const initializeCornerstone = async () => {
         decodeConfig: {
           convertFloatPixelDataToInt: false,
           use16BitDataType: true,
-          // Add more robust decoding options
           usePDFJS: false,
           useWebGL: false, // Disable WebGL to prevent GPU issues
         },
         // Configure image loader for better error handling
         errorInterceptor: (error: any) => {
-          console.error('DICOM Image Loader Error Details:', {
-            message: error.message,
-            stack: error.stack,
-            imageId: error.imageId,
-            request: error.request,
-            response: error.response
-          });
           // Don't throw - let the viewer handle gracefully
           return error;
         },
@@ -201,18 +163,6 @@ const initializeCornerstone = async () => {
           }
         }
       });
-      console.log('DICOM image loader initialized');
-      
-      // Verify WADO-RS support is available
-      const dicomImageLoader = (window as any).cornerstoneDICOMImageLoader || cornerstoneDICOMImageLoader;
-      if (dicomImageLoader?.wadors?.metaDataManager) {
-        console.log('DEBUG: ✅ WADO-RS metadata manager is available');
-      } else {
-        console.warn('DEBUG: ❌ WADO-RS metadata manager not available');
-        console.log('DEBUG: Checking both window and imported sources...');
-        console.log('DEBUG: window.cornerstoneDICOMImageLoader:', typeof (window as any).cornerstoneDICOMImageLoader);
-        console.log('DEBUG: imported cornerstoneDICOMImageLoader:', typeof cornerstoneDICOMImageLoader);
-      }
       
       // Add a fallback metadata provider to prevent undefined errors
       try {
@@ -231,14 +181,11 @@ const initializeCornerstone = async () => {
           return undefined;
         }, 1000); // High priority fallback
         
-        console.log('DEBUG: ✅ Fallback metadata provider registered');
       } catch (metaDataError) {
-        console.warn('DEBUG: Could not register fallback metadata provider:', metaDataError);
+        // Ignore metadata provider registration errors
       }
-      console.log('DICOM image loader initialized');
       
       await toolsInit();
-      console.log('Tools initialized');
       
       // Add all tools to the global state with error checking
       try {
@@ -249,16 +196,12 @@ const initializeCornerstone = async () => {
         addTool(RectangleROITool);
         addTool(EllipticalROITool);
         addTool(StackScrollTool);
-        console.log('All tools added successfully');
       } catch (toolError) {
-        console.error('Error adding tools:', toolError);
         throw new Error(`Tool registration failed: ${toolError.message}`);
       }
       
       isCornerstoneInitialized = true;
-      console.log('Cornerstone3D initialization complete');
     } catch (error) {
-      console.error('Failed to initialize Cornerstone3D:', error);
       // Reset the promise so we can retry
       cornerstoneInitPromise = null;
       throw error;
@@ -354,9 +297,8 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
       };
       
       imageSettingsRef.current.set(currentImageIndex, settings);
-      console.log(`DEBUG: Saved settings for image ${currentImageIndex + 1}:`, settings);
     } catch (error) {
-      console.warn('Failed to save image settings:', error);
+      // Ignore save errors
     }
   }, [viewport, currentImageIndex, isInverted, isFlippedHorizontal]);
   
@@ -365,12 +307,10 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
     
     const settings = imageSettingsRef.current.get(imageIndex);
     if (!settings) {
-      console.log(`DEBUG: No saved settings for image ${imageIndex + 1}, using defaults`);
       return;
     }
     
     try {
-      console.log(`DEBUG: Restoring settings for image ${imageIndex + 1}:`, settings);
       
       // Restore window/level
       if (settings.windowLevel) {
@@ -409,7 +349,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
       safeRender(viewport);
       
     } catch (error) {
-      console.warn('Failed to restore image settings:', error);
+      // Ignore restore errors
     }
   }, [viewport]);
 
@@ -444,39 +384,27 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
   const handleDicomError = useCallback((error: any, imageId: string, retryCallback?: () => Promise<void>) => {
     const errorMessage = (error?.message?.toLowerCase && error.message.toLowerCase()) || '';
     
-    console.error('DICOM loading error:', {
-      error,
-      imageId,
-      errorMessage,
-      errorType: error?.constructor?.name
-    });
-    
     // Check for specific error types - ensure errorMessage is a string
     if (errorMessage && (errorMessage.includes('buffer overrun') || errorMessage.includes('parsedicomdatasetexplicit'))) {
-      console.warn('DICOM buffer overrun detected for:', imageId);
       toast.error('DICOM data corruption detected. This may be due to network issues with remote PACS server.');
       
       // For buffer overrun errors, we can try to reload after a delay
       if (retryCallback) {
         setTimeout(() => {
-          console.log('Retrying DICOM load after buffer overrun...');
           retryCallback().catch(retryError => {
-            console.error('Retry failed:', retryError);
+            // Ignore retry errors
           });
         }, 2000);
       }
       
       return 'buffer_overrun';
     } else if (errorMessage && (errorMessage.includes('timeout') || errorMessage.includes('network'))) {
-      console.warn('Network timeout detected for:', imageId);
       toast.warning('Network timeout. Please check connection to PACS server.');
       return 'network_timeout';
     } else if (errorMessage && (errorMessage.includes('404') || errorMessage.includes('not found'))) {
-      console.warn('DICOM file not found:', imageId);
       toast.warning('DICOM file not found on server.');
       return 'not_found';
     } else {
-      console.error('Unknown DICOM error:', error);
       toast.error('Failed to load DICOM image.');
       return 'unknown';
     }
@@ -486,7 +414,6 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
   useEffect(() => {
     // Prevent double initialization
     if (initializationRef.current) {
-      console.log('Initialization already in progress or completed, skipping...');
       return;
     }
 
@@ -498,7 +425,6 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
           (message.includes('Cannot read properties of null') || 
            message.includes('RenderWindow.js') ||
            source?.includes('RenderWindow.js'))) {
-        console.debug('Suppressed VTK render error:', message);
         return true; // Prevent default error handling
       }
       // Let other errors through
@@ -510,11 +436,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
     
     window.onerror = handleVTKError;
 
-    console.log('SimpleDicomViewer mounted, imageIds:', imageIds);
-    console.log('mainViewportRef.current at mount:', mainViewportRef.current);
-    
     if (!imageIds || imageIds.length === 0) {
-      console.log('No images to load');
       setLoading(false);
       return;
     }
@@ -523,18 +445,11 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
 
     const waitForElement = async (maxRetries = 50) => {
       for (let i = 0; i < maxRetries; i++) {
-        console.log(`Retry ${i + 1}: mainViewportRef.current =`, mainViewportRef.current);
         if (mainViewportRef.current && mainViewportRef.current.offsetParent !== null) {
-          console.log('Element found and visible in DOM');
           return mainViewportRef.current;
         }
         await new Promise(resolve => setTimeout(resolve, 100));
       }
-      console.error('Element never became available. Final state:', {
-        current: mainViewportRef.current,
-        offsetParent: mainViewportRef.current?.offsetParent,
-        isConnected: mainViewportRef.current?.isConnected
-      });
       throw new Error('Viewport element not found after waiting');
     };
 
@@ -542,31 +457,21 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
       try {
         // Prevent multiple simultaneous loads
         if (isStackLoading) {
-          console.log('DEBUG: Stack already loading, skipping duplicate initialization');
           return;
         }
         
         setIsStackLoading(true);
         setLoading(true);
         setError(null);
-        
-        console.log('Starting initialization with:', { imageCount: imageIds.length, firstImage: imageIds[0] });
 
         // Wait for DOM element to be ready and visible
-        console.log('Waiting for viewport element...');
         const element = await waitForElement();
-        console.log('Viewport element found and ready:', element);
         
-        console.log('Initializing cornerstone...');
         await initializeCornerstone();
-        console.log('Cornerstone initialized');
-
-        console.log('Creating rendering engine...');
         const renderingEngineId = `simpleDicomViewer-${Date.now()}`;  // Unique ID to prevent conflicts
         const engine = new RenderingEngine(renderingEngineId);
         setRenderingEngine(engine);
 
-        console.log('Creating viewport...');
         const viewportId = `stackViewport-${Date.now()}`;  // Unique ID to prevent conflicts
         const viewportInput = {
           viewportId,
@@ -574,98 +479,37 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
           type: ViewportType.STACK,
         };
 
-        // Log element dimensions before enabling
-        console.log('Element dimensions before enable:', {
-          offsetWidth: element.offsetWidth,
-          offsetHeight: element.offsetHeight,
-          clientWidth: element.clientWidth,
-          clientHeight: element.clientHeight,
-          style: {
-            width: element.style.width,
-            height: element.style.height
-          }
-        });
-
         engine.enableElement(viewportInput);
         const stackViewport = engine.getViewport(viewportId);
         setViewport(stackViewport);
 
-        // Log canvas dimensions after enabling
-        const canvas = stackViewport.canvas;
-        console.log('Canvas dimensions after enable:', {
-          width: canvas.width,
-          height: canvas.height,
-          clientWidth: canvas.clientWidth,
-          clientHeight: canvas.clientHeight,
-          style: {
-            width: canvas.style.width,
-            height: canvas.style.height
-          }
-        });
-
-        console.log('Loading images...', imageIds);
-        console.log(`Total images: ${imageIds.length}, starting at index: ${currentImageIndex}`);
-        
         if (imageIds.length === 0) {
           throw new Error('No image IDs provided');
         }
         
-        // For multi-image debugging
-        if (imageIds.length > 2) {
-          console.log('DEBUG: Multi-image series detected:', {
-            totalImages: imageIds.length,
-            sampleImageIds: imageIds.slice(0, 3).map((id, idx) => ({ index: idx, id })),
-            allImageIds: imageIds
-          });
-        }
-        
         // Ensure currentImageIndex is valid
         const startIndex = Math.min(currentImageIndex, imageIds.length - 1);
-        console.log(`Setting stack with ${imageIds.length} images, starting at index ${startIndex}`);
         
         try {
-          console.log(`DEBUG: Pre-registering WADO-RS metadata before viewport operations...`);
-          
-          // CRITICAL: Pre-register WADO-RS metadata BEFORE any viewport operations
+          // Pre-register WADO-RS metadata BEFORE any viewport operations
           // This prevents Cornerstone from trying to access undefined metadata
           await preRegisterWadorsMetadata(imageIds);
-          
-          console.log(`DEBUG: Loading ONLY current image ${startIndex + 1}/${imageIds.length} - NO BULK LOADING`);
           
           // Try WADO-RS first, then fallback if it fails
           try {
             await stackViewport.setStack([imageIds[startIndex]], 0);
-            console.log('DEBUG: ✅ WADO-RS image loaded successfully');
           } catch (wadorsError) {
-            console.error('DEBUG: WADO-RS failed, error:', wadorsError);
-            
             // TEMPORARY: Create fallback wadouri image ID for debugging
             const fallbackImageId = imageIds[startIndex].replace('wadors:', 'wadouri:').replace('/frames/1', '/file');
-            console.log('DEBUG: Trying fallback wadouri:', fallbackImageId);
             
             try {
               await stackViewport.setStack([fallbackImageId], 0);
-              console.log('DEBUG: ✅ Fallback wadouri loaded successfully');
             } catch (fallbackError) {
-              console.error('DEBUG: Both WADO-RS and wadouri fallback failed:', fallbackError);
               throw wadorsError; // Throw original WADO-RS error
             }
           }
           
-          // Keep existing inversion state - don't auto-change it
-          console.log('DEBUG: Using existing inversion state for loaded images');
-          
         } catch (stackError) {
-          console.error('DEBUG: Stack loading failed:', stackError);
-          console.error('DEBUG: Stack error details:', {
-            errorMessage: stackError.message,
-            errorStack: stackError.stack,
-            imageCount: imageIds.length,
-            startIndex,
-            firstImageId: imageIds[0],
-            selectedImageId: imageIds[startIndex]
-          });
-          
           // Use our enhanced error handler
           const errorType = handleDicomError(stackError, imageIds[startIndex] || 'unknown', async () => {
             // Retry logic for stack loading
@@ -676,11 +520,9 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
           // If it's a buffer overrun, try loading just the current image
           if (errorType === 'buffer_overrun' && imageIds.length > 0) {
             try {
-              console.log('Attempting single image load due to buffer overrun...');
               await stackViewport.setStack([imageIds[startIndex]], 0);
               toast.warning('Loaded single image due to data corruption. Navigation may be limited.');
             } catch (singleImageError) {
-              console.error('Single image load also failed:', singleImageError);
               throw singleImageError;
             }
           } else {
@@ -701,19 +543,11 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
             try {
               // Get current canvas dimensions
               const canvas = stackViewport.canvas;
-              console.log('Canvas dimensions:', {
-                width: canvas.width,
-                height: canvas.height,
-                clientWidth: canvas.clientWidth,
-                clientHeight: canvas.clientHeight
-              });
               
               // Use the built-in fit method if available
               if (typeof stackViewport.fitToCanvas === 'function') {
-                console.log('Using fitToCanvas method');
                 stackViewport.fitToCanvas();
               } else {
-                console.log('Using manual zoom fit');
                 // Calculate appropriate zoom to fit image in canvas
                 const currentImage = stackViewport.getImageData();
                 if (currentImage && currentImage.dimensions) {
@@ -727,12 +561,6 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
                   const scaleY = canvasHeight / imageHeight;
                   const scale = Math.min(scaleX, scaleY) * 0.9; // 0.9 for some padding
                   
-                  console.log('Manual scaling:', {
-                    imageWidth, imageHeight,
-                    canvasWidth, canvasHeight,
-                    scale
-                  });
-                  
                   // Set camera properties for proper centering
                   const camera = stackViewport.getCamera();
                   stackViewport.setCamera({
@@ -745,24 +573,20 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
               }
               
               stackViewport.render();
-              console.log('Image fitted and centered successfully');
             } catch (fitError) {
-              console.warn('Error during delayed fit:', fitError);
+              // Ignore fit errors
             }
           }, 50);
         } catch (displayError) {
-          console.warn('Could not set up image fitting:', displayError);
           stackViewport.resetCamera();
         }
         
         stackViewport.render();
-        console.log('Images loaded and rendered with proper aspect ratio');
 
         // Set proper inversion based on PhotometricInterpretation
         setTimeout(() => {
           try {
             const properties = stackViewport.getProperties();
-            console.log('Current viewport properties:', properties);
             
             // For most medical images, MONOCHROME2 should NOT be inverted by default
             // MONOCHROME1 typically needs inversion
@@ -773,9 +597,8 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
             });
             setIsInverted(false);
             stackViewport.render();
-            console.log('Set viewport to non-inverted state (for MONOCHROME2)');
           } catch (err) {
-            console.warn('Could not set initial viewport properties:', err);
+            // Ignore property setting errors
           }
         }, 100);
 
@@ -783,13 +606,6 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
         if (element && !resizeObserverRef.current) {
           resizeObserverRef.current = new ResizeObserver((entries) => {
             if (engine && stackViewport) {
-              console.log('ResizeObserver triggered');
-              
-              // Get new dimensions
-              const entry = entries[0];
-              const { width, height } = entry.contentRect;
-              console.log('New viewport dimensions:', { width, height });
-              
               // Resize the rendering engine first
               engine.resize(true, false);
               
@@ -801,19 +617,16 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
                     stackViewport.fitToCanvas();
                   }
                   stackViewport.render();
-                  console.log('Viewport resized and image refitted');
                 } catch (resizeError) {
-                  console.warn('Error during resize refit:', resizeError);
+                  // Ignore resize errors
                 }
               }, 10);
             }
           });
           
           resizeObserverRef.current.observe(element);
-          console.log('ResizeObserver setup for aspect ratio preservation');
         }
 
-        console.log('Creating tool group...');
         const toolGroupId = `simpleDicomViewerToolGroup-${Date.now()}`;  // Unique ID to prevent conflicts
         
         // Remove existing tool group if it exists
@@ -835,15 +648,12 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
           tg.addTool(RectangleROITool.toolName);
           tg.addTool(EllipticalROITool.toolName);
           tg.addTool(StackScrollTool.toolName);
-          console.log('Tools added to tool group successfully');
         } catch (toolError) {
-          console.error('Error adding tools to tool group:', toolError);
           throw new Error(`Tool group setup failed: ${toolError.message}`);
         }
 
-        // CRITICAL: Add viewport to tool group AFTER metadata is registered and images are loaded
+        // Add viewport to tool group AFTER metadata is registered and images are loaded
         // This prevents the "Cannot read properties of undefined (reading 'includes')" error
-        console.log('Adding viewport to tool group AFTER metadata registration...');
         tg.addViewport(viewportId, renderingEngineId);
 
         // Activate tools with optimized settings and error handling
@@ -866,9 +676,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
             bindings: [{ mouseButton: MouseBindings.Auxiliary }],
           });
           tg.setToolActive(StackScrollTool.toolName);
-          console.log('Tools activated successfully');
         } catch (activationError) {
-          console.error('Error activating tools:', activationError);
           throw new Error(`Tool activation failed: ${activationError.message}`);
         }
 
@@ -882,11 +690,9 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
           }, 500);
         });
 
-        console.log('DICOM viewer fully initialized');
         setLoading(false);
         setIsStackLoading(false);
       } catch (err) {
-        console.error('Initialization failed:', err);
         setError(err instanceof Error ? err.message : 'Failed to initialize viewer');
         setLoading(false);
         setIsStackLoading(false);
@@ -920,7 +726,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
         try {
           renderingEngine.destroy();
         } catch (e) {
-          console.warn('Error destroying rendering engine:', e);
+          // Ignore destruction errors
         }
       }
       
@@ -929,7 +735,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
         try {
           ToolGroupManager.destroyToolGroup(toolGroup.id);
         } catch (e) {
-          console.warn('Error destroying tool group:', e);
+          // Ignore destruction errors
         }
       }
     };
@@ -984,7 +790,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
       
       setActiveTool(tool);
     } catch (error) {
-      console.error('Error setting tool active:', error);
+      // Ignore tool activation errors
     }
   }, [toolGroup]);
   
@@ -993,12 +799,10 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
     if (viewport && index >= 0 && index < imageIds.length && index !== currentImageIndex) {
       try {
         setLoadingNavigation(true);
-        console.log(`DEBUG: Loading SINGLE image ${index + 1}/${imageIds.length} - NO BULK LOADING`);
-        
         // Save current image settings before navigating
         saveCurrentImageSettings();
         
-        // SIMPLE: Load ONLY the new image, don't try to be smart
+        // Load ONLY the new image
         await viewport.setStack([imageIds[index]], 0);
         
         // Update current image index
@@ -1014,7 +818,6 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
               const shouldInvert = photometricInterpretation === 'MONOCHROME1';
               
               if (shouldInvert !== isInverted) {
-                console.log(`DEBUG: Image ${index + 1} requires different inversion: ${shouldInvert}`);
                 setIsInverted(shouldInvert);
                 
                 const properties = stackViewport.getProperties();
@@ -1026,14 +829,11 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
               }
             }
           } catch (photoError) {
-            console.warn('Could not check photometric interpretation for new image:', photoError);
+            // Ignore photometric interpretation errors
           }
         }, 150);
         
-        console.log(`DEBUG: Successfully navigated to image ${index + 1}/${imageIds.length}`);
-        
       } catch (error) {
-        console.error('DEBUG: Error in navigation:', error);
         // Try to stay on current image if navigation fails
       } finally {
         setLoadingNavigation(false);
@@ -1097,8 +897,6 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
       setIsFlippedHorizontal(false);
       
       safeRender(viewport);
-      
-      console.log('Viewport reset completed');
     }
   }, [viewport]);
 
@@ -1125,7 +923,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
         });
         safeRender(viewport);
       } catch (error) {
-        console.error('Error rotating image:', error);
+        // Ignore rotation errors
       }
     }
   }, [viewport]);
@@ -1146,9 +944,6 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
           } else {
             canvas.style.transform = 'scaleX(1)';
           }
-          console.log(`Horizontal flip: ${newHorizontalState}`);
-        } else {
-          console.warn('Canvas element not found for flip operation');
         }
         
         // Save settings after flip
@@ -1157,7 +952,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
         }, 50);
         
       } catch (error) {
-        console.error('Error flipping image horizontally:', error);
+        // Ignore flip errors
       }
     }
   }, [viewport, isFlippedHorizontal, saveCurrentImageSettings]);
@@ -1177,7 +972,6 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
         });
         
         safeRender(viewport);
-        console.log(`Image invert toggled: ${newInvertState}`);
         
         // Save settings after invert
         setTimeout(() => {
@@ -1185,7 +979,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
         }, 50);
         
       } catch (error) {
-        console.error('Error inverting image:', error);
+        // Ignore invert errors
       }
     }
   }, [viewport, isInverted, saveCurrentImageSettings]);
@@ -1218,10 +1012,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
         // Force viewport re-render
         safeRender(viewport);
         
-        console.log('All annotations cleared using state manager');
       } catch (error) {
-        console.error('Error clearing annotations:', error);
-        
         // Fallback: Simple SVG clearing
         try {
           const element = viewport.element;
@@ -1233,125 +1024,12 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
             }
           }
         } catch (fallbackError) {
-          console.error('Fallback clearing also failed:', fallbackError);
+          // Ignore fallback errors
         }
       }
     }
   }, [viewport]);
 
-  // Debug function to analyze image data and identify dimension issues
-  const debugImageInfo = useCallback(async () => {
-    if (!viewport) {
-      console.log('DEBUG: No viewport available');
-      return;
-    }
-    
-    try {
-      // Get the current image
-      const image = viewport.getImageData();
-      if (!image) {
-        console.log('DEBUG: No image data available');
-        return;
-      }
-      
-      console.log('DEBUG: Image Information:', {
-        dimensions: image.dimensions,
-        spacing: image.spacing,
-        origin: image.origin,
-        direction: image.direction,
-        scalarData: image.scalarData ? {
-          length: image.scalarData.length,
-          constructor: image.scalarData.constructor.name,
-          bytesPerElement: image.scalarData.BYTES_PER_ELEMENT
-        } : 'No scalar data',
-        metadata: image.metadata
-      });
-      
-      // Check if dimensions match pixel data
-      if (image.dimensions && image.scalarData) {
-        const expectedPixels = image.dimensions[0] * image.dimensions[1];
-        const actualPixels = image.scalarData.length;
-        
-        console.log('DEBUG: Pixel data check:', {
-          expectedPixels,
-          actualPixels,
-          match: expectedPixels === actualPixels,
-          ratio: actualPixels / expectedPixels
-        });
-        
-        if (expectedPixels !== actualPixels) {
-          console.error('🚨 DIMENSION MISMATCH DETECTED! This causes pixel reordering (word -> rdwo effect)');
-          console.error(`Expected: ${image.dimensions[0]} x ${image.dimensions[1]} = ${expectedPixels} pixels`);
-          console.error(`Actual: ${actualPixels} pixels`);
-          console.error(`Ratio: ${actualPixels / expectedPixels}`);
-          
-          // Try to guess actual dimensions
-          const possibleDimensions = [];
-          for (let width = 100; width <= 2048; width += 4) {
-            if (actualPixels % width === 0) {
-              const height = actualPixels / width;
-              if (height > 100 && height <= 2048) {
-                possibleDimensions.push({ width, height });
-              }
-            }
-          }
-          
-          console.log('DEBUG: All possible dimensions for this pixel count:', possibleDimensions.slice(0, 10));
-          
-          // Show the most likely candidates (common medical image sizes)
-          const likelyCandidates = possibleDimensions.filter(d => 
-            (d.width >= 256 && d.width <= 1024) && (d.height >= 256 && d.height <= 1024)
-          );
-          console.log('🎯 MOST LIKELY CORRECT DIMENSIONS:', likelyCandidates);
-          
-          // Show square candidates separately (very common in medical imaging)
-          const squareCandidates = possibleDimensions.filter(d => d.width === d.height);
-          console.log('📐 SQUARE DIMENSION CANDIDATES:', squareCandidates.slice(0, 5));
-          
-          // Alert about the specific issue
-          console.error('💡 SOLUTION: The backend metadata endpoint needs to return the correct dimensions.');
-          console.error('💡 The pixel data is being read with wrong width/height, causing reordering.');
-        } else {
-          console.log('✅ Dimensions match pixel data - no reordering issue');
-        }
-      }
-      
-      // Get viewport properties
-      const properties = viewport.getProperties();
-      console.log('DEBUG: Viewport properties:', properties);
-      
-      // Get the actual canvas size
-      const canvas = viewport.canvas;
-      console.log('DEBUG: Canvas info:', {
-        width: canvas.width,
-        height: canvas.height,
-        clientWidth: canvas.clientWidth,
-        clientHeight: canvas.clientHeight
-      });
-      
-      // Try to get cornerstone image object for more details
-      try {
-        const cornerstoneImage = viewport.getCornerstoneImage && viewport.getCornerstoneImage();
-        if (cornerstoneImage) {
-          console.log('DEBUG: Cornerstone image object:', {
-            width: cornerstoneImage.width,
-            height: cornerstoneImage.height,
-            color: cornerstoneImage.color,
-            columnPixelSpacing: cornerstoneImage.columnPixelSpacing,
-            rowPixelSpacing: cornerstoneImage.rowPixelSpacing,
-            minPixelValue: cornerstoneImage.minPixelValue,
-            maxPixelValue: cornerstoneImage.maxPixelValue,
-            sizeInBytes: cornerstoneImage.sizeInBytes
-          });
-        }
-      } catch (err) {
-        console.log('DEBUG: Could not get cornerstone image object:', err);
-      }
-      
-    } catch (error) {
-      console.error('DEBUG: Error getting image info:', error);
-    }
-  }, [viewport]);
   
   // Keyboard navigation for images
   useEffect(() => {
@@ -1397,7 +1075,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
       try {
         renderingEngine.destroy();
       } catch (e) {
-        console.warn('Error destroying rendering engine during retry:', e);
+        // Ignore destruction errors
       }
       setRenderingEngine(null);
     }
@@ -1405,18 +1083,15 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
       try {
         ToolGroupManager.destroyToolGroup(toolGroup.id);
       } catch (e) {
-        console.warn('Error destroying tool group during retry:', e);
+        // Ignore destruction errors
       }
       setToolGroup(null);
     }
     setViewport(null);
     
-    // Trigger re-initialization by forcing useEffect to run again
-    // We do this by temporarily clearing and resetting the imageIds
-    const currentImageIds = imageIds;
+    // Trigger re-initialization
     setTimeout(() => {
       // This will trigger the useEffect to run again
-      console.log('Retrying initialization...');
     }, 100);
   }, [renderingEngine, toolGroup, imageIds]);
 
@@ -1630,16 +1305,6 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
             >
               <Trash2 className="h-4 w-4" />
             </Button>
-            <div className="w-px h-6 bg-border mx-1" />
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={debugImageInfo}
-              title="Debug Image Info - Check Console"
-              className="bg-yellow-100 hover:bg-yellow-200 text-yellow-800"
-            >
-              🔍
-            </Button>
               </>
             )}
           </div>
@@ -1770,7 +1435,6 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
                   const shouldUseSeriesThumbnails = imageIds.length > 20 && seriesInfo.length > 1;
                   
                   if (shouldUseSeriesThumbnails) {
-                    console.log(`DEBUG: Using series-level thumbnails for ${seriesInfo.length} series`);
                     
                     // Calculate which series the current image belongs to
                     let currentSeriesIndex = 0;
@@ -1815,7 +1479,6 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
                     });
                   } else {
                     // For small studies or single series, show individual image thumbnails
-                    console.log(`DEBUG: Using image-level thumbnails for ${imageIds.length} images`);
                     return imageIds.map((imageId, index) => {
                       return (
                         <ThumbnailImage
@@ -1875,7 +1538,7 @@ const releaseSharedThumbnailEngine = () => {
         try {
           sharedThumbnailEngine.destroy();
         } catch (e) {
-          console.warn('Error destroying shared thumbnail engine:', e);
+          // Ignore destruction errors
         }
         sharedThumbnailEngine = null;
         thumbnailEngineInitPromise = null;
@@ -1932,8 +1595,6 @@ const ThumbnailImage: React.FC<ThumbnailImageProps> = ({ imageId, index, isActiv
     
     const loadThumbnail = async () => {
       try {
-        console.log(`DEBUG: Loading thumbnail ${index + 1}`);
-        
         // Small delay to stagger thumbnail loading
         await new Promise(resolve => setTimeout(resolve, index * 100));
         
@@ -1981,13 +1642,11 @@ const ThumbnailImage: React.FC<ThumbnailImageProps> = ({ imageId, index, isActiv
             }
             
             thumbViewport.render();
-            console.log(`DEBUG: Thumbnail ${index + 1} rendered successfully`);
             if (mounted) {
               setIsLoaded(true);
               isLoadingRef.current = false;
             }
           } catch (renderError) {
-            console.warn(`Thumbnail render error for ${index} (attempt ${renderAttempts + 1}):`, renderError);
             renderAttempts++;
             if (renderAttempts < maxRenderAttempts && mounted) {
               setTimeout(attemptRender, 200 * renderAttempts);
@@ -2000,7 +1659,6 @@ const ThumbnailImage: React.FC<ThumbnailImageProps> = ({ imageId, index, isActiv
         attemptRender();
         
       } catch (err) {
-        console.warn(`Failed to load thumbnail ${index}:`, err);
         if (mounted) {
           setError(true);
           isLoadingRef.current = false;
