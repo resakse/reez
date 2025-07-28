@@ -455,8 +455,10 @@ def configurable_dicom_frames(request, orthanc_id, frame_number):
         
         try:
             # Try Orthanc's raw pixel data endpoint (this gives us JUST the pixel data)
+            # Note: For single-frame images, frame 1 in URL corresponds to frame 0 in Orthanc
+            orthanc_frame_index = frame_number - 1  # Convert 1-based to 0-based
             raw_response = requests.get(
-                f"{orthanc_url}/instances/{orthanc_id}/frames/0/raw",
+                f"{orthanc_url}/instances/{orthanc_id}/frames/{orthanc_frame_index}/raw",
                 stream=True,
                 timeout=30
             )

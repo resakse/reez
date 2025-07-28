@@ -507,27 +507,16 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
             // Ignore metadata errors, use default
           }
           
-          // Try WADO-RS first, then fallback if it fails
-          try {
-            await stackViewport.setStack([imageIds[startIndex]], 0);
-            
-            // Set inversion immediately after stack is loaded
-            if (shouldInvert) {
-              const properties = stackViewport.getProperties();
-              stackViewport.setProperties({
-                ...properties,
-                invert: shouldInvert
-              });
-            }
-          } catch (wadorsError) {
-            // TEMPORARY: Create fallback wadouri image ID for debugging
-            const fallbackImageId = imageIds[startIndex].replace('wadors:', 'wadouri:').replace('/frames/1', '/file');
-            
-            try {
-              await stackViewport.setStack([fallbackImageId], 0);
-            } catch (fallbackError) {
-              throw wadorsError; // Throw original WADO-RS error
-            }
+          // Load WADO-RS image - NO FALLBACK TO WADOURI
+          await stackViewport.setStack([imageIds[startIndex]], 0);
+          
+          // Set inversion immediately after stack is loaded
+          if (shouldInvert) {
+            const properties = stackViewport.getProperties();
+            stackViewport.setProperties({
+              ...properties,
+              invert: shouldInvert
+            });
           }
           
         } catch (stackError) {
