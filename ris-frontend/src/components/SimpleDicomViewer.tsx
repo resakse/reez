@@ -11,6 +11,7 @@ import {
   FlipHorizontal, Palette
 } from 'lucide-react';
 import AuthService from '@/lib/auth';
+import { toast } from '@/lib/toast';
 
 // Modern Cornerstone3D imports
 import { init as coreInit, RenderingEngine, Enums as CoreEnums, type Types } from '@cornerstonejs/core';
@@ -29,9 +30,111 @@ import {
   annotation
 } from '@cornerstonejs/tools';
 import { init as dicomImageLoaderInit } from '@cornerstonejs/dicom-image-loader';
+import * as cornerstoneDICOMImageLoader from '@cornerstonejs/dicom-image-loader';
 
 const { ViewportType } = CoreEnums;
 const { MouseBindings } = ToolsEnums;
+
+// Fixed WADO-RS metadata pre-registration for proper image loading
+async function preRegisterWadorsMetadata(imageIds: string[]): Promise<void> {
+  try {
+    console.log('DEBUG: Pre-registering WADO-RS metadata for', imageIds.length, 'images');
+    
+    // Get the DICOM image loader from window or import
+    const dicomImageLoader = (window as any).cornerstoneDICOMImageLoader || cornerstoneDICOMImageLoader;
+    
+    if (!dicomImageLoader?.wadors?.metaDataManager) {
+      console.warn('DEBUG: WADO-RS metadata manager not available, skipping pre-registration');
+      return;
+    }
+    
+    // Process images in smaller batches to avoid overwhelming the server
+    const batchSize = 5;
+    
+    for (let i = 0; i < imageIds.length; i += batchSize) {
+      const batch = imageIds.slice(i, Math.min(i + batchSize, imageIds.length));
+      
+      await Promise.all(batch.map(async (imageId, batchIndex) => {
+        if (!imageId.startsWith('wadors:')) {
+          return; // Skip non-WADO-RS images
+        }
+        
+        try {
+          // Extract frames URL and convert to metadata URL
+          const framesUrl = imageId.replace('wadors:', '');
+          const metadataUrl = framesUrl.replace('/frames/1', '/metadata');
+          
+          console.log(`DEBUG: Fetching metadata ${i + batchIndex + 1}/${imageIds.length}`);
+          
+          // Fetch metadata from our endpoint
+          const response = await AuthService.authenticatedFetch(metadataUrl);
+          
+          if (!response.ok) {
+            console.warn(`Failed to fetch metadata for image ${i + batchIndex + 1}: ${response.status}`);
+            return;
+          }
+          
+          const metadataArray = await response.json();
+          const metadata = metadataArray[0]; // WADO-RS returns array format
+          
+          // Validate metadata structure
+          if (!metadata || typeof metadata !== 'object') {
+            console.warn(`Invalid metadata structure for image ${i + batchIndex + 1}`);
+            return;
+          }
+          
+          // Ensure critical tags are present and properly formatted
+          const criticalTags = ['00280010', '00280011', '00280100', '00280002', '00280004'];
+          let isValid = true;
+          
+          for (const tag of criticalTags) {
+            if (!metadata[tag]?.Value || !Array.isArray(metadata[tag].Value)) {
+              console.warn(`Missing or invalid critical tag ${tag} in image ${i + batchIndex + 1}`);
+              isValid = false;
+            }
+          }
+          
+          if (!isValid) {
+            console.warn(`Skipping registration of image ${i + batchIndex + 1} due to invalid metadata`);
+            return;
+          }
+          
+          // CRITICAL: Register metadata with Cornerstone WADO-RS metadata manager
+          // This follows the exact pattern from Cornerstone3D documentation
+          console.log(`DEBUG: Registering metadata for imageId: ${imageId}`);
+          console.log(`DEBUG: BulkDataURI: ${metadata["7fe00010"]?.BulkDataURI}`);
+          
+          dicomImageLoader.wadors.metaDataManager.add(imageId, metadata);
+          
+          // Verify registration worked
+          const retrievedMetadata = dicomImageLoader.wadors.metaDataManager.get(imageId);
+          if (retrievedMetadata) {
+            console.log(`DEBUG: ✅ Successfully registered metadata for image ${i + batchIndex + 1}`);
+            console.log(`DEBUG: Verified BulkDataURI: ${retrievedMetadata["7fe00010"]?.BulkDataURI}`);
+          } else {
+            console.warn(`DEBUG: ❌ Failed to verify metadata registration for image ${i + batchIndex + 1}`);
+          }
+          
+        } catch (error) {
+          console.warn(`Error pre-registering metadata for image ${i + batchIndex + 1}:`, error);
+          // Continue with other images even if one fails
+        }
+      }));
+      
+      // Small delay between batches to avoid overwhelming the server
+      if (i + batchSize < imageIds.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+    
+    console.log('DEBUG: Completed WADO-RS metadata pre-registration');
+    
+  } catch (error) {
+    console.error('DEBUG: Critical error in WADO-RS metadata pre-registration:', error);
+    throw error; // Re-throw to handle at higher level
+  }
+}
+
 
 // Global initialization flag and promise
 let isCornerstoneInitialized = false;
@@ -69,23 +172,69 @@ const initializeCornerstone = async () => {
         },
         // Optimize for performance and multi-image loading
         useWebWorkers: true,
-        maxWebWorkers: 4, // Limit concurrent workers to prevent memory issues
+        maxWebWorkers: 2, // Reduce to prevent memory/worker issues
+        strict: false, // Allow more lenient DICOM parsing
         decodeConfig: {
           convertFloatPixelDataToInt: false,
           use16BitDataType: true,
-          // Add timeout for large images
-          decodeConfig: {
-            timeout: 30000 // 30 second timeout for DICOM decoding
-          }
+          // Add more robust decoding options
+          usePDFJS: false,
+          useWebGL: false, // Disable WebGL to prevent GPU issues
         },
-        // Configure image loader for better multi-image handling
+        // Configure image loader for better error handling
+        errorInterceptor: (error: any) => {
+          console.error('DICOM Image Loader Error Details:', {
+            message: error.message,
+            stack: error.stack,
+            imageId: error.imageId,
+            request: error.request,
+            response: error.response
+          });
+          // Don't throw - let the viewer handle gracefully
+          return error;
+        },
+        // Simplified web worker config
         webWorkerTaskPools: {
           decodeTask: {
-            maxConcurrency: 4,
-            targetUtilization: 0.8
+            maxConcurrency: 2,
+            targetUtilization: 0.6 // Lower utilization to prevent overload
           }
         }
       });
+      console.log('DICOM image loader initialized');
+      
+      // Verify WADO-RS support is available
+      const dicomImageLoader = (window as any).cornerstoneDICOMImageLoader || cornerstoneDICOMImageLoader;
+      if (dicomImageLoader?.wadors?.metaDataManager) {
+        console.log('DEBUG: ✅ WADO-RS metadata manager is available');
+      } else {
+        console.warn('DEBUG: ❌ WADO-RS metadata manager not available');
+        console.log('DEBUG: Checking both window and imported sources...');
+        console.log('DEBUG: window.cornerstoneDICOMImageLoader:', typeof (window as any).cornerstoneDICOMImageLoader);
+        console.log('DEBUG: imported cornerstoneDICOMImageLoader:', typeof cornerstoneDICOMImageLoader);
+      }
+      
+      // Add a fallback metadata provider to prevent undefined errors
+      try {
+        const { metaData } = await import('@cornerstonejs/core');
+        
+        // Add a high-priority fallback provider for essential metadata
+        metaData.addProvider((type: string, imageId: string) => {
+          if (type === 'generalSeriesModule' || type === 'generalImageModule') {
+            // Provide fallback modality information to prevent NM helper errors
+            return {
+              modality: 'OT', // Default to 'Other' to prevent NM-specific errors
+              numberOfFrames: 1,
+              sopClassUID: '1.2.840.10008.5.1.4.1.1.7' // Secondary Capture SOP Class
+            };
+          }
+          return undefined;
+        }, 1000); // High priority fallback
+        
+        console.log('DEBUG: ✅ Fallback metadata provider registered');
+      } catch (metaDataError) {
+        console.warn('DEBUG: Could not register fallback metadata provider:', metaDataError);
+      }
       console.log('DICOM image loader initialized');
       
       await toolsInit();
@@ -119,14 +268,23 @@ const initializeCornerstone = async () => {
   await cornerstoneInitPromise;
 };
 
+interface SeriesInfo {
+  seriesId: string;
+  seriesInstanceUID: string;
+  seriesDescription: string;
+  instanceCount: number;
+}
+
 interface SimpleDicomViewerProps {
   imageIds: string[];
+  seriesInfo?: SeriesInfo[];
   studyMetadata: {
     patientName: string;
     patientId: string;
     studyDate: string;
     studyDescription: string;
     modality: string;
+    studyInstanceUID?: string;
   };
 }
 
@@ -144,7 +302,7 @@ interface ImageSettings {
   pan?: { x: number; y: number };
 }
 
-const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMetadata }) => {
+const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesInfo = [], studyMetadata }) => {
   const mainViewportRef = useRef<HTMLDivElement>(null);
   const [renderingEngine, setRenderingEngine] = useState<RenderingEngine | null>(null);
   const [viewport, setViewport] = useState<any>(null);
@@ -153,9 +311,11 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [loadingNavigation, setLoadingNavigation] = useState<boolean>(false);
+  const [backgroundLoading, setBackgroundLoading] = useState<boolean>(false);
+  const [isStackLoading, setIsStackLoading] = useState<boolean>(false);
   const [activeTool, setActiveTool] = useState<Tool>('wwwc');
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [isInverted, setIsInverted] = useState<boolean>(true);
+  const [isInverted, setIsInverted] = useState<boolean>(true);  // Default to inverted for X-rays
   const [isFlippedHorizontal, setIsFlippedHorizontal] = useState<boolean>(false);
   const [isToolbarMinimized, setIsToolbarMinimized] = useState<boolean>(false);
   const [toolbarPosition, setToolbarPosition] = useState({ x: 0, y: 16 }); // Initial position
@@ -279,6 +439,48 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
       }
     }
   }, []);
+
+  // Helper function to handle DICOM loading errors, especially buffer overruns
+  const handleDicomError = useCallback((error: any, imageId: string, retryCallback?: () => Promise<void>) => {
+    const errorMessage = (error?.message?.toLowerCase && error.message.toLowerCase()) || '';
+    
+    console.error('DICOM loading error:', {
+      error,
+      imageId,
+      errorMessage,
+      errorType: error?.constructor?.name
+    });
+    
+    // Check for specific error types - ensure errorMessage is a string
+    if (errorMessage && (errorMessage.includes('buffer overrun') || errorMessage.includes('parsedicomdatasetexplicit'))) {
+      console.warn('DICOM buffer overrun detected for:', imageId);
+      toast.error('DICOM data corruption detected. This may be due to network issues with remote PACS server.');
+      
+      // For buffer overrun errors, we can try to reload after a delay
+      if (retryCallback) {
+        setTimeout(() => {
+          console.log('Retrying DICOM load after buffer overrun...');
+          retryCallback().catch(retryError => {
+            console.error('Retry failed:', retryError);
+          });
+        }, 2000);
+      }
+      
+      return 'buffer_overrun';
+    } else if (errorMessage && (errorMessage.includes('timeout') || errorMessage.includes('network'))) {
+      console.warn('Network timeout detected for:', imageId);
+      toast.warning('Network timeout. Please check connection to PACS server.');
+      return 'network_timeout';
+    } else if (errorMessage && (errorMessage.includes('404') || errorMessage.includes('not found'))) {
+      console.warn('DICOM file not found:', imageId);
+      toast.warning('DICOM file not found on server.');
+      return 'not_found';
+    } else {
+      console.error('Unknown DICOM error:', error);
+      toast.error('Failed to load DICOM image.');
+      return 'unknown';
+    }
+  }, []);
   
   // Initialize Cornerstone3D - with better DOM readiness
   useEffect(() => {
@@ -338,6 +540,13 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
 
     const init = async () => {
       try {
+        // Prevent multiple simultaneous loads
+        if (isStackLoading) {
+          console.log('DEBUG: Stack already loading, skipping duplicate initialization');
+          return;
+        }
+        
+        setIsStackLoading(true);
         setLoading(true);
         setError(null);
         
@@ -354,11 +563,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
 
         console.log('Creating rendering engine...');
         const renderingEngineId = `simpleDicomViewer-${Date.now()}`;  // Unique ID to prevent conflicts
-        const engine = new RenderingEngine(renderingEngineId, {
-          // Optimize rendering performance
-          enableGPURendering: true,
-          strictZSpacingForVolumeViewport: false
-        });
+        const engine = new RenderingEngine(renderingEngineId);
         setRenderingEngine(engine);
 
         console.log('Creating viewport...');
@@ -369,9 +574,34 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
           type: ViewportType.STACK,
         };
 
+        // Log element dimensions before enabling
+        console.log('Element dimensions before enable:', {
+          offsetWidth: element.offsetWidth,
+          offsetHeight: element.offsetHeight,
+          clientWidth: element.clientWidth,
+          clientHeight: element.clientHeight,
+          style: {
+            width: element.style.width,
+            height: element.style.height
+          }
+        });
+
         engine.enableElement(viewportInput);
         const stackViewport = engine.getViewport(viewportId);
         setViewport(stackViewport);
+
+        // Log canvas dimensions after enabling
+        const canvas = stackViewport.canvas;
+        console.log('Canvas dimensions after enable:', {
+          width: canvas.width,
+          height: canvas.height,
+          clientWidth: canvas.clientWidth,
+          clientHeight: canvas.clientHeight,
+          style: {
+            width: canvas.style.width,
+            height: canvas.style.height
+          }
+        });
 
         console.log('Loading images...', imageIds);
         console.log(`Total images: ${imageIds.length}, starting at index: ${currentImageIndex}`);
@@ -394,12 +624,36 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
         console.log(`Setting stack with ${imageIds.length} images, starting at index ${startIndex}`);
         
         try {
-          console.log('DEBUG: Loading full stack for proper navigation...');
+          console.log(`DEBUG: Pre-registering WADO-RS metadata before viewport operations...`);
           
-          // Load all images in the stack for proper navigation
-          // This is necessary for proper multi-image navigation
-          await stackViewport.setStack(imageIds, startIndex);
-          console.log(`DEBUG: Full stack loaded successfully with ${imageIds.length} images, starting at index ${startIndex}`);
+          // CRITICAL: Pre-register WADO-RS metadata BEFORE any viewport operations
+          // This prevents Cornerstone from trying to access undefined metadata
+          await preRegisterWadorsMetadata(imageIds);
+          
+          console.log(`DEBUG: Loading ONLY current image ${startIndex + 1}/${imageIds.length} - NO BULK LOADING`);
+          
+          // Try WADO-RS first, then fallback if it fails
+          try {
+            await stackViewport.setStack([imageIds[startIndex]], 0);
+            console.log('DEBUG: ✅ WADO-RS image loaded successfully');
+          } catch (wadorsError) {
+            console.error('DEBUG: WADO-RS failed, error:', wadorsError);
+            
+            // TEMPORARY: Create fallback wadouri image ID for debugging
+            const fallbackImageId = imageIds[startIndex].replace('wadors:', 'wadouri:').replace('/frames/1', '/file');
+            console.log('DEBUG: Trying fallback wadouri:', fallbackImageId);
+            
+            try {
+              await stackViewport.setStack([fallbackImageId], 0);
+              console.log('DEBUG: ✅ Fallback wadouri loaded successfully');
+            } catch (fallbackError) {
+              console.error('DEBUG: Both WADO-RS and wadouri fallback failed:', fallbackError);
+              throw wadorsError; // Throw original WADO-RS error
+            }
+          }
+          
+          // Keep existing inversion state - don't auto-change it
+          console.log('DEBUG: Using existing inversion state for loaded images');
           
         } catch (stackError) {
           console.error('DEBUG: Stack loading failed:', stackError);
@@ -412,43 +666,114 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
             selectedImageId: imageIds[startIndex]
           });
           
-          throw stackError;
+          // Use our enhanced error handler
+          const errorType = handleDicomError(stackError, imageIds[startIndex] || 'unknown', async () => {
+            // Retry logic for stack loading
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            await stackViewport.setStack(imageIds, startIndex);
+          });
+          
+          // If it's a buffer overrun, try loading just the current image
+          if (errorType === 'buffer_overrun' && imageIds.length > 0) {
+            try {
+              console.log('Attempting single image load due to buffer overrun...');
+              await stackViewport.setStack([imageIds[startIndex]], 0);
+              toast.warning('Loaded single image due to data corruption. Navigation may be limited.');
+            } catch (singleImageError) {
+              console.error('Single image load also failed:', singleImageError);
+              throw singleImageError;
+            }
+          } else {
+            throw stackError;
+          }
         }
         
-        // Fit image to viewport while preserving aspect ratio
+        // Fit image to viewport while preserving aspect ratio and centering
         stackViewport.resetCamera();
         
-        // Set display area to maintain aspect ratio
-        const displayArea = {
-          imageArea: [1, 1], // Full image
-          imageCanvasPoint: {
-            imagePoint: [0.5, 0.5], // Center of image
-            canvasPoint: [0.5, 0.5] // Center of canvas
-          },
-          storeAsInitialCamera: true
-        };
-        
+        // Proper image fitting and centering
         try {
-          stackViewport.setDisplayArea(displayArea);
+          // Reset camera first
+          stackViewport.resetCamera();
+          
+          // Wait a moment for the reset to take effect
+          setTimeout(() => {
+            try {
+              // Get current canvas dimensions
+              const canvas = stackViewport.canvas;
+              console.log('Canvas dimensions:', {
+                width: canvas.width,
+                height: canvas.height,
+                clientWidth: canvas.clientWidth,
+                clientHeight: canvas.clientHeight
+              });
+              
+              // Use the built-in fit method if available
+              if (typeof stackViewport.fitToCanvas === 'function') {
+                console.log('Using fitToCanvas method');
+                stackViewport.fitToCanvas();
+              } else {
+                console.log('Using manual zoom fit');
+                // Calculate appropriate zoom to fit image in canvas
+                const currentImage = stackViewport.getImageData();
+                if (currentImage && currentImage.dimensions) {
+                  const imageWidth = currentImage.dimensions[0];
+                  const imageHeight = currentImage.dimensions[1];
+                  const canvasWidth = canvas.clientWidth;
+                  const canvasHeight = canvas.clientHeight;
+                  
+                  // Calculate scale to fit image in canvas
+                  const scaleX = canvasWidth / imageWidth;
+                  const scaleY = canvasHeight / imageHeight;
+                  const scale = Math.min(scaleX, scaleY) * 0.9; // 0.9 for some padding
+                  
+                  console.log('Manual scaling:', {
+                    imageWidth, imageHeight,
+                    canvasWidth, canvasHeight,
+                    scale
+                  });
+                  
+                  // Set camera properties for proper centering
+                  const camera = stackViewport.getCamera();
+                  stackViewport.setCamera({
+                    ...camera,
+                    parallelScale: Math.max(imageHeight, imageWidth) / (2 * scale),
+                    position: [imageWidth / 2, imageHeight / 2, camera.position[2]],
+                    focalPoint: [imageWidth / 2, imageHeight / 2, camera.focalPoint[2]]
+                  });
+                }
+              }
+              
+              stackViewport.render();
+              console.log('Image fitted and centered successfully');
+            } catch (fitError) {
+              console.warn('Error during delayed fit:', fitError);
+            }
+          }, 50);
         } catch (displayError) {
-          console.warn('Could not set display area, using default fit:', displayError);
+          console.warn('Could not set up image fitting:', displayError);
+          stackViewport.resetCamera();
         }
         
         stackViewport.render();
         console.log('Images loaded and rendered with proper aspect ratio');
 
-        // Start with inverted state (true) which is what Cornerstone defaults to
+        // Set proper inversion based on PhotometricInterpretation
         setTimeout(() => {
           try {
             const properties = stackViewport.getProperties();
             console.log('Current viewport properties:', properties);
+            
+            // For most medical images, MONOCHROME2 should NOT be inverted by default
+            // MONOCHROME1 typically needs inversion
+            // Try starting with non-inverted state first
             stackViewport.setProperties({
               ...properties,
-              invert: true
+              invert: false
             });
-            setIsInverted(true);
+            setIsInverted(false);
             stackViewport.render();
-            console.log('Set viewport to inverted state (default behavior)');
+            console.log('Set viewport to non-inverted state (for MONOCHROME2)');
           } catch (err) {
             console.warn('Could not set initial viewport properties:', err);
           }
@@ -456,21 +781,31 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
 
         // Set up ResizeObserver for aspect ratio preservation
         if (element && !resizeObserverRef.current) {
-          resizeObserverRef.current = new ResizeObserver(() => {
+          resizeObserverRef.current = new ResizeObserver((entries) => {
             if (engine && stackViewport) {
-              // Store current presentation before resize
-              const currentPresentation = stackViewport.getViewPresentation();
+              console.log('ResizeObserver triggered');
               
-              // Resize the rendering engine
+              // Get new dimensions
+              const entry = entries[0];
+              const { width, height } = entry.contentRect;
+              console.log('New viewport dimensions:', { width, height });
+              
+              // Resize the rendering engine first
               engine.resize(true, false);
               
-              // Restore the presentation to maintain zoom/pan
-              if (currentPresentation) {
-                stackViewport.setViewPresentation(currentPresentation);
-              }
-              
-              stackViewport.render();
-              console.log('Viewport resized while maintaining aspect ratio');
+              // Then refit the image to prevent wrapping/cropping
+              setTimeout(() => {
+                try {
+                  stackViewport.resetCamera();
+                  if (typeof stackViewport.fitToCanvas === 'function') {
+                    stackViewport.fitToCanvas();
+                  }
+                  stackViewport.render();
+                  console.log('Viewport resized and image refitted');
+                } catch (resizeError) {
+                  console.warn('Error during resize refit:', resizeError);
+                }
+              }, 10);
             }
           });
           
@@ -506,6 +841,9 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
           throw new Error(`Tool group setup failed: ${toolError.message}`);
         }
 
+        // CRITICAL: Add viewport to tool group AFTER metadata is registered and images are loaded
+        // This prevents the "Cannot read properties of undefined (reading 'includes')" error
+        console.log('Adding viewport to tool group AFTER metadata registration...');
         tg.addViewport(viewportId, renderingEngineId);
 
         // Activate tools with optimized settings and error handling
@@ -546,10 +884,12 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
 
         console.log('DICOM viewer fully initialized');
         setLoading(false);
+        setIsStackLoading(false);
       } catch (err) {
         console.error('Initialization failed:', err);
         setError(err instanceof Error ? err.message : 'Failed to initialize viewer');
         setLoading(false);
+        setIsStackLoading(false);
         initializationRef.current = false; // Reset on error so retry can work
       }
     };
@@ -653,21 +993,42 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
     if (viewport && index >= 0 && index < imageIds.length && index !== currentImageIndex) {
       try {
         setLoadingNavigation(true);
-        console.log(`DEBUG: Navigating to image ${index + 1}/${imageIds.length} (index: ${index})`);
+        console.log(`DEBUG: Loading SINGLE image ${index + 1}/${imageIds.length} - NO BULK LOADING`);
         
         // Save current image settings before navigating
         saveCurrentImageSettings();
         
-        // Use setImageIdIndex for direct navigation to specific image
-        await viewport.setImageIdIndex(index);
+        // SIMPLE: Load ONLY the new image, don't try to be smart
+        await viewport.setStack([imageIds[index]], 0);
         
-        // Update current image index first
+        // Update current image index
         setCurrentImageIndex(index);
         
         // Wait a moment for the image to load, then restore settings
         setTimeout(() => {
           restoreImageSettings(index);
-        }, 100);
+          try {
+            const image = stackViewport.getCurrentImageData();
+            if (image && image.metadata) {
+              const photometricInterpretation = image.metadata.PhotometricInterpretation;
+              const shouldInvert = photometricInterpretation === 'MONOCHROME1';
+              
+              if (shouldInvert !== isInverted) {
+                console.log(`DEBUG: Image ${index + 1} requires different inversion: ${shouldInvert}`);
+                setIsInverted(shouldInvert);
+                
+                const properties = stackViewport.getProperties();
+                stackViewport.setProperties({
+                  ...properties,
+                  invert: shouldInvert
+                });
+                stackViewport.render();
+              }
+            }
+          } catch (photoError) {
+            console.warn('Could not check photometric interpretation for new image:', photoError);
+          }
+        }, 150);
         
         console.log(`DEBUG: Successfully navigated to image ${index + 1}/${imageIds.length}`);
         
@@ -877,6 +1238,120 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
       }
     }
   }, [viewport]);
+
+  // Debug function to analyze image data and identify dimension issues
+  const debugImageInfo = useCallback(async () => {
+    if (!viewport) {
+      console.log('DEBUG: No viewport available');
+      return;
+    }
+    
+    try {
+      // Get the current image
+      const image = viewport.getImageData();
+      if (!image) {
+        console.log('DEBUG: No image data available');
+        return;
+      }
+      
+      console.log('DEBUG: Image Information:', {
+        dimensions: image.dimensions,
+        spacing: image.spacing,
+        origin: image.origin,
+        direction: image.direction,
+        scalarData: image.scalarData ? {
+          length: image.scalarData.length,
+          constructor: image.scalarData.constructor.name,
+          bytesPerElement: image.scalarData.BYTES_PER_ELEMENT
+        } : 'No scalar data',
+        metadata: image.metadata
+      });
+      
+      // Check if dimensions match pixel data
+      if (image.dimensions && image.scalarData) {
+        const expectedPixels = image.dimensions[0] * image.dimensions[1];
+        const actualPixels = image.scalarData.length;
+        
+        console.log('DEBUG: Pixel data check:', {
+          expectedPixels,
+          actualPixels,
+          match: expectedPixels === actualPixels,
+          ratio: actualPixels / expectedPixels
+        });
+        
+        if (expectedPixels !== actualPixels) {
+          console.error('🚨 DIMENSION MISMATCH DETECTED! This causes pixel reordering (word -> rdwo effect)');
+          console.error(`Expected: ${image.dimensions[0]} x ${image.dimensions[1]} = ${expectedPixels} pixels`);
+          console.error(`Actual: ${actualPixels} pixels`);
+          console.error(`Ratio: ${actualPixels / expectedPixels}`);
+          
+          // Try to guess actual dimensions
+          const possibleDimensions = [];
+          for (let width = 100; width <= 2048; width += 4) {
+            if (actualPixels % width === 0) {
+              const height = actualPixels / width;
+              if (height > 100 && height <= 2048) {
+                possibleDimensions.push({ width, height });
+              }
+            }
+          }
+          
+          console.log('DEBUG: All possible dimensions for this pixel count:', possibleDimensions.slice(0, 10));
+          
+          // Show the most likely candidates (common medical image sizes)
+          const likelyCandidates = possibleDimensions.filter(d => 
+            (d.width >= 256 && d.width <= 1024) && (d.height >= 256 && d.height <= 1024)
+          );
+          console.log('🎯 MOST LIKELY CORRECT DIMENSIONS:', likelyCandidates);
+          
+          // Show square candidates separately (very common in medical imaging)
+          const squareCandidates = possibleDimensions.filter(d => d.width === d.height);
+          console.log('📐 SQUARE DIMENSION CANDIDATES:', squareCandidates.slice(0, 5));
+          
+          // Alert about the specific issue
+          console.error('💡 SOLUTION: The backend metadata endpoint needs to return the correct dimensions.');
+          console.error('💡 The pixel data is being read with wrong width/height, causing reordering.');
+        } else {
+          console.log('✅ Dimensions match pixel data - no reordering issue');
+        }
+      }
+      
+      // Get viewport properties
+      const properties = viewport.getProperties();
+      console.log('DEBUG: Viewport properties:', properties);
+      
+      // Get the actual canvas size
+      const canvas = viewport.canvas;
+      console.log('DEBUG: Canvas info:', {
+        width: canvas.width,
+        height: canvas.height,
+        clientWidth: canvas.clientWidth,
+        clientHeight: canvas.clientHeight
+      });
+      
+      // Try to get cornerstone image object for more details
+      try {
+        const cornerstoneImage = viewport.getCornerstoneImage && viewport.getCornerstoneImage();
+        if (cornerstoneImage) {
+          console.log('DEBUG: Cornerstone image object:', {
+            width: cornerstoneImage.width,
+            height: cornerstoneImage.height,
+            color: cornerstoneImage.color,
+            columnPixelSpacing: cornerstoneImage.columnPixelSpacing,
+            rowPixelSpacing: cornerstoneImage.rowPixelSpacing,
+            minPixelValue: cornerstoneImage.minPixelValue,
+            maxPixelValue: cornerstoneImage.maxPixelValue,
+            sizeInBytes: cornerstoneImage.sizeInBytes
+          });
+        }
+      } catch (err) {
+        console.log('DEBUG: Could not get cornerstone image object:', err);
+      }
+      
+    } catch (error) {
+      console.error('DEBUG: Error getting image info:', error);
+    }
+  }, [viewport]);
   
   // Keyboard navigation for images
   useEffect(() => {
@@ -948,13 +1423,51 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
   if (error) {
     return (
       <div className="flex items-center justify-center h-96">
-        <Card className="w-96">
+        <Card className="w-full max-w-lg">
           <CardHeader>
             <CardTitle className="text-red-600">Error Loading Images</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-red-500 mb-4">{error}</p>
-            <Button onClick={retryViewer} className="w-full">
+            
+            {/* Check if this is the specific Orthanc database issue */}
+            {(error && typeof error === 'string' && (error.includes('database inconsistency') || error.includes('PACS server') || error.includes('not accessible'))) && (
+              <div className="bg-blue-50 border border-blue-200 rounded p-3 mb-4">
+                <h4 className="font-semibold text-blue-800 mb-2">💡 Alternative Viewer Available</h4>
+                <p className="text-sm text-blue-700 mb-3">
+                  The PACS server has configuration issues, but you can still view this study using Stone Web Viewer:
+                </p>
+                <Button 
+                  onClick={() => {
+                    const orthancUrl = 'http://192.168.20.172:8042';
+                    // Extract study UID from studyMetadata or construct from imageIds
+                    let studyUid = studyMetadata?.studyInstanceUID;
+                    if (!studyUid && imageIds.length > 0) {
+                      // Try to extract from the first image ID
+                      const firstImageId = imageIds[0];
+                      const match = firstImageId.match(/studies\/([^\/]+)\//);
+                      if (match) {
+                        studyUid = match[1];
+                      }
+                    }
+                    
+                    if (studyUid) {
+                      const stoneUrl = `${orthancUrl}/stone-webviewer/index.html?study=${studyUid}`;
+                      window.open(stoneUrl, '_blank');
+                    } else {
+                      // Fallback to general Stone Web Viewer
+                      const stoneUrl = `${orthancUrl}/stone-webviewer/`;
+                      window.open(stoneUrl, '_blank');
+                    }
+                  }}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  🔗 Open in Stone Web Viewer
+                </Button>
+              </div>
+            )}
+            
+            <Button onClick={retryViewer} className="w-full" variant="outline">
               Retry Loading
             </Button>
           </CardContent>
@@ -1117,6 +1630,16 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
             >
               <Trash2 className="h-4 w-4" />
             </Button>
+            <div className="w-px h-6 bg-border mx-1" />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={debugImageInfo}
+              title="Debug Image Info - Check Console"
+              className="bg-yellow-100 hover:bg-yellow-200 text-yellow-800"
+            >
+              🔍
+            </Button>
               </>
             )}
           </div>
@@ -1129,7 +1652,11 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
           <div
             ref={mainViewportRef}
             className="w-full h-full bg-black"
-            style={{ minHeight: '400px' }}
+            style={{ 
+              minHeight: '400px',
+              position: 'relative',
+              overflow: 'hidden' // Prevent image wrapping/overflow
+            }}
           >
             {/* Loading Overlay */}
             {showLoading && (
@@ -1159,14 +1686,42 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
             {/* No Images Overlay */}
             {showNoImages && (
               <div className="absolute inset-0 flex items-center justify-center bg-background/80">
-                <Card className="w-96">
+                <Card className="w-full max-w-md">
                   <CardHeader>
                     <CardTitle>No Images Available</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-muted-foreground">
-                      No DICOM images found for this study.
+                    <p className="text-muted-foreground mb-4">
+                      No DICOM images found for this study. This may be due to PACS server configuration issues.
                     </p>
+                    
+                    {/* Stone Web Viewer Fallback */}
+                    <div className="bg-blue-50 border border-blue-200 rounded p-3">
+                      <h4 className="font-semibold text-blue-800 mb-2">💡 Try Alternative Viewer</h4>
+                      <p className="text-sm text-blue-700 mb-3">
+                        You can still view this study using Stone Web Viewer:
+                      </p>
+                      <Button 
+                        onClick={() => {
+                          const orthancUrl = 'http://192.168.20.172:8042';
+                          // Extract study UID from studyMetadata
+                          let studyUid = studyMetadata?.studyInstanceUID;
+                          
+                          if (studyUid) {
+                            const stoneUrl = `${orthancUrl}/stone-webviewer/index.html?study=${studyUid}`;
+                            window.open(stoneUrl, '_blank');
+                          } else {
+                            // Fallback to general Stone Web Viewer
+                            const stoneUrl = `${orthancUrl}/stone-webviewer/`;
+                            window.open(stoneUrl, '_blank');
+                          }
+                        }}
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                        size="sm"
+                      >
+                        🔗 Open in Stone Web Viewer
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               </div>
@@ -1208,21 +1763,72 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, studyMe
                 </Button>
               </div>
 
-              {/* Thumbnail Images */}
+              {/* Thumbnail Images - Series-level or Image-level based on study size */}
               <div className="flex gap-1 flex-1 overflow-x-auto">
-                {imageIds.map((imageId, index) => {
-                  // Always render ThumbnailImage component for all images
-                  // Let the component handle its own lazy loading via Intersection Observer
-                  return (
-                    <ThumbnailImage
-                      key={imageId}
-                      imageId={imageId}
-                      index={index}
-                      isActive={index === currentImageIndex}
-                      onClick={() => goToImage(index)}
-                    />
-                  );
-                })}
+                {(() => {
+                  // For large studies with multiple series (typically CT/MR), show series-level thumbnails
+                  const shouldUseSeriesThumbnails = imageIds.length > 20 && seriesInfo.length > 1;
+                  
+                  if (shouldUseSeriesThumbnails) {
+                    console.log(`DEBUG: Using series-level thumbnails for ${seriesInfo.length} series`);
+                    
+                    // Calculate which series the current image belongs to
+                    let currentSeriesIndex = 0;
+                    let imageCountSoFar = 0;
+                    for (let i = 0; i < seriesInfo.length; i++) {
+                      if (currentImageIndex < imageCountSoFar + seriesInfo[i].instanceCount) {
+                        currentSeriesIndex = i;
+                        break;
+                      }
+                      imageCountSoFar += seriesInfo[i].instanceCount;
+                    }
+                    
+                    return seriesInfo.map((series, seriesIndex) => {
+                      // Calculate the first image index for this series
+                      let seriesStartIndex = 0;
+                      for (let i = 0; i < seriesIndex; i++) {
+                        seriesStartIndex += seriesInfo[i].instanceCount;
+                      }
+                      
+                      const representativeImageId = imageIds[seriesStartIndex];
+                      const isActiveSeries = seriesIndex === currentSeriesIndex;
+                      
+                      return (
+                        <div
+                          key={series.seriesId}
+                          className="flex-shrink-0 relative"
+                          title={`${series.seriesDescription} (${series.instanceCount} images)`}
+                        >
+                          <ThumbnailImage
+                            imageId={representativeImageId}
+                            index={seriesStartIndex}
+                            isActive={isActiveSeries}
+                            onClick={() => goToImage(seriesStartIndex)}
+                          />
+                          {/* Series info overlay */}
+                          <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs p-1 rounded-b">
+                            <div className="font-medium truncate">{series.seriesDescription || `Series ${seriesIndex + 1}`}</div>
+                            <div className="text-xs opacity-75">{series.instanceCount} imgs</div>
+                          </div>
+                        </div>
+                      );
+                    });
+                  } else {
+                    // For small studies or single series, show individual image thumbnails
+                    console.log(`DEBUG: Using image-level thumbnails for ${imageIds.length} images`);
+                    return imageIds.map((imageId, index) => {
+                      return (
+                        <ThumbnailImage
+                          key={imageId}
+                          imageId={imageId}
+                          index={index}
+                          isActive={index === currentImageIndex}
+                          onClick={() => goToImage(index)}
+                        />
+                      );
+                    });
+                  }
+                })()}
               </div>
             </div>
           </div>
@@ -1251,10 +1857,7 @@ const getSharedThumbnailEngine = async () => {
   
   thumbnailEngineInitPromise = (async () => {
     await initializeCornerstone();
-    sharedThumbnailEngine = new RenderingEngine(`sharedThumbnailEngine-${Date.now()}`, {
-      enableGPURendering: true,
-      strictZSpacingForVolumeViewport: false
-    });
+    sharedThumbnailEngine = new RenderingEngine(`sharedThumbnailEngine-${Date.now()}`);
     return sharedThumbnailEngine;
   })();
   
@@ -1354,7 +1957,7 @@ const ThumbnailImage: React.FC<ThumbnailImageProps> = ({ imageId, index, isActiv
         const thumbViewport = thumbEngine.getViewport(thumbViewportId);
         
         // Load the single image with shorter timeout for thumbnails
-        const loadPromise = thumbViewport.setStack([imageId], 0);
+        const loadPromise = (thumbViewport as any).setStack([imageId], 0);
         const timeoutPromise = new Promise((_, reject) => 
           setTimeout(() => reject(new Error('Thumbnail load timeout')), 8000)
         );
@@ -1369,6 +1972,14 @@ const ThumbnailImage: React.FC<ThumbnailImageProps> = ({ imageId, index, isActiv
         
         const attemptRender = () => {
           try {
+            // Reset camera and center thumbnail image
+            thumbViewport.resetCamera();
+            
+            // Try to fit to canvas for proper centering
+            if (typeof thumbViewport.fitToCanvas === 'function') {
+              thumbViewport.fitToCanvas();
+            }
+            
             thumbViewport.render();
             console.log(`DEBUG: Thumbnail ${index + 1} rendered successfully`);
             if (mounted) {

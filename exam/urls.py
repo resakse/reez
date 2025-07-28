@@ -10,7 +10,8 @@ from .views import (
 )
 from .settings_views import PacsConfigListCreateAPIView, PacsConfigDetailAPIView, get_current_pacs_config, get_pacs_orthanc_url
 from .examination_views import ExaminationListAPIView, ExaminationDetailAPIView
-from .pacs_views import PacsSearchView, pacs_stats, import_legacy_study, DicomImageProxyView, dicom_instance_proxy, get_study_image_ids, get_enhanced_study_metadata
+from .pacs_views import PacsSearchView, pacs_stats, import_legacy_study, DicomImageProxyView, dicom_instance_proxy, get_study_image_ids, get_enhanced_study_metadata, pacs_health_check, dicom_instance_raw_proxy, dicom_instance_dicomweb_proxy
+from .configurable_pacs_views import configurable_dicom_instance_proxy, configurable_dicom_metadata, configurable_dicom_frames
 
 from . import api
 # from .export import export_xls
@@ -88,11 +89,17 @@ urlpatterns = [
     path('pacs/search/', PacsSearchView.as_view(), name='pacs-search'),
     path('pacs/stats/', pacs_stats, name='pacs-stats'),
     path('pacs/import/', import_legacy_study, name='pacs-import'),
+    path('pacs/health/', pacs_health_check, name='pacs-health'),
     
     # DICOM Image Proxy endpoints (authenticated users)
     path('pacs/dicom-web/studies/<str:study_uid>/series/<str:series_uid>/instances/<str:instance_uid>', 
          DicomImageProxyView.as_view(), name='dicom-image-proxy'),
     path('pacs/instances/<str:orthanc_id>/file', dicom_instance_proxy, name='dicom-instance-proxy'),
+    path('pacs/instances/<str:orthanc_id>/dicomweb', dicom_instance_dicomweb_proxy, name='dicom-instance-dicomweb-proxy'),
+    path('pacs/instances/<str:orthanc_id>/configurable', configurable_dicom_instance_proxy, name='dicom-instance-configurable-proxy'),
+    path('pacs/instances/<str:orthanc_id>/metadata', configurable_dicom_metadata, name='dicom-instance-metadata'),
+    path('pacs/instances/<str:orthanc_id>/frames/<int:frame_number>', configurable_dicom_frames, name='dicom-instance-frames'),
+    path('pacs/instances/<str:orthanc_id>/raw', dicom_instance_raw_proxy, name='dicom-instance-raw-proxy'),
     path('pacs/studies/<str:study_uid>/image-ids/', get_study_image_ids, name='get-study-image-ids'),
     path('pacs/studies/<str:study_uid>/enhanced-metadata/', get_enhanced_study_metadata, name='get-enhanced-study-metadata'),
 ]

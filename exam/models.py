@@ -15,8 +15,22 @@ User = settings.AUTH_USER_MODEL
 
 # Create your models here.
 class PacsConfig(models.Model):
+    ENDPOINT_STYLE_CHOICES = [
+        ('dicomweb', 'DICOMweb (OHIF-style) - Standard WADO-RS'),
+        ('file', 'File endpoint - Direct Orthanc /file'),
+        ('attachment', 'Attachment - Raw DICOM data'),
+        ('auto', 'Auto-detect - Try best working endpoint'),
+    ]
+    
     orthancurl = models.URLField(verbose_name="Orthanc URL", max_length=200)
     viewrurl = models.URLField(verbose_name="DICOM Viewer URL", max_length=200)
+    endpoint_style = models.CharField(
+        verbose_name="Endpoint Style",
+        max_length=20,
+        choices=ENDPOINT_STYLE_CHOICES,
+        default='dicomweb',
+        help_text="Choose which Orthanc endpoint style to use for DICOM image retrieval"
+    )
     created = models.DateTimeField(auto_now_add=True)
     modified = models.DateTimeField(auto_now=True)
 
@@ -25,7 +39,7 @@ class PacsConfig(models.Model):
         verbose_name_plural = "PACS Configurations"
 
     def __str__(self):
-        return f"PACS Config (Last modified: {self.modified})"
+        return f"PACS Config ({self.get_endpoint_style_display()}) - {self.modified}"
 
 
 class Modaliti(models.Model):

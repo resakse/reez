@@ -26,7 +26,8 @@ class PacsConfigListCreateAPIView(generics.ListCreateAPIView):
         if not config:
             config = PacsConfig.objects.create(
                 orthancurl='http://localhost:8042',
-                viewrurl='http://localhost:3000/viewer'
+                viewrurl='http://localhost:3000/viewer',
+                endpoint_style='dicomweb'
             )
         return PacsConfig.objects.all()
 
@@ -46,7 +47,8 @@ def get_current_pacs_config(request):
         # Create default configuration if none exists
         config = PacsConfig.objects.create(
             orthancurl='http://localhost:8043',
-            viewrurl='http://localhost:3000/viewer'
+            viewrurl='http://localhost:3000/viewer',
+            endpoint_style='dicomweb'
         )
     
     serializer = PacsConfigSerializer(config)

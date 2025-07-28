@@ -60,9 +60,9 @@ const StudyBrowser: React.FC<StudyBrowserProps> = ({
   const filteredStudies = studies
     .filter(study => {
       const matchesSearch = searchTerm === '' || 
-        study.patientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        study.patientID.includes(searchTerm) ||
-        study.accessionNumber.toLowerCase().includes(searchTerm.toLowerCase());
+        (study.patientName?.toLowerCase?.() || '').includes(searchTerm.toLowerCase()) ||
+        (study.patientID || '').includes(searchTerm) ||
+        (study.accessionNumber?.toLowerCase?.() || '').includes(searchTerm.toLowerCase());
       
       const matchesModality = modalityFilter === '' || study.modality === modalityFilter;
       
@@ -74,9 +74,9 @@ const StudyBrowser: React.FC<StudyBrowserProps> = ({
           return new Date(b.studyDate + ' ' + b.studyTime).getTime() - 
                  new Date(a.studyDate + ' ' + a.studyTime).getTime();
         case 'patient':
-          return a.patientName.localeCompare(b.patientName);
+          return (a.patientName || '').localeCompare(b.patientName || '');
         case 'modality':
-          return a.modality.localeCompare(b.modality);
+          return (a.modality || '').localeCompare(b.modality || '');
         default:
           return 0;
       }

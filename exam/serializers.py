@@ -405,7 +405,16 @@ class PositionChoicesSerializer(serializers.Serializer):
 
 
 class PacsConfigSerializer(serializers.ModelSerializer):
+    endpoint_style_choices = serializers.SerializerMethodField()
+    
     class Meta:
         model = PacsConfig
-        fields = ['id', 'orthancurl', 'viewrurl', 'created', 'modified']
-        read_only_fields = ['created', 'modified']
+        fields = ['id', 'orthancurl', 'viewrurl', 'endpoint_style', 'endpoint_style_choices', 'created', 'modified']
+        read_only_fields = ['created', 'modified', 'endpoint_style_choices']
+    
+    def get_endpoint_style_choices(self, obj):
+        """Return the available endpoint style choices for the frontend"""
+        return [
+            {'value': choice[0], 'label': choice[1]} 
+            for choice in PacsConfig.ENDPOINT_STYLE_CHOICES
+        ]

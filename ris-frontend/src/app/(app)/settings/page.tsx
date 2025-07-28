@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Shield, AlertCircle, CheckCircle2 } from 'lucide-react';
 import AuthService from '@/lib/auth';
 
@@ -14,6 +15,8 @@ interface PacsConfig {
   id: number;
   orthancurl: string;
   viewrurl: string;
+  endpoint_style: string;
+  endpoint_style_choices: Array<{value: string, label: string}>;
   created: string;
   modified: string;
 }
@@ -21,6 +24,7 @@ interface PacsConfig {
 interface PacsFormData {
   orthancurl: string;
   viewrurl: string;
+  endpoint_style: string;
 }
 
 export default function SettingsPage() {
@@ -29,6 +33,7 @@ export default function SettingsPage() {
   const [formData, setFormData] = useState<PacsFormData>({
     orthancurl: '',
     viewrurl: '',
+    endpoint_style: 'dicomweb',
   });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -60,6 +65,7 @@ export default function SettingsPage() {
         setFormData({
           orthancurl: config.orthancurl,
           viewrurl: config.viewrurl,
+          endpoint_style: config.endpoint_style || 'dicomweb',
         });
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load PACS configuration');
@@ -129,6 +135,7 @@ export default function SettingsPage() {
   const isFormValid = (): boolean => {
     return formData.orthancurl.trim() !== '' && 
            formData.viewrurl.trim() !== '' &&
+           formData.endpoint_style.trim() !== '' &&
            isValidUrl(formData.orthancurl) && 
            isValidUrl(formData.viewrurl);
   };
@@ -226,6 +233,33 @@ export default function SettingsPage() {
               </p>
             </div>
 
+            <div>
+              <Label htmlFor="endpoint_style">DICOM Endpoint Style *</Label>
+              <Select 
+                value={formData.endpoint_style} 
+                onValueChange={(value) => handleInputChange('endpoint_style', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select endpoint style" />
+                </SelectTrigger>
+                <SelectContent>
+                  {pacsConfig?.endpoint_style_choices?.map((choice) => (
+                    <SelectItem key={choice.value} value={choice.value}>
+                      {choice.label}
+                    </SelectItem>
+                  )) || [
+                    <SelectItem key="dicomweb" value="dicomweb">DICOMweb (OHIF-style) - Standard WADO-RS</SelectItem>,
+                    <SelectItem key="file" value="file">File endpoint - Direct Orthanc /file</SelectItem>,
+                    <SelectItem key="attachment" value="attachment">Attachment - Raw DICOM data</SelectItem>,
+                    <SelectItem key="auto" value="auto">Auto-detect - Try best working endpoint</SelectItem>
+                  ]}
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-gray-600 mt-1">
+                Choose which Orthanc endpoint to use for DICOM image retrieval. <strong>DICOMweb (OHIF-style)</strong> is recommended as it uses the same endpoints as OHIF viewer and prevents image inversion issues.
+              </p>
+            </div>
+
             <div className="flex space-x-2 pt-4">
               <Button 
                 type="submit" 
@@ -240,6 +274,12 @@ export default function SettingsPage() {
             <div className="mt-6 pt-6 border-t">
               <h3 className="text-sm font-medium text-gray-900 mb-2">Configuration Info</h3>
               <dl className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2 text-sm">
+                <div>
+                  <dt className="font-medium text-gray-500">Current Endpoint Style:</dt>
+                  <dd className="text-gray-900 font-mono">
+                    {pacsConfig.endpoint_style_choices?.find(choice => choice.value === pacsConfig.endpoint_style)?.label || pacsConfig.endpoint_style}
+                  </dd>
+                </div>
                 <div>
                   <dt className="font-medium text-gray-500">Created:</dt>
                   <dd className="text-gray-900">{new Date(pacsConfig.created).toLocaleString()}</dd>

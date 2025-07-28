@@ -77,6 +77,7 @@ export default function LegacyStudyViewerPage() {
   
   const [metadata, setMetadata] = useState<StudyMetadata | null>(null);
   const [imageIds, setImageIds] = useState<string[]>([]);
+  const [seriesInfo, setSeriesInfo] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
@@ -143,21 +144,14 @@ export default function LegacyStudyViewerPage() {
     if (!studyUid) return;
     
     try {
-      console.log('🔍 Fetching enhanced DICOM data for study:', studyUid);
       // Fetch detailed metadata from our enhanced endpoint
       const response = await AuthService.authenticatedFetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/pacs/studies/${studyUid}/enhanced-metadata/`
       );
       
-      console.log('📡 Enhanced metadata response status:', response.status);
-      
       if (response.ok) {
         const data = await response.json();
-        console.log('📋 Enhanced metadata response data:', data);
         setEnhancedDicomData(data.series || []);
-        console.log('📊 Enhanced DICOM data set to:', data.series || []);
-      } else {
-        console.error('❌ Enhanced metadata request failed:', response.status, response.statusText);
       }
     } catch (err) {
       console.error('Error fetching enhanced DICOM data:', err);
@@ -195,30 +189,36 @@ export default function LegacyStudyViewerPage() {
       setLoading(true);
       setError(null);
 
-      // Fetch study metadata and image IDs in parallel
-      const [studyMetadata, studyImageIds] = await Promise.all([
+      // Fetch study metadata and image data in parallel
+      const [studyMetadata, studyImageData] = await Promise.all([
         getStudyMetadata(studyUid),
         getStudyImageIds(studyUid)
       ]);
 
       console.log('Study metadata:', studyMetadata);
-      console.log('Study image IDs:', studyImageIds);
-      console.log(`Found ${studyImageIds.length} images for study ${studyUid}`);
+      console.log('Study image data:', studyImageData);
+      console.log(`Found ${studyImageData.imageIds.length} images in ${studyImageData.seriesInfo.length} series for study ${studyUid}`);
 
       // Cache the fetched data
       studyDataCache.set(studyUid, {
         metadata: studyMetadata,
-        imageIds: studyImageIds,
+        imageIds: studyImageData.imageIds,
         timestamp: now
       });
 
       setMetadata(studyMetadata);
-      setImageIds(studyImageIds);
+      setImageIds(studyImageData.imageIds);
+      setSeriesInfo(studyImageData.seriesInfo);
       
-      if (studyImageIds.length === 0) {
+      if (studyImageData.imageIds.length === 0) {
         toast.warning('No DICOM images found in this study');
       } else {
-        toast.success(`Loaded ${studyImageIds.length} images from legacy study`);
+        const seriesCount = studyImageData.seriesInfo.length;
+        if (seriesCount > 1) {
+          toast.success(`Loaded ${studyImageData.imageIds.length} images across ${seriesCount} series from study`);
+        } else {
+          toast.success(`Loaded ${studyImageData.imageIds.length} images from study`);
+        }
       }
     } catch (err) {
       console.error('Error loading legacy study:', err);
@@ -430,6 +430,7 @@ export default function LegacyStudyViewerPage() {
           {imageIds.length > 0 ? (
             <SimpleDicomViewer 
               imageIds={imageIds}
+              seriesInfo={seriesInfo}
               studyMetadata={{
                 patientName: metadata.PatientName || 'Unknown',
                 patientId: metadata.PatientID || 'Unknown',
@@ -506,6 +507,7 @@ export default function LegacyStudyViewerPage() {
         {imageIds.length > 0 ? (
           <SimpleDicomViewer 
             imageIds={imageIds}
+            seriesInfo={seriesInfo}
             studyMetadata={{
               patientName: metadata.PatientName || 'Unknown',
               patientId: metadata.PatientID || 'Unknown',
@@ -516,11 +518,21 @@ export default function LegacyStudyViewerPage() {
           />
         ) : (
           <div className="h-full flex items-center justify-center bg-background">
-            <div className="text-center">
+            <div className="text-center max-w-md">
               <Eye className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
               <h3 className="text-lg font-semibold mb-2">No Images Available</h3>
-              <p className="text-muted-foreground">
-                This study contains no viewable images
+              <p className="text-muted-foreground mb-4">
+                This study contains no viewable images. This may be due to:
+              </p>
+              <ul className="text-sm text-muted-foreground text-left space-y-1">
+                <li>• PACS server storage configuration issues</li>
+                <li>• DICOM files were deleted from storage</li>
+                <li>• Network connectivity problems</li>
+                <li>• Corrupted or invalid DICOM data</li>
+                <li>• Orthanc database inconsistency</li>
+              </ul>
+              <p className="text-xs text-muted-foreground mt-4">
+                Contact your system administrator if this problem persists.
               </p>
             </div>
           </div>
@@ -639,10 +651,6 @@ export default function LegacyStudyViewerPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {(() => {
-                console.log('🎯 Rendering Study Details - isImportedToRis:', isImportedToRis, 'risExaminations.length:', risExaminations.length, 'enhancedDicomData.length:', enhancedDicomData.length);
-                return null;
-              })()}
               {isImportedToRis && risExaminations.length > 0 ? (
                 // Show enhanced RIS examination details
                 <>
