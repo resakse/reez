@@ -35,6 +35,7 @@ const SimpleDicomViewer = dynamic(() => import('@/components/SimpleDicomViewer')
     </div>
   ),
 });
+
 import { getStudyMetadata, getStudyImageIds } from '@/lib/orthanc';
 import { toast } from '@/lib/toast';
 import AuthService from '@/lib/auth';
@@ -189,15 +190,49 @@ export default function LegacyStudyViewerPage() {
       setLoading(true);
       setError(null);
 
-      // Fetch study metadata and image data in parallel
-      const [studyMetadata, studyImageData] = await Promise.all([
-        getStudyMetadata(studyUid),
-        getStudyImageIds(studyUid)
-      ]);
-
+      // First fetch study metadata to determine if it's a large CT/MRI study
+      const studyMetadata = await getStudyMetadata(studyUid);
       console.log('Study metadata:', studyMetadata);
-      console.log('Study image data:', studyImageData);
-      console.log(`Found ${studyImageData.imageIds.length} images in ${studyImageData.seriesInfo.length} series for study ${studyUid}`);
+
+      // ONLY use series endpoint - NO FALLBACKS
+      console.log('🔍 DEBUG: Attempting to fetch series metadata');
+      const seriesResponse = await AuthService.authenticatedFetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/pacs/studies/${studyUid}/series/`
+      );
+      
+      console.log('🔍 DEBUG: Series response status:', seriesResponse.status);
+      
+      if (!seriesResponse.ok) {
+        throw new Error(`Series endpoint failed with status ${seriesResponse.status}`);
+      }
+      
+      const seriesData = await seriesResponse.json();
+      const totalImages = seriesData.series?.reduce((sum: number, s: any) => sum + s.imageCount, 0) || 0;
+      const seriesCount = seriesData.series?.length || 0;
+      
+      console.log(`Study: ${totalImages} images across ${seriesCount} series`);
+      
+      // Create data with ONLY first image of each series
+      const firstImages = seriesData.series?.map((s: any) => `wadors:${s.firstImageUrl}`) || [];
+      
+      // Map series data to expected format
+      const enhancedSeriesInfo = seriesData.series?.map((s: any) => ({
+        seriesId: s.seriesId,
+        seriesInstanceUID: s.seriesUid,
+        seriesDescription: s.seriesDescription,
+        instanceCount: s.imageCount,
+        imageCount: s.imageCount
+      })) || [];
+      
+      const studyImageData = {
+        imageIds: firstImages, // Only first images for thumbnails
+        seriesInfo: enhancedSeriesInfo,
+        total: totalImages
+      };
+      
+      toast.success(`Study loaded: ${totalImages} images across ${seriesCount} series. Showing 1 thumbnail per series.`);
+
+      console.log('Final study image data:', studyImageData);
 
       // Cache the fetched data
       studyDataCache.set(studyUid, {
@@ -208,12 +243,17 @@ export default function LegacyStudyViewerPage() {
 
       setMetadata(studyMetadata);
       setImageIds(studyImageData.imageIds);
-      setSeriesInfo(studyImageData.seriesInfo);
+      setSeriesInfo(studyImageData.seriesInfo || []);
       
       if (studyImageData.imageIds.length === 0) {
         toast.warning('No DICOM images found in this study');
+      } else if (studyImageData.total && studyImageData.total > studyImageData.imageIds.length) {
+        // Large study with lazy loading
+        const seriesCount = studyImageData.seriesInfo?.length || 0;
+        toast.success(`Study loaded: ${studyImageData.total} images across ${seriesCount} series. Images will load on demand.`);
       } else {
-        const seriesCount = studyImageData.seriesInfo.length;
+        // Regular study
+        const seriesCount = studyImageData.seriesInfo?.length || 0;
         if (seriesCount > 1) {
           toast.success(`Loaded ${studyImageData.imageIds.length} images across ${seriesCount} series from study`);
         } else {
@@ -436,7 +476,8 @@ export default function LegacyStudyViewerPage() {
                 patientId: metadata.PatientID || 'Unknown',
                 studyDate: metadata.StudyDate || '',
                 studyDescription: metadata.StudyDescription || '',
-                modality: metadata.Modality || 'Unknown'
+                modality: metadata.Modality || 'Unknown',
+                studyInstanceUID: studyUid
               }}
             />
           ) : (
@@ -513,7 +554,8 @@ export default function LegacyStudyViewerPage() {
               patientId: metadata.PatientID || 'Unknown',
               studyDate: metadata.StudyDate || '',
               studyDescription: metadata.StudyDescription || '',
-              modality: metadata.Modality || 'Unknown'
+              modality: metadata.Modality || 'Unknown',
+              studyInstanceUID: studyUid
             }}
           />
         ) : (

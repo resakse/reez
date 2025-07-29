@@ -10,7 +10,7 @@ from .views import (
 )
 from .settings_views import PacsConfigListCreateAPIView, PacsConfigDetailAPIView, get_current_pacs_config, get_pacs_orthanc_url
 from .examination_views import ExaminationListAPIView, ExaminationDetailAPIView
-from .pacs_views import PacsSearchView, pacs_stats, import_legacy_study, DicomImageProxyView, dicom_instance_proxy, get_study_image_ids, get_enhanced_study_metadata, pacs_health_check, dicom_instance_raw_proxy, dicom_instance_dicomweb_proxy
+from .pacs_views import PacsSearchView, pacs_stats, import_legacy_study, DicomImageProxyView, dicom_instance_proxy, get_study_image_ids, get_enhanced_study_metadata, pacs_health_check, dicom_instance_raw_proxy, dicom_instance_dicomweb_proxy, get_study_series_metadata, get_series_bulk_images
 from .configurable_pacs_views import configurable_dicom_instance_proxy, configurable_dicom_metadata, configurable_dicom_frames
 
 from . import api
@@ -102,4 +102,8 @@ urlpatterns = [
     path('pacs/instances/<str:orthanc_id>/raw', dicom_instance_raw_proxy, name='dicom-instance-raw-proxy'),
     path('pacs/studies/<str:study_uid>/image-ids/', get_study_image_ids, name='get-study-image-ids'),
     path('pacs/studies/<str:study_uid>/enhanced-metadata/', get_enhanced_study_metadata, name='get-enhanced-study-metadata'),
+    
+    # CT Scan Bulk Retrieval API endpoints (NEW)
+    path('pacs/studies/<str:study_uid>/series/', get_study_series_metadata, name='get-study-series-metadata'),
+    path('pacs/studies/<str:study_uid>/series/<str:series_uid>/images/bulk', get_series_bulk_images, name='get-series-bulk-images'),
 ]

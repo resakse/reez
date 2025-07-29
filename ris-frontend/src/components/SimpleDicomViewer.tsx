@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { 
   ZoomIn, ZoomOut, RotateCw, Move, Square, Circle, 
   Ruler, MousePointer, RotateCcw, Maximize, Settings,
@@ -245,8 +246,9 @@ interface ImageSettings {
   pan?: { x: number; y: number };
 }
 
-const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesInfo = [], studyMetadata }) => {
+const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initialImageIds, seriesInfo = [], studyMetadata }) => {
   const mainViewportRef = useRef<HTMLDivElement>(null);
+  const [imageIds, setImageIds] = useState<string[]>(initialImageIds);
   const [renderingEngine, setRenderingEngine] = useState<RenderingEngine | null>(null);
   const [viewport, setViewport] = useState<any>(null);
   const [toolGroup, setToolGroup] = useState<any>(null);
@@ -262,6 +264,13 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
   const [isFlippedHorizontal, setIsFlippedHorizontal] = useState<boolean>(false);
   const [isToolbarMinimized, setIsToolbarMinimized] = useState<boolean>(false);
   const [toolbarPosition, setToolbarPosition] = useState({ x: 0, y: 16 }); // Initial position
+  const [seriesLoadingProgress, setSeriesLoadingProgress] = useState<Record<string, number>>({});
+  const [loadingSeries, setLoadingSeries] = useState<Set<string>>(new Set());
+  
+  // Cache loaded series to prevent re-fetching
+  const [loadedSeriesCache, setLoadedSeriesCache] = useState<Map<string, string[]>>(new Map());
+  const [currentSeriesId, setCurrentSeriesId] = useState<string | null>(null);
+  
   const playbackIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
@@ -273,6 +282,175 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
   // Track initialization state to prevent double loading
   const initializationRef = useRef(false);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
+  
+  // Preload images in background to prevent refetching on scroll
+  const preloadImagesInBackground = useCallback(async (imageIds: string[], seriesKey: string) => {
+    try {
+      console.log(`🔄 Preloading ${imageIds.length} images for series ${seriesKey}`);
+      
+      // Use Cornerstone's image loader to preload all images
+      const { imageLoader } = await import('@cornerstonejs/core');
+      
+      // Load images in batches to avoid overwhelming the browser
+      const batchSize = 10;
+      let loaded = 0;
+      
+      for (let i = 0; i < imageIds.length; i += batchSize) {
+        const batch = imageIds.slice(i, Math.min(i + batchSize, imageIds.length));
+        
+        // Load batch sequentially to show proper progress
+        for (const imageId of batch) {
+          try {
+            // This actually loads the image data into Cornerstone's cache
+            await imageLoader.loadAndCacheImage(imageId);
+            loaded++;
+            
+            // Update progress bar with actual image loading progress
+            const progress = Math.round((loaded / imageIds.length) * 100);
+            setSeriesLoadingProgress(prev => ({ ...prev, [seriesKey]: progress }));
+            
+            // Update progress occasionally in console
+            if (loaded % 20 === 0 || loaded === imageIds.length) {
+              console.log(`📈 Preloaded ${loaded}/${imageIds.length} images (${progress}%)`);
+            }
+          } catch (err) {
+            console.warn(`Failed to preload image ${imageId}:`, err);
+            loaded++; // Count failed images too so progress continues
+          }
+        }
+        
+        // Small delay between batches to avoid blocking UI
+        if (i + batchSize < imageIds.length) {
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+      }
+      
+      console.log(`✅ Preloading complete: ${loaded}/${imageIds.length} images cached`);
+      toast.success(`Preloaded ${loaded} images - scrolling should be instant now`);
+      
+      // Clean up progress after completion
+      setTimeout(() => {
+        setSeriesLoadingProgress(prev => {
+          const updated = { ...prev };
+          delete updated[seriesKey];
+          return updated;
+        });
+      }, 2000);
+      
+    } catch (err) {
+      console.error('Background preloading failed:', err);
+      // Clean up progress on error
+      setSeriesLoadingProgress(prev => {
+        const updated = { ...prev };
+        delete updated[seriesKey];
+        return updated;
+      });
+    }
+  }, []);
+
+  // Load series URLs and preload images in background
+  const loadSeriesInBackground = useCallback(async (seriesKey: string, series: any) => {
+    try {
+      console.log(`🔄 Loading URLs for series ${seriesKey} in background`);
+      
+      // Step 1: Fetch URLs
+      const response = await AuthService.authenticatedFetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/pacs/studies/${studyMetadata.studyInstanceUID}/series/${series.seriesInstanceUID}/images/bulk?start=0&count=1000`
+      );
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch series data: ${response.status}`);
+      }
+      
+      const bulkData = await response.json();
+      const seriesImageIds = bulkData.images?.map((img: any) => `wadors:${img.imageUrl}`) || [];
+      
+      console.log(`📋 Loaded ${seriesImageIds.length} URLs for series ${seriesKey}`);
+      
+      // Step 2: Cache URLs and update viewport
+      setLoadedSeriesCache(prev => new Map(prev).set(seriesKey, seriesImageIds));
+      setCurrentSeriesId(seriesKey);
+      
+      // Step 3: Register metadata and set stack
+      if (viewport && seriesImageIds.length > 0) {
+        await preRegisterWadorsMetadata(seriesImageIds);
+        await viewport.setStack(seriesImageIds, 0);
+        setImageIds(seriesImageIds);
+        setCurrentImageIndex(0);
+        viewport.render();
+      }
+      
+      // Step 4: Start preloading with progress bar
+      console.log(`🎯 Starting image preloading for ${seriesImageIds.length} images`);
+      setSeriesLoadingProgress(prev => ({ ...prev, [seriesKey]: 0 }));
+      preloadImagesInBackground(seriesImageIds, seriesKey);
+      
+    } catch (err) {
+      console.error('Background series loading failed:', err);
+      toast.error(`Failed to load series: ${err}`);
+    } finally {
+      // Remove from loading set
+      setLoadingSeries(prev => {
+        const updated = new Set(prev);
+        updated.delete(seriesKey);
+        return updated;
+      });
+    }
+  }, [viewport, studyMetadata, preloadImagesInBackground]);
+
+
+  // Update local imageIds when prop changes
+  useEffect(() => {
+    setImageIds(initialImageIds);
+  }, [initialImageIds]);
+
+  // Load bulk URLs immediately on page load (background)
+  useEffect(() => {
+    if (seriesInfo.length > 0 && studyMetadata?.studyInstanceUID) {
+      console.log(`🔄 Loading bulk URLs for ${seriesInfo.length} series on page load`);
+      
+      seriesInfo.forEach((series, index) => {
+        const seriesKey = series.seriesInstanceUID || `series-${index}`;
+        
+        // Load URLs in background
+        setTimeout(() => {
+          loadSeriesUrlsInBackground(seriesKey, series, index);
+        }, index * 500); // Stagger by 500ms
+      });
+    }
+  }, [seriesInfo, studyMetadata]);
+
+  // Start image preloading when URLs are loaded
+  const loadSeriesUrlsInBackground = useCallback(async (seriesKey: string, series: any, seriesIndex: number) => {
+    try {
+      console.log(`📋 Loading URLs for series ${seriesKey}`);
+      
+      const response = await AuthService.authenticatedFetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/pacs/studies/${studyMetadata.studyInstanceUID}/series/${series.seriesInstanceUID}/images/bulk?start=0&count=1000`
+      );
+      
+      if (!response.ok) {
+        console.warn(`Failed to load URLs for series ${seriesKey}`);
+        return;
+      }
+      
+      const bulkData = await response.json();
+      const seriesImageIds = bulkData.images?.map((img: any) => `wadors:${img.imageUrl}`) || [];
+      
+      console.log(`✅ Loaded ${seriesImageIds.length} URLs for series ${seriesKey}`);
+      
+      // Cache URLs
+      setLoadedSeriesCache(prev => new Map(prev).set(seriesKey, seriesImageIds));
+      
+      // Start preloading images immediately with progress bar
+      console.log(`🎯 Starting preload for series ${seriesKey}`);
+      setSeriesLoadingProgress(prev => ({ ...prev, [seriesKey]: 0 }));
+      preloadImagesInBackground(seriesImageIds, seriesKey);
+      
+    } catch (err) {
+      console.warn(`Failed to load series ${seriesKey}:`, err);
+    }
+  }, [studyMetadata, preloadImagesInBackground]);
 
   // Helper functions for per-image settings
   const saveCurrentImageSettings = useCallback(() => {
@@ -491,7 +669,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
         const startIndex = Math.min(currentImageIndex, imageIds.length - 1);
         
         try {
-          // Pre-register WADO-RS metadata BEFORE any viewport operations
+          // Pre-register WADO-RS metadata for the limited images only
           await preRegisterWadorsMetadata(imageIds);
           
           // Check PhotometricInterpretation from metadata BEFORE loading image
@@ -731,7 +909,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
         }
       }
     };
-  }, [imageIds]); // Keep only imageIds as dependency
+  }, [initialImageIds]); // Only reinitialize on prop change, not state change
 
   // Tool management functions
   const setToolActive = useCallback((tool: Tool) => {
@@ -1023,6 +1201,32 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
   }, [viewport]);
 
   
+  // Mouse wheel navigation for images
+  useEffect(() => {
+    const handleWheel = (event: WheelEvent) => {
+      // Only handle wheel events on the viewport
+      if (!mainViewportRef.current?.contains(event.target as Node)) {
+        return;
+      }
+      
+      event.preventDefault();
+      
+      const delta = event.deltaY > 0 ? 1 : -1;
+      
+      if (delta > 0) {
+        nextImage();
+      } else {
+        prevImage();
+      }
+    };
+
+    const element = mainViewportRef.current;
+    if (element) {
+      element.addEventListener('wheel', handleWheel, { passive: false });
+      return () => element.removeEventListener('wheel', handleWheel);
+    }
+  }, [nextImage, prevImage]);
+
   // Keyboard navigation for images
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -1387,7 +1591,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
         </div>
 
         {/* Thumbnails Strip - Bottom */}
-        {!showLoading && !showNoImages && imageIds.length > 1 && (
+        {!showLoading && !showNoImages && (imageIds.length > 1 || seriesInfo.length > 1) && (
           <div className="h-24 border-t bg-muted/5 p-2">
             <div className="flex items-center gap-2 h-full overflow-x-auto">
               {/* Navigation Controls */}
@@ -1420,68 +1624,72 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds, seriesI
                 </Button>
               </div>
 
-              {/* Thumbnail Images - Series-level or Image-level based on study size */}
+              {/* Thumbnails - ONLY 1 per series, NO FALLBACKS */}
               <div className="flex gap-1 flex-1 overflow-x-auto">
                 {(() => {
-                  // For large studies with multiple series (typically CT/MR), show series-level thumbnails
-                  const shouldUseSeriesThumbnails = imageIds.length > 20 && seriesInfo.length > 1;
-                  
-                  if (shouldUseSeriesThumbnails) {
-                    
-                    // Calculate which series the current image belongs to
-                    let currentSeriesIndex = 0;
-                    let imageCountSoFar = 0;
-                    for (let i = 0; i < seriesInfo.length; i++) {
-                      if (currentImageIndex < imageCountSoFar + seriesInfo[i].instanceCount) {
-                        currentSeriesIndex = i;
-                        break;
-                      }
-                      imageCountSoFar += seriesInfo[i].instanceCount;
-                    }
+                  // ONLY show series thumbnails if seriesInfo exists
+                  if (seriesInfo.length > 0) {
+                    console.log(`📊 SERIES MODE: Showing ${seriesInfo.length} series thumbnails ONLY`);
                     
                     return seriesInfo.map((series, seriesIndex) => {
-                      // Calculate the first image index for this series
-                      let seriesStartIndex = 0;
-                      for (let i = 0; i < seriesIndex; i++) {
-                        seriesStartIndex += seriesInfo[i].instanceCount;
-                      }
+                      // Since we only load first image per series, use seriesIndex directly
+                      const representativeImageId = imageIds[seriesIndex];
+                      if (!representativeImageId) return null;
                       
-                      const representativeImageId = imageIds[seriesStartIndex];
-                      const isActiveSeries = seriesIndex === currentSeriesIndex;
+                      // Check if this series is currently active (simple index match)
+                      const isActiveSeries = currentImageIndex === seriesIndex;
+                      
+                      const handleSeriesClick = async () => {
+                        // Just go to this series image for now
+                        goToImage(seriesIndex);
+                      };
                       
                       return (
                         <div
                           key={series.seriesId}
-                          className="flex-shrink-0 relative"
+                          className="flex-shrink-0 flex flex-col items-center"
                           title={`${series.seriesDescription} (${series.instanceCount} images)`}
                         >
-                          <ThumbnailImage
-                            imageId={representativeImageId}
-                            index={seriesStartIndex}
-                            isActive={isActiveSeries}
-                            onClick={() => goToImage(seriesStartIndex)}
-                          />
-                          {/* Series info overlay */}
-                          <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs p-1 rounded-b">
-                            <div className="font-medium truncate">{series.seriesDescription || `Series ${seriesIndex + 1}`}</div>
-                            <div className="text-xs opacity-75">{series.instanceCount} imgs</div>
+                          <div className="relative">
+                            <ThumbnailImage
+                              imageId={representativeImageId}
+                              index={seriesIndex}
+                              isActive={isActiveSeries}
+                              onClick={handleSeriesClick}
+                            />
+                            
+                            {/* Clean progress bar - only when preloading images */}
+                            {(() => {
+                              const seriesKey = series.seriesInstanceUID || `series-${seriesIndex}`;
+                              const progress = seriesLoadingProgress[seriesKey];
+                              
+                              if (progress !== undefined && progress > 0 && progress < 100) {
+                                return (
+                                  <div className="absolute bottom-0 left-0 right-0 px-1 pb-1">
+                                    <Progress value={progress} className="h-1" />
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
+                          </div>
+                          
+                          {/* Series name below thumbnail */}
+                          <div className="text-xs text-center mt-1 max-w-20 truncate">
+                            {series.seriesDescription || `Series ${seriesIndex + 1}`}
                           </div>
                         </div>
                       );
                     });
                   } else {
-                    // For small studies or single series, show individual image thumbnails
-                    return imageIds.map((imageId, index) => {
-                      return (
-                        <ThumbnailImage
-                          key={imageId}
-                          imageId={imageId}
-                          index={index}
-                          isActive={index === currentImageIndex}
-                          onClick={() => goToImage(index)}
-                        />
-                      );
-                    });
+                    // NO FALLBACK - only show message
+                    console.log(`📊 NO SERIES INFO: No thumbnails shown`);
+                    
+                    return (
+                      <div className="flex items-center justify-center p-4 text-sm text-muted-foreground">
+                        Use mouse wheel or arrow keys to navigate {imageIds.length} images
+                      </div>
+                    );
                   }
                 })()}
               </div>

@@ -1444,6 +1444,203 @@ def get_enhanced_study_metadata(request, study_uid):
         return Response({'error': f'Server error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_study_series_metadata(request, study_uid):
+    """
+    Get DICOM series metadata for CT scan bulk retrieval
+    
+    URL format: /api/pacs/studies/{study_uid}/series/
+    Returns series information with first frame URLs for thumbnails
+    """
+    try:
+        # Get Orthanc URL from configuration
+        pacs_config = PacsConfig.objects.first()
+        if not pacs_config:
+            return Response({'error': 'PACS configuration not found'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        orthanc_url = pacs_config.orthancurl
+        
+        # Find the study
+        find_response = requests.post(
+            f"{orthanc_url}/tools/find",
+            headers={'Content-Type': 'application/json'},
+            json={
+                'Level': 'Study',
+                'Query': {'StudyInstanceUID': study_uid},
+                'Expand': True,
+            },
+            timeout=30
+        )
+        
+        if not find_response.ok or not find_response.json():
+            return Response({'error': f'Study not found: {study_uid}'}, status=status.HTTP_404_NOT_FOUND)
+        
+        study_data = find_response.json()[0]
+        
+        # Process each series
+        series_metadata = []
+        
+        for series_id in study_data.get('Series', []):
+            try:
+                # Get series details
+                series_response = requests.get(f"{orthanc_url}/series/{series_id}", timeout=30)
+                if not series_response.ok:
+                    continue
+                    
+                series_data = series_response.json()
+                series_tags = series_data.get('MainDicomTags', {})
+                instances = series_data.get('Instances', [])
+                
+                if not instances:
+                    continue
+                
+                # Get first instance for thumbnail
+                first_instance_id = instances[0]
+                
+                # Build API URL for first frame
+                api_url = request.build_absolute_uri('/').rstrip('/')
+                first_frame_url = f"{api_url}/api/pacs/instances/{first_instance_id}/frames/1"
+                
+                # Extract series metadata
+                series_info = {
+                    'seriesId': series_id,
+                    'seriesUid': series_tags.get('SeriesInstanceUID', ''),
+                    'seriesNumber': int(series_tags.get('SeriesNumber', 0)) if series_tags.get('SeriesNumber') else 0,
+                    'seriesDescription': series_tags.get('SeriesDescription', f'Series {series_tags.get("SeriesNumber", "Unknown")}'),
+                    'modality': series_tags.get('Modality', 'OT'),
+                    'imageCount': len(instances),
+                    'firstImageUrl': first_frame_url,
+                    'instances': [
+                        {
+                            'instanceId': instance_id,
+                            'frameUrl': f"{api_url}/api/pacs/instances/{instance_id}/frames/1"
+                        } for instance_id in instances
+                    ]
+                }
+                
+                series_metadata.append(series_info)
+                
+            except Exception as e:
+                print(f"Error processing series {series_id}: {e}")
+                continue
+        
+        # Sort series by series number
+        series_metadata.sort(key=lambda x: x['seriesNumber'])
+        
+        return Response({
+            'studyUid': study_uid,
+            'series': series_metadata,
+            'totalSeries': len(series_metadata),
+            'success': True
+        })
+        
+    except requests.exceptions.RequestException as e:
+        return Response({'error': f'Network error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    except Exception as e:
+        return Response({'error': f'Server error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_series_bulk_images(request, study_uid, series_uid):
+    """
+    Get bulk image URLs for a series with pagination
+    
+    URL format: /api/pacs/studies/{study_uid}/series/{series_uid}/images/bulk?start=0&count=50
+    """
+    try:
+        # Get pagination parameters
+        start = int(request.GET.get('start', 0))
+        count = int(request.GET.get('count', 50))
+        
+        # Get Orthanc URL from configuration
+        pacs_config = PacsConfig.objects.first()
+        if not pacs_config:
+            return Response({'error': 'PACS configuration not found'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        orthanc_url = pacs_config.orthancurl
+        
+        # Find the series
+        find_response = requests.post(
+            f"{orthanc_url}/tools/find",
+            headers={'Content-Type': 'application/json'},
+            json={
+                'Level': 'Series',
+                'Query': {'SeriesInstanceUID': series_uid},
+                'Expand': True,
+            },
+            timeout=30
+        )
+        
+        if not find_response.ok or not find_response.json():
+            return Response({'error': f'Series not found: {series_uid}'}, status=status.HTTP_404_NOT_FOUND)
+        
+        series_data = find_response.json()[0]
+        instances = series_data.get('Instances', [])
+        
+        if not instances:
+            return Response({'error': f'No instances found in series: {series_uid}'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Sort instances by instance number if available
+        instance_details = []
+        for instance_id in instances:
+            try:
+                instance_response = requests.get(f"{orthanc_url}/instances/{instance_id}", timeout=10)
+                if instance_response.ok:
+                    instance_data = instance_response.json()
+                    instance_tags = instance_data.get('MainDicomTags', {})
+                    instance_number = int(instance_tags.get('InstanceNumber', 0)) if instance_tags.get('InstanceNumber') else 0
+                    
+                    instance_details.append({
+                        'instanceId': instance_id,
+                        'instanceNumber': instance_number,
+                        'sopInstanceUid': instance_tags.get('SOPInstanceUID', '')
+                    })
+            except:
+                # Add instance without metadata if fetch fails
+                instance_details.append({
+                    'instanceId': instance_id,
+                    'instanceNumber': 0,
+                    'sopInstanceUid': ''
+                })
+        
+        # Sort by instance number
+        instance_details.sort(key=lambda x: x['instanceNumber'])
+        
+        # Apply pagination
+        total_images = len(instance_details)
+        end = min(start + count, total_images)
+        paginated_instances = instance_details[start:end]
+        
+        # Build image URLs
+        api_url = request.build_absolute_uri('/').rstrip('/')
+        images = []
+        
+        for i, instance in enumerate(paginated_instances):
+            images.append({
+                'imageNumber': start + i + 1,
+                'imageUrl': f"{api_url}/api/pacs/instances/{instance['instanceId']}/frames/1",
+                'instanceUid': instance['sopInstanceUid'],
+                'frameNumber': 1,
+                'orthancId': instance['instanceId']
+            })
+        
+        return Response({
+            'images': images,
+            'totalImages': total_images,
+            'hasMore': end < total_images,
+            'start': start,
+            'count': len(images),
+            'success': True
+        })
+        
+    except requests.exceptions.RequestException as e:
+        return Response({'error': f'Network error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    except Exception as e:
+        return Response({'error': f'Server error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def pacs_health_check(request):
