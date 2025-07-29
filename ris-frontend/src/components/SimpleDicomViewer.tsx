@@ -285,15 +285,19 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
   };
 
   const [imageIds, setImageIdsRaw] = useState<string[]>(initialImageIds);
-  const [renderingEngine, setRenderingEngineRaw] = useState<RenderingEngine | null>(null);
-  const [viewport, setViewportRaw] = useState<any>(null);
-  const [toolGroup, setToolGroupRaw] = useState<any>(null);
+  // Convert engine/viewport/toolGroup to refs - they don't need to trigger re-renders
+  const renderingEngineRef = useRef<RenderingEngine | null>(null);
+  const viewportRef = useRef<any>(null);
+  const toolGroupRef = useRef<any>(null);
+  
+  // Keep only UI-affecting state as actual state
   const [currentImageIndex, setCurrentImageIndexRaw] = useState<number>(0);
   const [error, setErrorRaw] = useState<string | null>(null);
   const [loading, setLoadingRaw] = useState<boolean>(true);
   const [loadingNavigation, setLoadingNavigationRaw] = useState<boolean>(false);
-  const [backgroundLoading, setBackgroundLoadingRaw] = useState<boolean>(false);
-  const [isStackLoading, setIsStackLoadingRaw] = useState<boolean>(false);
+  // Convert loading states to refs if they don't need to trigger UI updates
+  const isStackLoadingRef = useRef<boolean>(false);
+  const backgroundLoadingRef = useRef<boolean>(false);
   const [activeTool, setActiveToolRaw] = useState<Tool>('wwwc');
   const [isPlaying, setIsPlayingRaw] = useState<boolean>(false);
   const [isInverted, setIsInvertedRaw] = useState<boolean>(false);  // Will be set automatically based on PhotometricInterpretation
@@ -305,15 +309,34 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
   
   // Debug-wrapped setters
   const setImageIds = createDebugSetter('imageIds', setImageIdsRaw);
-  const setRenderingEngine = createDebugSetter('renderingEngine', setRenderingEngineRaw);
-  const setViewport = createDebugSetter('viewport', setViewportRaw);
-  const setToolGroup = createDebugSetter('toolGroup', setToolGroupRaw);
+  
+  // Ref setters for non-UI state - no re-renders
+  const setRenderingEngine = (engine: RenderingEngine | null) => {
+    console.log('🔄 REF UPDATE: renderingEngine', engine);
+    renderingEngineRef.current = engine;
+  };
+  const setViewport = (viewport: any) => {
+    console.log('🔄 REF UPDATE: viewport', viewport);
+    viewportRef.current = viewport;
+  };
+  const setToolGroup = (toolGroup: any) => {
+    console.log('🔄 REF UPDATE: toolGroup', toolGroup);
+    toolGroupRef.current = toolGroup;
+  };
   const setCurrentImageIndex = createDebugSetter('currentImageIndex', setCurrentImageIndexRaw);
   const setError = createDebugSetter('error', setErrorRaw);
   const setLoading = createDebugSetter('loading', setLoadingRaw);
   const setLoadingNavigation = createDebugSetter('loadingNavigation', setLoadingNavigationRaw);
-  const setBackgroundLoading = createDebugSetter('backgroundLoading', setBackgroundLoadingRaw);
-  const setIsStackLoading = createDebugSetter('isStackLoading', setIsStackLoadingRaw);
+  
+  // Ref setters for internal loading states
+  const setBackgroundLoading = (value: boolean) => {
+    console.log('🔄 REF UPDATE: backgroundLoading', value);
+    backgroundLoadingRef.current = value;
+  };
+  const setIsStackLoading = (value: boolean) => {
+    console.log('🔄 REF UPDATE: isStackLoading', value);
+    isStackLoadingRef.current = value;
+  };
   const setActiveTool = createDebugSetter('activeTool', setActiveToolRaw);
   const setIsPlaying = createDebugSetter('isPlaying', setIsPlayingRaw);
   const setIsInverted = createDebugSetter('isInverted', setIsInvertedRaw);
@@ -330,6 +353,13 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
   const playbackIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
+  
+  // Create convenience references for easier access
+  const renderingEngine = renderingEngineRef.current;
+  const viewport = viewportRef.current;
+  const toolGroup = toolGroupRef.current;
+  const isStackLoading = isStackLoadingRef.current;
+  const backgroundLoading = backgroundLoadingRef.current;
 
   // Store per-image settings
   const imageSettingsRef = useRef<Map<number, ImageSettings>>(new Map());
