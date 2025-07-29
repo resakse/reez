@@ -278,7 +278,7 @@ export default function LegacyStudyViewerPage() {
       checkRisImportStatus();
       fetchEnhancedDicomData();
     }
-  }, [studyUid, user, fetchStudyData, checkRisImportStatus, fetchEnhancedDicomData]);
+  }, [studyUid, user]);
 
   // Keyboard shortcut for full window toggle (F key)
   useEffect(() => {

@@ -307,6 +307,7 @@ def configurable_dicom_metadata(request, orthanc_id):
             if samples_value:
                 try:
                     essential_tags['00280002']['Value'] = [int(samples_value)] if isinstance(samples_value, (str, int)) else samples_value
+                    essential_tags['00280002']['vr'] = 'US'  # Correct VR
                 except:
                     pass
         

@@ -247,25 +247,81 @@ interface ImageSettings {
 }
 
 const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initialImageIds, seriesInfo = [], studyMetadata }) => {
+  // Debug re-renders with detailed prop change tracking
+  const renderCountRef = useRef(0);
+  const prevPropsRef = useRef({ imageIds: initialImageIds, seriesInfo, studyMetadata });
+  
+  renderCountRef.current++;
+  const currentProps = { imageIds: initialImageIds, seriesInfo, studyMetadata };
+  const prevProps = prevPropsRef.current;
+  
+  const propsChanged = {
+    imageIds: JSON.stringify(prevProps.imageIds) !== JSON.stringify(currentProps.imageIds),
+    seriesInfo: JSON.stringify(prevProps.seriesInfo) !== JSON.stringify(currentProps.seriesInfo),
+    studyMetadata: JSON.stringify(prevProps.studyMetadata) !== JSON.stringify(currentProps.studyMetadata)
+  };
+  
+  console.log(`🔍 SimpleDicomViewer render #${renderCountRef.current}`, {
+    imageIds: initialImageIds.length,
+    seriesInfo: seriesInfo.length,
+    studyUID: studyMetadata.studyInstanceUID
+  });
+  
+  if (propsChanged.imageIds || propsChanged.seriesInfo || propsChanged.studyMetadata) {
+    console.log(`📝 Props changed:`, propsChanged);
+  } else if (renderCountRef.current > 1) {
+    console.log(`🔄 Internal state change caused render #${renderCountRef.current}`);
+  }
+  
+  prevPropsRef.current = currentProps;
+
   const mainViewportRef = useRef<HTMLDivElement>(null);
-  const [imageIds, setImageIds] = useState<string[]>(initialImageIds);
-  const [renderingEngine, setRenderingEngine] = useState<RenderingEngine | null>(null);
-  const [viewport, setViewport] = useState<any>(null);
-  const [toolGroup, setToolGroup] = useState<any>(null);
-  const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [loadingNavigation, setLoadingNavigation] = useState<boolean>(false);
-  const [backgroundLoading, setBackgroundLoading] = useState<boolean>(false);
-  const [isStackLoading, setIsStackLoading] = useState<boolean>(false);
-  const [activeTool, setActiveTool] = useState<Tool>('wwwc');
-  const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [isInverted, setIsInverted] = useState<boolean>(false);  // Will be set automatically based on PhotometricInterpretation
-  const [isFlippedHorizontal, setIsFlippedHorizontal] = useState<boolean>(false);
-  const [isToolbarMinimized, setIsToolbarMinimized] = useState<boolean>(false);
-  const [toolbarPosition, setToolbarPosition] = useState({ x: 0, y: 16 }); // Initial position
-  const [seriesLoadingProgress, setSeriesLoadingProgress] = useState<Record<string, number>>({});
-  const [loadingSeries, setLoadingSeries] = useState<Set<string>>(new Set());
+  // Add debugging wrapper for state setters
+  const createDebugSetter = (name: string, setter: any) => {
+    return (...args: any[]) => {
+      console.log(`🔄 STATE UPDATE: ${name}`, args[0]);
+      return setter(...args);
+    };
+  };
+
+  const [imageIds, setImageIdsRaw] = useState<string[]>(initialImageIds);
+  const [renderingEngine, setRenderingEngineRaw] = useState<RenderingEngine | null>(null);
+  const [viewport, setViewportRaw] = useState<any>(null);
+  const [toolGroup, setToolGroupRaw] = useState<any>(null);
+  const [currentImageIndex, setCurrentImageIndexRaw] = useState<number>(0);
+  const [error, setErrorRaw] = useState<string | null>(null);
+  const [loading, setLoadingRaw] = useState<boolean>(true);
+  const [loadingNavigation, setLoadingNavigationRaw] = useState<boolean>(false);
+  const [backgroundLoading, setBackgroundLoadingRaw] = useState<boolean>(false);
+  const [isStackLoading, setIsStackLoadingRaw] = useState<boolean>(false);
+  const [activeTool, setActiveToolRaw] = useState<Tool>('wwwc');
+  const [isPlaying, setIsPlayingRaw] = useState<boolean>(false);
+  const [isInverted, setIsInvertedRaw] = useState<boolean>(false);  // Will be set automatically based on PhotometricInterpretation
+  const [isFlippedHorizontal, setIsFlippedHorizontalRaw] = useState<boolean>(false);
+  const [isToolbarMinimized, setIsToolbarMinimizedRaw] = useState<boolean>(false);
+  const [toolbarPosition, setToolbarPositionRaw] = useState({ x: 0, y: 16 }); // Initial position
+  const [seriesLoadingProgress, setSeriesLoadingProgressRaw] = useState<Record<string, number>>({});
+  const [loadingSeries, setLoadingSeriesRaw] = useState<Set<string>>(new Set());
+  
+  // Debug-wrapped setters
+  const setImageIds = createDebugSetter('imageIds', setImageIdsRaw);
+  const setRenderingEngine = createDebugSetter('renderingEngine', setRenderingEngineRaw);
+  const setViewport = createDebugSetter('viewport', setViewportRaw);
+  const setToolGroup = createDebugSetter('toolGroup', setToolGroupRaw);
+  const setCurrentImageIndex = createDebugSetter('currentImageIndex', setCurrentImageIndexRaw);
+  const setError = createDebugSetter('error', setErrorRaw);
+  const setLoading = createDebugSetter('loading', setLoadingRaw);
+  const setLoadingNavigation = createDebugSetter('loadingNavigation', setLoadingNavigationRaw);
+  const setBackgroundLoading = createDebugSetter('backgroundLoading', setBackgroundLoadingRaw);
+  const setIsStackLoading = createDebugSetter('isStackLoading', setIsStackLoadingRaw);
+  const setActiveTool = createDebugSetter('activeTool', setActiveToolRaw);
+  const setIsPlaying = createDebugSetter('isPlaying', setIsPlayingRaw);
+  const setIsInverted = createDebugSetter('isInverted', setIsInvertedRaw);
+  const setIsFlippedHorizontal = createDebugSetter('isFlippedHorizontal', setIsFlippedHorizontalRaw);
+  const setIsToolbarMinimized = createDebugSetter('isToolbarMinimized', setIsToolbarMinimizedRaw);
+  const setToolbarPosition = createDebugSetter('toolbarPosition', setToolbarPositionRaw);
+  const setSeriesLoadingProgress = createDebugSetter('seriesLoadingProgress', setSeriesLoadingProgressRaw); 
+  const setLoadingSeries = createDebugSetter('loadingSeries', setLoadingSeriesRaw);
   
   // Cache loaded series to prevent re-fetching
   const [loadedSeriesCache, setLoadedSeriesCache] = useState<Map<string, string[]>>(new Map());
@@ -283,8 +339,16 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
   const initializationRef = useRef(false);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   
+  // Track if bulk loading has been initiated to prevent duplicate useEffect runs
+  const bulkLoadingInitiatedRef = useRef(false);
+  
   // Preload images in background to prevent refetching on scroll
   const preloadImagesInBackground = useCallback(async (imageIds: string[], seriesKey: string) => {
+    // COMMENTED OUT TO PREVENT CHROME CRASH WHILE DEBUGGING RE-RENDERS
+    console.log(`🚫 DISABLED: Would preload ${imageIds.length} images for series ${seriesKey}`);
+    return;
+    
+    /* DISABLED TEMPORARILY
     try {
       console.log(`🔄 Preloading ${imageIds.length} images for series ${seriesKey}`);
       
@@ -346,68 +410,27 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
         return updated;
       });
     }
+    */
   }, []);
 
-  // Load series URLs and preload images in background
-  const loadSeriesInBackground = useCallback(async (seriesKey: string, series: any) => {
-    try {
-      console.log(`🔄 Loading URLs for series ${seriesKey} in background`);
-      
-      // Step 1: Fetch URLs
-      const response = await AuthService.authenticatedFetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/pacs/studies/${studyMetadata.studyInstanceUID}/series/${series.seriesInstanceUID}/images/bulk?start=0&count=1000`
-      );
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch series data: ${response.status}`);
-      }
-      
-      const bulkData = await response.json();
-      const seriesImageIds = bulkData.images?.map((img: any) => `wadors:${img.imageUrl}`) || [];
-      
-      console.log(`📋 Loaded ${seriesImageIds.length} URLs for series ${seriesKey}`);
-      
-      // Step 2: Cache URLs and update viewport
-      setLoadedSeriesCache(prev => new Map(prev).set(seriesKey, seriesImageIds));
-      setCurrentSeriesId(seriesKey);
-      
-      // Step 3: Register metadata and set stack
-      if (viewport && seriesImageIds.length > 0) {
-        await preRegisterWadorsMetadata(seriesImageIds);
-        await viewport.setStack(seriesImageIds, 0);
-        setImageIds(seriesImageIds);
-        setCurrentImageIndex(0);
-        viewport.render();
-      }
-      
-      // Step 4: Start preloading with progress bar
-      console.log(`🎯 Starting image preloading for ${seriesImageIds.length} images`);
-      setSeriesLoadingProgress(prev => ({ ...prev, [seriesKey]: 0 }));
-      preloadImagesInBackground(seriesImageIds, seriesKey);
-      
-    } catch (err) {
-      console.error('Background series loading failed:', err);
-      toast.error(`Failed to load series: ${err}`);
-    } finally {
-      // Remove from loading set
-      setLoadingSeries(prev => {
-        const updated = new Set(prev);
-        updated.delete(seriesKey);
-        return updated;
-      });
-    }
-  }, [viewport, studyMetadata, preloadImagesInBackground]);
 
 
-  // Update local imageIds when prop changes
-  useEffect(() => {
-    setImageIds(initialImageIds);
-  }, [initialImageIds]);
+  // REMOVED: Update local imageIds when prop changes - redundant since imageIds are initialized with initialImageIds
+  // useEffect(() => {
+  //   setImageIds(initialImageIds);
+  // }, [initialImageIds]);
 
   // Load bulk URLs immediately on page load (background)
   useEffect(() => {
+    // Prevent duplicate execution of this useEffect
+    if (bulkLoadingInitiatedRef.current) {
+      console.log(`⏭️ Bulk loading already initiated, skipping duplicate useEffect execution`);
+      return;
+    }
+    
     if (seriesInfo.length > 0 && studyMetadata?.studyInstanceUID) {
       console.log(`🔄 Loading bulk URLs for ${seriesInfo.length} series on page load`);
+      bulkLoadingInitiatedRef.current = true; // Mark as initiated
       
       seriesInfo.forEach((series, index) => {
         const seriesKey = series.seriesInstanceUID || `series-${index}`;
@@ -439,18 +462,19 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
       
       console.log(`✅ Loaded ${seriesImageIds.length} URLs for series ${seriesKey}`);
       
-      // Cache URLs
-      setLoadedSeriesCache(prev => new Map(prev).set(seriesKey, seriesImageIds));
+      // Cache URLs - DISABLED to prevent unnecessary re-renders during debugging
+      // setLoadedSeriesCache(prev => new Map(prev).set(seriesKey, seriesImageIds));
       
       // Start preloading images immediately with progress bar
       console.log(`🎯 Starting preload for series ${seriesKey}`);
-      setSeriesLoadingProgress(prev => ({ ...prev, [seriesKey]: 0 }));
+      // DISABLED progress tracking to prevent unnecessary re-renders during debugging
+      // setSeriesLoadingProgress(prev => ({ ...prev, [seriesKey]: 0 }));
       preloadImagesInBackground(seriesImageIds, seriesKey);
       
     } catch (err) {
       console.warn(`Failed to load series ${seriesKey}:`, err);
     }
-  }, [studyMetadata, preloadImagesInBackground]);
+  }, [studyMetadata]);
 
   // Helper functions for per-image settings
   const saveCurrentImageSettings = useCallback(() => {
@@ -478,7 +502,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
     } catch (error) {
       // Ignore save errors
     }
-  }, [viewport, currentImageIndex, isInverted, isFlippedHorizontal]);
+  }, [viewport]);
   
   const restoreImageSettings = useCallback((imageIndex: number) => {
     if (!viewport) return;
@@ -638,6 +662,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
           return;
         }
         
+        // Batch initial state updates to reduce re-renders
         setIsStackLoading(true);
         setLoading(true);
         setError(null);
@@ -860,6 +885,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
           }, 500);
         });
 
+        // Batch final state updates to reduce re-renders
         setLoading(false);
         setIsStackLoading(false);
       } catch (err) {
@@ -966,58 +992,68 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
   
   // Navigation functions with proper stack navigation
   const goToImage = useCallback(async (index: number) => {
-    if (viewport && index >= 0 && index < imageIds.length && index !== currentImageIndex) {
-      try {
-        setLoadingNavigation(true);
-        // Save current image settings before navigating
-        saveCurrentImageSettings();
-        
-        // Load ONLY the new image
-        await viewport.setStack([imageIds[index]], 0);
-        
-        // Update current image index
-        setCurrentImageIndex(index);
-        
-        // Wait a moment for the image to load, then restore settings
-        setTimeout(() => {
-          restoreImageSettings(index);
+    // Read current index from state functional update to avoid dependency
+    setCurrentImageIndex(prevIndex => {
+      if (viewport && index >= 0 && index < imageIds.length && index !== prevIndex) {
+        (async () => {
           try {
-            const image = stackViewport.getCurrentImageData();
-            if (image && image.metadata) {
-              const photometricInterpretation = image.metadata.PhotometricInterpretation;
-              const shouldInvert = photometricInterpretation === 'MONOCHROME1';
-              
-              if (shouldInvert !== isInverted) {
-                setIsInverted(shouldInvert);
-                
-                const properties = stackViewport.getProperties();
-                stackViewport.setProperties({
-                  ...properties,
-                  invert: shouldInvert
-                });
-                stackViewport.render();
+            setLoadingNavigation(true);
+            // Save current image settings before navigating
+            saveCurrentImageSettings();
+            
+            // Load ONLY the new image
+            await viewport.setStack([imageIds[index]], 0);
+            
+            // Wait a moment for the image to load, then restore settings
+            setTimeout(() => {
+              restoreImageSettings(index);
+              try {
+                const image = stackViewport.getCurrentImageData();
+                if (image && image.metadata) {
+                  const photometricInterpretation = image.metadata.PhotometricInterpretation;
+                  const shouldInvert = photometricInterpretation === 'MONOCHROME1';
+                  
+                  if (shouldInvert !== isInverted) {
+                    setIsInverted(shouldInvert);
+                    
+                    const properties = stackViewport.getProperties();
+                    stackViewport.setProperties({
+                      ...properties,
+                      invert: shouldInvert
+                    });
+                    stackViewport.render();
+                  }
+                }
+              } catch (photoError) {
+                // Ignore photometric interpretation errors
               }
-            }
-          } catch (photoError) {
-            // Ignore photometric interpretation errors
+            }, 150);
+            
+          } catch (error) {
+            // Try to stay on current image if navigation fails
+          } finally {
+            setLoadingNavigation(false);
           }
-        }, 150);
-        
-      } catch (error) {
-        // Try to stay on current image if navigation fails
-      } finally {
-        setLoadingNavigation(false);
+        })();
+        return index;
       }
-    }
-  }, [viewport, imageIds, currentImageIndex, saveCurrentImageSettings, restoreImageSettings]);
+      return prevIndex;
+    });
+  }, [viewport, imageIds]);
   
   const nextImage = useCallback(() => {
-    goToImage(currentImageIndex + 1);
-  }, [currentImageIndex, goToImage]);
+    setCurrentImageIndex(prevIndex => {
+      goToImage(prevIndex + 1);
+      return prevIndex; // Return previous index since goToImage will update it
+    });
+  }, [goToImage]);
   
   const prevImage = useCallback(() => {
-    goToImage(currentImageIndex - 1);
-  }, [currentImageIndex, goToImage]);
+    setCurrentImageIndex(prevIndex => {
+      goToImage(prevIndex - 1);
+      return prevIndex; // Return previous index since goToImage will update it
+    });
+  }, [goToImage]);
   
   // Playback functions
   const togglePlayback = useCallback(() => {
@@ -1629,8 +1665,6 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
                 {(() => {
                   // ONLY show series thumbnails if seriesInfo exists
                   if (seriesInfo.length > 0) {
-                    console.log(`📊 SERIES MODE: Showing ${seriesInfo.length} series thumbnails ONLY`);
-                    
                     return seriesInfo.map((series, seriesIndex) => {
                       // Since we only load first image per series, use seriesIndex directly
                       const representativeImageId = imageIds[seriesIndex];
@@ -1683,8 +1717,6 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
                     });
                   } else {
                     // NO FALLBACK - only show message
-                    console.log(`📊 NO SERIES INFO: No thumbnails shown`);
-                    
                     return (
                       <div className="flex items-center justify-center p-4 text-sm text-muted-foreground">
                         Use mouse wheel or arrow keys to navigate {imageIds.length} images
