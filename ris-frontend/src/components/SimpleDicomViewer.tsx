@@ -492,27 +492,19 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
         }
       }
       
-      // Create batch loading promises for concurrent processing
-      const batchPromises: Promise<void>[] = [];
-      const semaphore = new Array(maxConcurrentBatches).fill(0);
-      let activeBatches = 0;
+      // Store all batches with their correct positions
+      const orderedBatches: {start: number, imageIds: string[]}[] = [];
       
-      // Function to process a single batch
-      const processBatch = async (start: number, batchIndex: number) => {
+      // Function to process a single batch and return it with position info
+      const processBatch = async (start: number, batchIndex: number): Promise<{start: number, imageIds: string[]}> => {
         try {
-          // Wait for available slot
-          while (activeBatches >= maxConcurrentBatches) {
-            await new Promise(resolve => requestAnimationFrame(() => resolve(undefined)));
-          }
-          activeBatches++;
-          
           // Fetch batch URLs
           const response = await AuthService.authenticatedFetch(
             `${process.env.NEXT_PUBLIC_API_URL}/api/pacs/studies/${studyMetadata?.studyInstanceUID}/series/${series.seriesInstanceUID}/images/bulk?start=${start}&count=${batchSize}`
           );
           
           if (!response.ok) {
-            return;
+            return {start, imageIds: []};
           }
           
           const batchData = await response.json();
@@ -520,7 +512,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
           const batchImageUrls = batchImages.map((img: any) => img.imageUrl);
           
           if (batchImageUrls.length === 0) {
-            return;
+            return {start, imageIds: []};
           }
           
           // Convert to WADORS format and register metadata
@@ -549,24 +541,34 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
           // Wait for all images in this batch to load
           await Promise.all(imageLoadPromises);
           
-          // Add batch to main imageIds for immediate scrolling
-          setImageIds(prevImageIds => {
-            const newImageIds = [...prevImageIds, ...wadorsImageIds];
-            return newImageIds;
-          });
+          return {start, imageIds: wadorsImageIds};
           
-        } finally {
-          activeBatches--;
+        } catch (error) {
+          return {start, imageIds: []};
         }
       };
       
-      // Start all batches concurrently
+      // Process batches with limited concurrency
+      const batchPromises: Promise<{start: number, imageIds: string[]}>[] = [];
+      
       for (let start = 0; start < actualTotalImages; start += batchSize) {
         batchPromises.push(processBatch(start, Math.floor(start / batchSize)));
       }
       
-      // Wait for all batches to complete
-      await Promise.all(batchPromises);
+      // Wait for all batches to complete and collect results
+      const batchResults = await Promise.all(batchPromises);
+      
+      // Sort batches by start position to maintain correct order
+      batchResults.sort((a, b) => a.start - b.start);
+      
+      // Combine all batch results in correct order
+      const allOrderedImageIds: string[] = [];
+      batchResults.forEach(batch => {
+        allOrderedImageIds.push(...batch.imageIds);
+      });
+      
+      // Add all images to imageIds in correct order
+      setImageIds(allOrderedImageIds);
       
       // Final progress update
       setSeriesLoadingProgress(prev => ({ 
@@ -1459,47 +1461,36 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
   }, [viewport]);
 
   
-  // Mouse wheel navigation for images - restricted to current series only
+  // Mouse wheel navigation for scrollbar - only works when there are multiple images
   useEffect(() => {
     const handleWheel = (event: WheelEvent) => {
-      // Only handle wheel events on the viewport
-      if (!mainViewportRef.current?.contains(event.target as Node)) {
+      // Only handle wheel events on the viewport when there are multiple images
+      if (!mainViewportRef.current?.contains(event.target as Node) || imageIds.length <= 1) {
         return;
       }
       
       event.preventDefault();
       
-      // If no viewport or series, do nothing
-      if (!viewport || !currentSeriesId) {
+      // If no viewport, do nothing
+      if (!viewport) {
         return;
       }
       
       const delta = event.deltaY > 0 ? 1 : -1;
       
-      // Get the actual loaded images for current series
-      const progressData = seriesLoadingProgress[currentSeriesId];
-      if (!progressData || progressData.loaded === 0) {
-        return; // No images loaded yet
-      }
+      // Calculate new index within current imageIds (which should only contain current series after switchToSeries)
+      const newIndex = Math.max(0, Math.min(currentImageIndex + delta, imageIds.length - 1));
       
-      // Calculate new index within the loaded images of current series only
-      const maxLoadedIndex = Math.min(progressData.loaded - 1, imageIds.length - 1);
-      const newIndex = Math.max(0, Math.min(currentImageIndex + delta, maxLoadedIndex));
-      
-      // Only navigate if we're actually changing index and within bounds
-      if (newIndex !== currentImageIndex && newIndex >= 0 && newIndex < imageIds.length) {
-        // Use direct viewport navigation to avoid complex goToImage logic
-        const targetImageId = imageIds[newIndex];
-        if (targetImageId) {
-          setCurrentImageIndex(newIndex);
-          
-          // Simple viewport stack update without complex metadata handling
-          viewport.setStack([targetImageId], 0).then(() => {
-            viewport.render();
-          }).catch(() => {
-            // Ignore navigation errors
-          });
-        }
+      // Only navigate if we're actually changing index
+      if (newIndex !== currentImageIndex && imageIds[newIndex]) {
+        setCurrentImageIndex(newIndex);
+        
+        // Use direct viewport navigation
+        viewport.setStack([imageIds[newIndex]], 0).then(() => {
+          viewport.render();
+        }).catch(() => {
+          // Ignore navigation errors - stay on current image
+        });
       }
     };
 
@@ -1508,7 +1499,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
       element.addEventListener('wheel', handleWheel, { passive: false });
       return () => element.removeEventListener('wheel', handleWheel);
     }
-  }, [viewport, currentSeriesId, seriesLoadingProgress, currentImageIndex, imageIds]);
+  }, [viewport, currentImageIndex, imageIds]);
 
   // Keyboard navigation for images
   useEffect(() => {
@@ -1824,10 +1815,11 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
 
 
         {/* Main Viewport - Full size */}
-        <div className="flex-1 relative">
+        <div className="flex-1 relative flex">
+          {/* DICOM Viewport */}
           <div
             ref={mainViewportRef}
-            className="w-full h-full bg-black"
+            className="flex-1 bg-black"
             style={{ 
               minHeight: '400px',
               position: 'relative',
@@ -1950,6 +1942,93 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
               </div>
             )}
           </div>
+          
+          {/* Vertical Scrollbar for Series Navigation */}
+          {!showLoading && !showNoImages && imageIds.length > 1 && (
+            <div className="w-6 bg-muted/5 border-l flex flex-col">
+              {/* Series Image Counter */}
+              <div className="px-1 py-1 border-b bg-background/90 text-center">
+                <div className="text-xs font-medium text-muted-foreground">
+                  {currentImageIndex + 1}/{imageIds.length}
+                </div>
+              </div>
+              
+              {/* Vertical Scrollbar */}
+              <div className="flex-1 relative px-1 py-2">
+                <div 
+                  className="w-3 h-full bg-muted/30 rounded-sm relative mx-auto cursor-pointer"
+                  onClick={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const clickY = e.clientY - rect.top;
+                    const percentage = clickY / rect.height;
+                    const newIndex = Math.floor(percentage * imageIds.length);
+                    const clampedIndex = Math.max(0, Math.min(newIndex, imageIds.length - 1));
+                    
+                    if (clampedIndex !== currentImageIndex && imageIds[clampedIndex]) {
+                      setCurrentImageIndex(clampedIndex);
+                      if (viewport) {
+                        viewport.setStack([imageIds[clampedIndex]], 0).then(() => {
+                          viewport.render();
+                        }).catch(() => {
+                          // Ignore navigation errors
+                        });
+                      }
+                    }
+                  }}
+                >
+                  {/* Scrollbar Thumb */}
+                  <div 
+                    className="absolute w-full bg-primary rounded-sm transition-all duration-200 hover:bg-primary/80 cursor-grab active:cursor-grabbing"
+                    style={{
+                      height: Math.max(16, (1 / imageIds.length) * 100) + '%',
+                      top: (currentImageIndex / Math.max(1, imageIds.length - 1)) * (100 - Math.max(16, (1 / imageIds.length) * 100)) + '%'
+                    }}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      const scrollbarRect = e.currentTarget.parentElement!.getBoundingClientRect();
+                      const thumbHeight = e.currentTarget.offsetHeight;
+                      const trackHeight = scrollbarRect.height;
+                      const usableHeight = trackHeight - thumbHeight;
+                      
+                      // Calculate where on the thumb the user clicked
+                      const thumbRect = e.currentTarget.getBoundingClientRect();
+                      const clickOffsetY = e.clientY - thumbRect.top;
+                      
+                      const handleMouseMove = (moveEvent: MouseEvent) => {
+                        // Calculate new thumb position based on mouse position minus the click offset
+                        const mouseRelativeToTrack = moveEvent.clientY - scrollbarRect.top - clickOffsetY;
+                        const newThumbTop = Math.max(0, Math.min(mouseRelativeToTrack, usableHeight));
+                        
+                        // Convert thumb position to image index
+                        const percentage = usableHeight > 0 ? newThumbTop / usableHeight : 0;
+                        const newIndex = Math.round(percentage * (imageIds.length - 1));
+                        const clampedIndex = Math.max(0, Math.min(newIndex, imageIds.length - 1));
+                        
+                        if (clampedIndex !== currentImageIndex && imageIds[clampedIndex]) {
+                          setCurrentImageIndex(clampedIndex);
+                          if (viewport) {
+                            viewport.setStack([imageIds[clampedIndex]], 0).then(() => {
+                              viewport.render();
+                            }).catch(() => {
+                              // Ignore navigation errors
+                            });
+                          }
+                        }
+                      };
+                      
+                      const handleMouseUp = () => {
+                        document.removeEventListener('mousemove', handleMouseMove);
+                        document.removeEventListener('mouseup', handleMouseUp);
+                      };
+                      
+                      document.addEventListener('mousemove', handleMouseMove);
+                      document.addEventListener('mouseup', handleMouseUp);
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Thumbnails Strip - Bottom */}
