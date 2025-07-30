@@ -457,12 +457,19 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
   // Track which series have been fully loaded
   const loadedSeries = useRef<Map<string, string[]>>(new Map());
   
+  // Track current loading controller to cancel previous loads
+  const currentLoadingController = useRef<AbortController | null>(null);
+  
   // Progressive series loading: immediate first batch + background loading of remaining batches
   const loadSeriesInBackground = useCallback(async (seriesKey: string, series: any) => {
     // Prevent duplicate loading of same series
     if (activeSeriesLoaders.current.has(seriesKey)) {
       return;
     }
+    
+    // Create abort controller for this loading operation
+    const abortController = new AbortController();
+    currentLoadingController.current = abortController;
     
     activeSeriesLoaders.current.add(seriesKey);
     
@@ -540,6 +547,12 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
       
       // Load and display first batch immediately
       const firstBatchImageIds = await loadFirstBatch();
+      
+      // Check if loading was aborted
+      if (abortController.signal.aborted) {
+        return;
+      }
+      
       setImageIds(firstBatchImageIds); // Show first batch immediately
       
       // Store first batch in cache
@@ -603,6 +616,11 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
           const batchImageIds = await loadBatchSequentially(start, batchIndex);
           
           if (batchImageIds.length > 0) {
+            // Check if loading was aborted before updating UI
+            if (abortController.signal.aborted) {
+              return;
+            }
+            
             // Add this batch to current images and update UI immediately
             currentImageIds = [...currentImageIds, ...batchImageIds];
             setImageIds(currentImageIds);
@@ -653,6 +671,12 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
       return;
     }
     
+    // Cancel any previous loading to prevent UI conflicts
+    if (currentLoadingController.current) {
+      currentLoadingController.current.abort();
+      currentLoadingController.current = null;
+    }
+    
     // Check if series is already loaded
     const cachedImages = loadedSeries.current.get(seriesKey);
     if (cachedImages && cachedImages.length > 0) {
@@ -660,6 +684,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
       setImageIds(cachedImages);
       setCurrentImageIndex(0);
       setCurrentSeriesId(seriesKey);
+      setSwitchingSeries(false); // Clear any switching state
       return;
     }
     
