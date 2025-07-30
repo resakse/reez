@@ -327,6 +327,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
   const [error, setErrorRaw] = useState<string | null>(null);
   const [loading, setLoadingRaw] = useState<boolean>(true);
   const [loadingNavigation, setLoadingNavigationRaw] = useState<boolean>(false);
+  const [switchingSeries, setSwitchingSeriesRaw] = useState<boolean>(false);
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   // Convert loading states to refs if they don't need to trigger UI updates
   const isStackLoadingRef = useRef<boolean>(false);
@@ -363,6 +364,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
   const setError = createDebugSetter('error', setErrorRaw);
   const setLoading = createDebugSetter('loading', setLoadingRaw);
   const setLoadingNavigation = createDebugSetter('loadingNavigation', setLoadingNavigationRaw);
+  const setSwitchingSeries = createDebugSetter('switchingSeries', setSwitchingSeriesRaw);
   
   // Delayed loading indicator - only shows after 150ms for cache misses
   const setLoadingNavigationDelayed = (isLoading: boolean) => {
@@ -452,6 +454,9 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
   // Track which series are currently being loaded to avoid duplicates
   const activeSeriesLoaders = useRef<Set<string>>(new Set());
   
+  // Track which series have been fully loaded
+  const loadedSeries = useRef<Map<string, string[]>>(new Map());
+  
   // Progressive series loading: immediate first batch + background loading of remaining batches
   const loadSeriesInBackground = useCallback(async (seriesKey: string, series: any) => {
     // Prevent duplicate loading of same series
@@ -537,9 +542,11 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
       const firstBatchImageIds = await loadFirstBatch();
       setImageIds(firstBatchImageIds); // Show first batch immediately
       
-      // Clear loading state once first batch is available
+      // Store first batch in cache
       if (firstBatchImageIds.length > 0) {
+        loadedSeries.current.set(seriesKey, [...firstBatchImageIds]);
         setLoading(false);
+        setSwitchingSeries(false);
       }
       
       // PHASE 2: Load remaining batches sequentially in background
@@ -599,6 +606,9 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
             // Add this batch to current images and update UI immediately
             currentImageIds = [...currentImageIds, ...batchImageIds];
             setImageIds(currentImageIds);
+            
+            // Update the loaded series cache with current progress
+            loadedSeries.current.set(seriesKey, [...currentImageIds]);
           }
         }
       }
@@ -608,6 +618,8 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
         ...prev, 
         [seriesKey]: { loaded: actualTotalImages, total: actualTotalImages } 
       }));
+      
+      // Series is already stored progressively during loading, no need to store again
       
       // Remove progress indicator after brief delay
       setTimeout(() => {
@@ -625,15 +637,45 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
         delete updated[seriesKey];
         return updated;
       });
+      // Clear switching state on error
+      setSwitchingSeries(false);
+      setLoading(false);
     } finally {
       activeSeriesLoaders.current.delete(seriesKey);
     }
   }, [studyMetadata?.studyInstanceUID]);
 
-  // Start loading current series when user switches series
+  // Smart series switching that handles already loaded/loading series
   const switchToSeries = useCallback((seriesKey: string, series: any) => {
     
-    // Set loading state before clearing images to show loading instead of "No Images Available"
+    // If this is the current series, do nothing
+    if (currentSeriesId === seriesKey) {
+      return;
+    }
+    
+    // Check if series is already loaded
+    const cachedImages = loadedSeries.current.get(seriesKey);
+    if (cachedImages && cachedImages.length > 0) {
+      // Series already loaded - just switch to it without reloading
+      setImageIds(cachedImages);
+      setCurrentImageIndex(0);
+      setCurrentSeriesId(seriesKey);
+      return;
+    }
+    
+    // Check if series is currently loading
+    if (activeSeriesLoaders.current.has(seriesKey)) {
+      // Series is loading - just switch to it and show current progress
+      const currentProgress = loadedSeries.current.get(seriesKey) || [];
+      setImageIds(currentProgress);
+      setCurrentImageIndex(0);
+      setCurrentSeriesId(seriesKey);
+      setSwitchingSeries(true); // Show progress indicator
+      return;
+    }
+    
+    // Series not loaded and not loading - start fresh loading
+    setSwitchingSeries(true);
     setLoading(true);
     
     // Clear imageIds when switching to a new series to prevent mixing
@@ -645,9 +687,9 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
     // Update current series
     setCurrentSeriesId(seriesKey);
     
-    // Immediately start loading this series in background
+    // Start loading this series in background
     loadSeriesInBackground(seriesKey, series);
-  }, [loadSeriesInBackground]);
+  }, [loadSeriesInBackground, currentSeriesId]);
   
   // Only load series when explicitly requested (first series auto-loads, others load on thumbnail click)
   // Removed automatic continuous loading - series only load when user clicks thumbnail
@@ -1690,8 +1732,8 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
   }
   
   // Always render the viewport div, but show loading/error states with overlays
-  const showLoading = loading;
-  const showNoImages = !loading && imageIds.length === 0;
+  const showBlockingLoading = loading && !switchingSeries; // Only block for initial viewport setup
+  const showNoImages = !loading && !switchingSeries && imageIds.length === 0;
   
   return (
     <div className="w-full h-full flex flex-col bg-background">
@@ -1866,8 +1908,8 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
               justifyContent: 'center'
             }}
           >
-            {/* Loading Overlay */}
-            {showLoading && (
+            {/* Loading Overlay - Only for initial viewport setup */}
+            {showBlockingLoading && (
               <div className="absolute inset-0 flex items-center justify-center bg-background/80">
                 <Card className="w-96">
                   <CardHeader>
@@ -1998,7 +2040,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
           </div>
           
           {/* Vertical Scrollbar for Series Navigation */}
-          {!showLoading && !showNoImages && imageIds.length > 1 && (
+          {!showBlockingLoading && !showNoImages && imageIds.length > 1 && (
             <div className="w-6 bg-muted/5 border-l flex flex-col">
               {/* Series Image Counter */}
               <div className="px-1 py-1 border-b bg-background/90 text-center">
@@ -2086,7 +2128,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
         </div>
 
         {/* Thumbnails Strip - Bottom */}
-        {!showLoading && !showNoImages && (imageIds.length > 1 || seriesInfo.length > 1) && (
+        {!showBlockingLoading && !showNoImages && (imageIds.length > 1 || seriesInfo.length > 1) && (
           <div className="h-24 border-t bg-muted/5 p-2">
             <div className="flex items-center gap-2 h-full overflow-x-auto">
               {/* Navigation Controls */}
@@ -2135,11 +2177,16 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
                       const handleSeriesClick = async () => {
                         const seriesKey = series.seriesInstanceUID || `series-${seriesIndex}`;
                         
+                        // Only reset image position if switching to a different series
+                        const isDifferentSeries = currentSeriesId !== seriesKey;
+                        
                         // Switch to this series and start loading it
                         switchToSeries(seriesKey, series);
                         
-                        // Also navigate to the representative image for now
-                        goToImage(seriesIndex);
+                        // Only navigate to first image if switching to different series
+                        if (isDifferentSeries) {
+                          goToImage(seriesIndex);
+                        }
                       };
                       
                       return (
