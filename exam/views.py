@@ -1108,6 +1108,9 @@ def upload_dicom_files(request):
 
         def find_or_create_patient(file_metadata):
             """Find or create patient for this specific file"""
+            from pesakit.utils import parse_identification_number
+            from datetime import datetime, date
+            
             patient_name = file_metadata.get('patient_name', 'Unknown Patient')
             patient_id = file_metadata.get('patient_id', '')
             patient_sex = file_metadata.get('patient_sex', '')
@@ -1126,25 +1129,38 @@ def upload_dicom_files(request):
             
             # Try to find existing patient by Patient ID
             if patient_id:
-                existing_patient = Pesakit.objects.filter(
-                    Q(nric=patient_id) | Q(mrn=patient_id)
-                ).first()
+                # First try exact NRIC match (raw)
+                existing_patient = Pesakit.objects.filter(nric=patient_id).first()
                 if existing_patient:
-                    print(f"DEBUG: Found existing patient: {existing_patient.id} - {existing_patient.nama}")
+                    print(f"DEBUG: Found existing patient by NRIC: {existing_patient.id} - {existing_patient.nama}")
                     return existing_patient
-                else:
-                    print(f"DEBUG: No existing patient found for ID: {patient_id}")
+                
+                # Then try formatted NRIC (with dashes)
+                nric_info = parse_identification_number(patient_id)
+                if nric_info and nric_info.get('is_valid'):
+                    formatted_nric = nric_info['formatted']
+                    existing_patient = Pesakit.objects.filter(nric=formatted_nric).first()
+                    if existing_patient:
+                        print(f"DEBUG: Found existing patient by formatted NRIC: {existing_patient.id} - {existing_patient.nama}")
+                        return existing_patient
+                
+                # Try MRN match
+                existing_patient = Pesakit.objects.filter(mrn=patient_id).first()
+                if existing_patient:
+                    print(f"DEBUG: Found existing patient by MRN: {existing_patient.id} - {existing_patient.nama}")
+                    return existing_patient
+                
+                print(f"DEBUG: No existing patient found for ID: {patient_id}")
             
             # Create new patient from DICOM metadata
-            from pesakit.utils import parse_identification_number
-            from datetime import datetime, date
-            
             print(f"DEBUG: Creating new patient with PatientID: '{patient_id}'")
+            print(f"DEBUG: Raw PatientID from DICOM: '{patient_id}' (type: {type(patient_id)}, len: {len(patient_id)})")
             
+            # Parse NRIC info for patient creation
             nric_info = None
             if patient_id:
                 nric_info = parse_identification_number(patient_id)
-                print(f"DEBUG: NRIC parsing result: {nric_info}")
+            print(f"DEBUG: NRIC parsing result: {nric_info}")
             
             # Determine patient details from NRIC or DICOM tags
             if nric_info and nric_info.get('is_valid'):
@@ -1161,16 +1177,18 @@ def upload_dicom_files(request):
                 else:
                     gender = 'U'  # Unknown
                 # Use the PatientID directly as NRIC if available
-                formatted_nric = patient_id if patient_id else f'DICOM_{timezone.now().strftime("%Y%m%d%H%M%S")}_{len(all_results["patients"])}'
+                formatted_nric = patient_id if patient_id else f'DICOM_{timezone.now().strftime("%Y%m%d%H%M%S")}'
                 print(f"DEBUG: Using DICOM fallback: NRIC={formatted_nric}, Gender={gender}")
             
+            print(f"DEBUG: About to create patient with nama='{patient_name}', nric='{patient_id}', mrn='{patient_id}', jantina='{gender}'")
             new_patient = Pesakit.objects.create(
                 nama=patient_name,
-                nric=formatted_nric,
+                nric=patient_id,  # Use raw PatientID for NRIC
+                mrn=patient_id,   # Use raw PatientID for MRN
                 jantina=gender,
                 jxr=request.user
             )
-            print(f"DEBUG: Created patient ID {new_patient.id} with NRIC: '{new_patient.nric}'")
+            print(f"DEBUG: Created patient ID {new_patient.id} with NRIC: '{new_patient.nric}', MRN: '{new_patient.mrn}', Name: '{new_patient.nama}', Gender: '{new_patient.jantina}'")
             return new_patient
 
         # Process each file individually to ensure separate patients get separate daftars
@@ -1209,6 +1227,7 @@ def upload_dicom_files(request):
                     study_description = (registration_data.get('study_description') or 
                                        file_metadata.get('study_description') or 'Uploaded Study')
                     
+                    print(f"DEBUG: About to create daftar with pesakit={patient.id}, modality='{modality_name}', study_uid='{study_instance_uid}', accession='{accession_number}'")
                     daftar = Daftar.objects.create(
                         pesakit=patient,
                         pemohon=referring_physician,
@@ -1221,6 +1240,7 @@ def upload_dicom_files(request):
                         study_status='COMPLETED',
                         tarikh=timezone.now()
                     )
+                    print(f"DEBUG: Created daftar ID {daftar.id} for patient {patient.id} with accession '{daftar.parent_accession_number}'")
                     
                     # Add ward if specified
                     if registration_data.get('ward_id'):
@@ -1281,7 +1301,14 @@ def upload_dicom_files(request):
                     'modality': modality.strip() if modality else 'OT'
                 }
             
-                # Now create examination for this file and daftar
+            # Now create examination for each file and daftar
+            for file_metadata in processed_files:
+                # Get the daftar for this file
+                patient = find_or_create_patient(file_metadata)
+                study_instance_uid = file_metadata.get('study_instance_uid', '')
+                accession_number = generate_custom_accession(file_metadata)
+                daftar_key = f"{patient.id}_{study_instance_uid or accession_number}"
+                daftar = all_results['daftars'][daftar_key]
                 print(f"DEBUG: Processing file: {file_metadata['filename']}")
                 exam_details = parse_dicom_examination_details(file_metadata)
                 print(f"DEBUG: Parsed exam details: {exam_details}")
@@ -1407,6 +1434,7 @@ def upload_dicom_files(request):
                     notes_parts.append(f"Operator: {exam_details['radiographer_name']}")
                 
                 # Create examination record
+                print(f"DEBUG: About to create Pemeriksaan for daftar {daftar.id}, exam {exam.id}")
                 pemeriksaan = Pemeriksaan.objects.create(
                     daftar=daftar,
                     exam=exam,
@@ -1417,6 +1445,7 @@ def upload_dicom_files(request):
                     jxr=radiographer,
                     exam_status='COMPLETED'
                 )
+                print(f"DEBUG: Created Pemeriksaan ID {pemeriksaan.id} with accession '{pemeriksaan.accession_number}'")
                 all_results['examinations'].append(pemeriksaan)
             
         except Exception as e:

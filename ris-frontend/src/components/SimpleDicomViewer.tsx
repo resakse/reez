@@ -473,6 +473,93 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
     
     activeSeriesLoaders.current.add(seriesKey);
     
+    // Check if we're resuming a partially loaded series (not first-time loading)
+    const existingCached = loadedSeries.current.get(seriesKey);
+    const expectedTotalImages = series.instanceCount || 1;
+    
+    if (existingCached && existingCached.length > 0 && existingCached.length < expectedTotalImages) {
+      // We're resuming - skip the first batch loading and go straight to sequential loading
+      try {
+        setImageIds(existingCached); // Show existing progress immediately
+        
+        // Jump directly to sequential loading from where we left off
+        let currentImageIds = [...existingCached];
+        const batchSize = 20;
+        
+        // Calculate starting point for loading (resume from where we left off)
+        const startingBatch = Math.floor(currentImageIds.length / batchSize);
+        const startingImageIndex = startingBatch * batchSize;
+        
+        // Only proceed if there are more images to load
+        if (startingImageIndex < expectedTotalImages) {
+          // Sequential batch loading for remaining images
+          const loadBatchSequentially = async (start: number, batchIndex: number): Promise<string[]> => {
+            try {
+              const response = await AuthService.authenticatedFetch(
+                `${process.env.NEXT_PUBLIC_API_URL}/api/pacs/studies/${studyMetadata?.studyInstanceUID}/series/${series.seriesInstanceUID}/images/bulk?start=${start}&count=${batchSize}`
+              );
+              
+              if (!response.ok) return [];
+              
+              const batchData = await response.json();
+              const batchImages = batchData.images || [];
+              const batchImageUrls = batchImages.map((img: any) => img.imageUrl);
+              
+              if (batchImageUrls.length === 0) return [];
+              
+              const wadorsImageIds = batchImageUrls.map((url: string) => `wadors:${url}`);
+              await preRegisterWadorsMetadata(wadorsImageIds);
+              
+              // Load images in this batch
+              const { imageLoader } = await import('@cornerstonejs/core');
+              const imageLoadPromises = wadorsImageIds.map(async (imageId) => {
+                try {
+                  await imageLoader.loadAndCacheImage(imageId);
+                } catch (err) {
+                  // Silent fail for individual images
+                }
+              });
+              
+              await Promise.all(imageLoadPromises);
+              return wadorsImageIds;
+              
+            } catch (error) {
+              return [];
+            }
+          };
+          
+          // Load remaining batches sequentially
+          for (let start = Math.max(batchSize, startingImageIndex); start < expectedTotalImages; start += batchSize) {
+            if (abortController.signal.aborted) {
+              activeSeriesLoaders.current.delete(seriesKey);
+              return;
+            }
+            
+            const batchIndex = Math.floor(start / batchSize);
+            const batchImageIds = await loadBatchSequentially(start, batchIndex);
+            
+            if (batchImageIds.length > 0) {
+              if (abortController.signal.aborted) {
+                activeSeriesLoaders.current.delete(seriesKey);
+                return;
+              }
+              
+              currentImageIds = [...currentImageIds, ...batchImageIds];
+              setImageIds(currentImageIds);
+              loadedSeries.current.set(seriesKey, [...currentImageIds]);
+            }
+          }
+        }
+        
+        // Mark as completed
+        setSwitchingSeries(false);
+        return;
+        
+      } catch (err) {
+        // Fall through to normal loading if resume fails
+      }
+    }
+    
     try {
       const totalImages = series.instanceCount || 1;
       const { imageLoader } = await import('@cornerstonejs/core');
@@ -550,6 +637,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
       
       // Check if loading was aborted
       if (abortController.signal.aborted) {
+        activeSeriesLoaders.current.delete(seriesKey);
         return;
       }
       
@@ -565,6 +653,14 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
       // PHASE 2: Load remaining batches sequentially in background
       if (actualTotalImages > batchSize) {
         let currentImageIds = [...firstBatchImageIds]; // Start with first batch
+        
+        // Check if we're resuming a partially loaded series
+        const existingCached = loadedSeries.current.get(seriesKey);
+        if (existingCached && existingCached.length > firstBatchImageIds.length) {
+          // Resume from existing progress
+          currentImageIds = [...existingCached];
+          setImageIds(currentImageIds); // Update UI with existing progress
+        }
         
         // Sequential batch loading function
         const loadBatchSequentially = async (start: number, batchIndex: number): Promise<string[]> => {
@@ -610,14 +706,19 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
           }
         };
         
-        // Load batches sequentially starting from batch 1
-        for (let start = batchSize; start < actualTotalImages; start += batchSize) {
+        // Calculate starting point for loading (resume from where we left off)
+        const startingBatch = Math.floor(currentImageIds.length / batchSize);
+        const startingImageIndex = startingBatch * batchSize;
+        
+        // Load batches sequentially starting from where we left off
+        for (let start = Math.max(batchSize, startingImageIndex); start < actualTotalImages; start += batchSize) {
           const batchIndex = Math.floor(start / batchSize);
           const batchImageIds = await loadBatchSequentially(start, batchIndex);
           
           if (batchImageIds.length > 0) {
             // Check if loading was aborted before updating UI
             if (abortController.signal.aborted) {
+              activeSeriesLoaders.current.delete(seriesKey);
               return;
             }
             
@@ -677,15 +778,27 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
       currentLoadingController.current = null;
     }
     
-    // Check if series is already loaded
+    // Check if series is already fully loaded
     const cachedImages = loadedSeries.current.get(seriesKey);
+    const expectedTotalImages = series.instanceCount || 1;
+    
     if (cachedImages && cachedImages.length > 0) {
-      // Series already loaded - just switch to it without reloading
+      // Switch to cached images immediately
       setImageIds(cachedImages);
       setCurrentImageIndex(0);
       setCurrentSeriesId(seriesKey);
-      setSwitchingSeries(false); // Clear any switching state
-      return;
+      
+      // Check if this series is fully loaded or needs to resume downloading
+      if (cachedImages.length >= expectedTotalImages) {
+        // Series is fully loaded
+        setSwitchingSeries(false);
+        return;
+      } else {
+        // Series is partially loaded - resume downloading in background
+        setSwitchingSeries(true);
+        loadSeriesInBackground(seriesKey, series);
+        return;
+      }
     }
     
     // Check if series is currently loading
