@@ -939,12 +939,12 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
         stackViewport.resetCamera();
         stackViewport.render();
         
-        // Apply CSS to prevent canvas stretching
+        // Apply CSS to fill viewport while maintaining aspect ratio
         const canvas = stackViewport.canvas;
         if (canvas) {
-          canvas.style.objectFit = 'contain';
-          canvas.style.maxWidth = '100%';
-          canvas.style.maxHeight = '100%';
+          canvas.style.objectFit = 'cover';
+          canvas.style.width = '100%';
+          canvas.style.height = '100%';
         }
         
         stackViewport.render();
@@ -965,12 +965,12 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
                     stackViewport.resetCamera();
                     stackViewport.render();
                     
-                    // Force canvas to maintain aspect ratio via CSS
+                    // Force canvas to fill viewport while maintaining aspect ratio
                     const canvas = stackViewport.canvas;
                     if (canvas) {
-                      canvas.style.objectFit = 'contain';
-                      canvas.style.maxWidth = '100%';
-                      canvas.style.maxHeight = '100%';
+                      canvas.style.objectFit = 'cover';
+                      canvas.style.width = '100%';
+                      canvas.style.height = '100%';
                     }
                   }, 50);
                   
