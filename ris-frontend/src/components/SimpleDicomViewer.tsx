@@ -1459,7 +1459,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
   }, [viewport]);
 
   
-  // Mouse wheel navigation for images
+  // Mouse wheel navigation for images - restricted to current series only
   useEffect(() => {
     const handleWheel = (event: WheelEvent) => {
       // Only handle wheel events on the viewport
@@ -1469,12 +1469,37 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
       
       event.preventDefault();
       
+      // If no viewport or series, do nothing
+      if (!viewport || !currentSeriesId) {
+        return;
+      }
+      
       const delta = event.deltaY > 0 ? 1 : -1;
       
-      if (delta > 0) {
-        nextImage();
-      } else {
-        prevImage();
+      // Get the actual loaded images for current series
+      const progressData = seriesLoadingProgress[currentSeriesId];
+      if (!progressData || progressData.loaded === 0) {
+        return; // No images loaded yet
+      }
+      
+      // Calculate new index within the loaded images of current series only
+      const maxLoadedIndex = Math.min(progressData.loaded - 1, imageIds.length - 1);
+      const newIndex = Math.max(0, Math.min(currentImageIndex + delta, maxLoadedIndex));
+      
+      // Only navigate if we're actually changing index and within bounds
+      if (newIndex !== currentImageIndex && newIndex >= 0 && newIndex < imageIds.length) {
+        // Use direct viewport navigation to avoid complex goToImage logic
+        const targetImageId = imageIds[newIndex];
+        if (targetImageId) {
+          setCurrentImageIndex(newIndex);
+          
+          // Simple viewport stack update without complex metadata handling
+          viewport.setStack([targetImageId], 0).then(() => {
+            viewport.render();
+          }).catch(() => {
+            // Ignore navigation errors
+          });
+        }
       }
     };
 
@@ -1483,7 +1508,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
       element.addEventListener('wheel', handleWheel, { passive: false });
       return () => element.removeEventListener('wheel', handleWheel);
     }
-  }, [nextImage, prevImage]);
+  }, [viewport, currentSeriesId, seriesLoadingProgress, currentImageIndex, imageIds]);
 
   // Keyboard navigation for images
   useEffect(() => {
