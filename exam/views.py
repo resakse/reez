@@ -1072,175 +1072,167 @@ def upload_dicom_files(request):
                     'message': str(e)
                 }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
-        # Find or create patient record
-        patient = None
-        if registration_data['patient_id']:
-            # Link to existing patient
+        # Helper functions
+        def generate_custom_accession(file_metadata):
+            requesting_service = file_metadata.get('requesting_service', '')
+            study_date = file_metadata.get('study_date', '')
+            original_accession = file_metadata.get('accession_number', '')
+            
+            if not requesting_service or not study_date or not original_accession:
+                return original_accession  # Fallback to original
+            
+            # Extract first letters of each word in RequestingService
+            service_parts = requesting_service.strip().split()
+            service_code = ''.join(part[0].upper() for part in service_parts if part)
+            
+            # Extract year from StudyDate (YYYYMMDD format)
+            if len(study_date) >= 4:
+                year = study_date[:4]
+            else:
+                year = str(timezone.now().year)
+            
+            # Calculate remaining space for accession number
+            remaining_chars = 16 - len(service_code) - len(year)
+            remaining_chars = max(1, remaining_chars)  # At least 1 digit
+            
+            # Zero-fill the original accession number to fit remaining space
             try:
-                patient = Pesakit.objects.get(id=registration_data['patient_id'])
-            except Pesakit.DoesNotExist:
-                return Response({
-                    'success': False,
-                    'error': 'Patient not found',
-                    'message': f'Patient with ID {registration_data["patient_id"]} does not exist'
-                }, status=status.HTTP_400_BAD_REQUEST)
-        else:
-            # Try to find existing patient by Patient ID or create new one
-            patient_id_dicom = patient_info['patient_id']
-            if patient_id_dicom:
+                accession_num = int(original_accession)
+                formatted_accession = str(accession_num).zfill(remaining_chars)
+            except (ValueError, TypeError):
+                formatted_accession = original_accession[:remaining_chars].zfill(remaining_chars)
+            
+            # Combine and ensure total length <= 16
+            result = f"{service_code}{year}{formatted_accession}"
+            return result[:16]
+
+        def find_or_create_patient(file_metadata):
+            """Find or create patient for this specific file"""
+            patient_name = file_metadata.get('patient_name', 'Unknown Patient')
+            patient_id = file_metadata.get('patient_id', '')
+            patient_sex = file_metadata.get('patient_sex', '')
+            patient_birth_date = file_metadata.get('patient_birth_date', '')
+            
+            print(f"DEBUG: Looking for patient with ID: '{patient_id}', Name: '{patient_name}'")
+            
+            # Manual override takes precedence
+            if registration_data.get('patient_id'):
                 try:
-                    patient = Pesakit.objects.filter(
-                        Q(nric=patient_id_dicom) | Q(mrn=patient_id_dicom)
-                    ).first()
-                except:
+                    patient = Pesakit.objects.get(id=registration_data['patient_id'])
+                    print(f"DEBUG: Found manual override patient: {patient.id}")
+                    return patient
+                except Pesakit.DoesNotExist:
                     pass
             
-            if not patient:
-                # Create new patient from DICOM metadata with NRIC parsing
-                from pesakit.utils import parse_identification_number
-                from datetime import datetime, date
-                
-                # Parse NRIC if available and valid
-                nric_info = None
-                patient_nric = patient_info['patient_id']
-                if patient_nric:
-                    nric_info = parse_identification_number(patient_nric)
-                
-                # Determine patient details from NRIC or DICOM tags
-                if nric_info and nric_info.get('is_valid'):
-                    # Use NRIC-derived information
-                    gender = nric_info['gender']  # 'L' for male, 'P' for female
-                    birth_date = nric_info['dob']
-                    formatted_nric = nric_info['formatted']
+            # Try to find existing patient by Patient ID
+            if patient_id:
+                existing_patient = Pesakit.objects.filter(
+                    Q(nric=patient_id) | Q(mrn=patient_id)
+                ).first()
+                if existing_patient:
+                    print(f"DEBUG: Found existing patient: {existing_patient.id} - {existing_patient.nama}")
+                    return existing_patient
                 else:
-                    # Use DICOM tags as fallback
-                    # Convert DICOM PatientSex (M/F) to system gender (L/P)
-                    dicom_sex = patient_info.get('patient_sex', '').upper()
-                    if dicom_sex == 'M':
-                        gender = 'L'  # Male
-                    elif dicom_sex == 'F':
-                        gender = 'P'  # Female
-                    else:
-                        gender = 'U'  # Unknown
-                    
-                    # Parse DICOM birth date (YYYYMMDD format)
-                    birth_date = None
-                    dicom_birth_date = patient_info.get('patient_birth_date', '')
-                    if dicom_birth_date and len(dicom_birth_date) == 8:
-                        try:
-                            birth_date = datetime.strptime(dicom_birth_date, '%Y%m%d').date()
-                        except ValueError:
-                            pass
-                    
-                    formatted_nric = patient_nric or f'DICOM_{timezone.now().strftime("%Y%m%d%H%M%S")}'
-                
-                patient = Pesakit.objects.create(
-                    nama=patient_info['patient_name'] or 'Unknown Patient',
-                    nric=formatted_nric,
-                    jantina=gender,
-                    jxr=request.user  # Required field for the user who created the record
-                )
-        
-        # Create study registration (Daftar)
-        try:
-            # Use DICOM-extracted modality with manual override
-            modality_name = registration_data.get('modality') or processed_files[0].get('modality', 'OT')
-            modality, _ = Modaliti.objects.get_or_create(
-                nama=modality_name,
-                defaults={'singkatan': modality_name[:5]}
+                    print(f"DEBUG: No existing patient found for ID: {patient_id}")
+            
+            # Create new patient from DICOM metadata
+            from pesakit.utils import parse_identification_number
+            from datetime import datetime, date
+            
+            print(f"DEBUG: Creating new patient with PatientID: '{patient_id}'")
+            
+            nric_info = None
+            if patient_id:
+                nric_info = parse_identification_number(patient_id)
+                print(f"DEBUG: NRIC parsing result: {nric_info}")
+            
+            # Determine patient details from NRIC or DICOM tags
+            if nric_info and nric_info.get('is_valid'):
+                gender = nric_info['gender']
+                formatted_nric = nric_info['formatted']
+                print(f"DEBUG: Using NRIC-derived data: NRIC={formatted_nric}, Gender={gender}")
+            else:
+                # Use DICOM tags as fallback
+                dicom_sex = patient_sex.upper()
+                if dicom_sex == 'M':
+                    gender = 'L'  # Male
+                elif dicom_sex == 'F':
+                    gender = 'P'  # Female
+                else:
+                    gender = 'U'  # Unknown
+                # Use the PatientID directly as NRIC if available
+                formatted_nric = patient_id if patient_id else f'DICOM_{timezone.now().strftime("%Y%m%d%H%M%S")}_{len(all_results["patients"])}'
+                print(f"DEBUG: Using DICOM fallback: NRIC={formatted_nric}, Gender={gender}")
+            
+            new_patient = Pesakit.objects.create(
+                nama=patient_name,
+                nric=formatted_nric,
+                jantina=gender,
+                jxr=request.user
             )
-            
-            # Use DICOM metadata with manual overrides (same as PACS Browser import)
-            first_file = processed_files[0]
-            referring_physician = (registration_data.get('referring_physician') or 
-                                 first_file.get('referring_physician') or 'Upload')
-            study_description = (registration_data.get('study_description') or 
-                               first_file.get('study_description') or 'Uploaded Study')
-            # Generate custom accession number from DICOM metadata
-            def generate_custom_accession(file_metadata):
-                requesting_service = file_metadata.get('requesting_service', '')
-                study_date = file_metadata.get('study_date', '')
-                original_accession = file_metadata.get('accession_number', '')
+            print(f"DEBUG: Created patient ID {new_patient.id} with NRIC: '{new_patient.nric}'")
+            return new_patient
+
+        # Process each file individually to ensure separate patients get separate daftars
+        all_results = {
+            'patients': {},
+            'daftars': {},
+            'examinations': []
+        }
+        
+        try:
+            for file_metadata in processed_files:
+                # Get patient for this specific file  
+                patient = find_or_create_patient(file_metadata)
+                patient_key = f"{patient.nric}_{patient.nama}"
+                all_results['patients'][patient_key] = patient
                 
-                if not requesting_service or not study_date or not original_accession:
-                    return original_accession  # Fallback to original
+                # Generate accession for this file
+                accession_number = generate_custom_accession(file_metadata)
                 
-                # Extract first letters of each word in RequestingService
-                # "KK SUNGAI BULOH" -> "KSB"
-                service_parts = requesting_service.strip().split()
-                service_code = ''.join(part[0].upper() for part in service_parts if part)
+                # Create or find Daftar for this patient/study
+                study_instance_uid = file_metadata.get('study_instance_uid', '')
+                daftar_key = f"{patient.id}_{study_instance_uid or accession_number}"
                 
-                # Extract year from StudyDate (YYYYMMDD format)
-                if len(study_date) >= 4:
-                    year = study_date[:4]
+                print(f"DEBUG: Daftar key: {daftar_key}")
+                print(f"DEBUG: Study UID: '{study_instance_uid}', Accession: '{accession_number}'")
+                
+                if daftar_key in all_results['daftars']:
+                    daftar = all_results['daftars'][daftar_key]
+                    print(f"DEBUG: Using existing daftar: {daftar.id}")
                 else:
-                    year = str(timezone.now().year)
-                
-                # Calculate remaining space for accession number
-                # Total limit: 16 chars, service_code (3) + year (4) = 7, leaving 9 for accession
-                remaining_chars = 16 - len(service_code) - len(year)
-                remaining_chars = max(1, remaining_chars)  # At least 1 digit
-                
-                # Zero-fill the original accession number to fit remaining space
-                try:
-                    accession_num = int(original_accession)
-                    formatted_accession = str(accession_num).zfill(remaining_chars)
-                except (ValueError, TypeError):
-                    formatted_accession = original_accession[:remaining_chars].zfill(remaining_chars)
-                
-                # Combine and ensure total length <= 16
-                result = f"{service_code}{year}{formatted_accession}"
-                return result[:16]  # Truncate if somehow still too long
-            
-            accession_number = generate_custom_accession(first_file)
-            
-            # Create registration - handle accession number uniqueness
-            parent_accession = accession_number if accession_number else None
-            regular_accession = accession_number if accession_number else None
-            
-            # If accession number exists, check if Daftar already exists
-            if parent_accession:
-                existing_daftar = Daftar.objects.filter(parent_accession_number=parent_accession).first()
-                if existing_daftar:
-                    # Use existing daftar instead of creating new one
-                    daftar = existing_daftar
-                else:
+                    print(f"DEBUG: Creating new daftar for patient {patient.id}")
+                    # Create new daftar for this patient/study
+                    modality_name = registration_data.get('modality') or file_metadata.get('modality', 'OT')
+                    referring_physician = (registration_data.get('referring_physician') or 
+                                         file_metadata.get('referring_physician') or 'Upload')
+                    study_description = (registration_data.get('study_description') or 
+                                       file_metadata.get('study_description') or 'Uploaded Study')
+                    
                     daftar = Daftar.objects.create(
                         pesakit=patient,
                         pemohon=referring_physician,
                         study_description=study_description,
                         modality=modality_name,
                         study_instance_uid=study_instance_uid,
-                        parent_accession_number=parent_accession,
-                        accession_number=regular_accession,
+                        parent_accession_number=accession_number or None,
+                        accession_number=accession_number or None,
                         jxr=request.user,
                         study_status='COMPLETED',
                         tarikh=timezone.now()
                     )
-            else:
-                # No accession number, create new daftar
-                daftar = Daftar.objects.create(
-                    pesakit=patient,
-                    pemohon=referring_physician,
-                    study_description=study_description,
-                    modality=modality_name,
-                    study_instance_uid=study_instance_uid,
-                    parent_accession_number=None,
-                    accession_number=None,
-                    jxr=request.user,
-                    study_status='COMPLETED',
-                    tarikh=timezone.now()
-                )
-            
-            # Add ward if specified
-            if registration_data.get('ward_id'):
-                try:
-                    from wad.models import Ward
-                    ward = Ward.objects.get(id=registration_data['ward_id'])
-                    daftar.rujukan = ward
-                    daftar.save()
-                except Ward.DoesNotExist:
-                    pass
+                    
+                    # Add ward if specified
+                    if registration_data.get('ward_id'):
+                        try:
+                            from wad.models import Ward
+                            ward = Ward.objects.get(id=registration_data['ward_id'])
+                            daftar.rujukan = ward
+                            daftar.save()
+                        except Ward.DoesNotExist:
+                            pass
+                    
+                    all_results['daftars'][daftar_key] = daftar
             
             # Create examination records (Pemeriksaan) - parse DICOM metadata like PACS Browser import
             created_examinations = []
@@ -1289,12 +1281,7 @@ def upload_dicom_files(request):
                     'modality': modality.strip() if modality else 'OT'
                 }
             
-            # Create examination records (Pemeriksaan) - parse DICOM metadata like PACS Browser import
-            created_examinations = []
-            from exam.models import Exam, Part, Pemeriksaan
-            
-            # Process each file to create examinations
-            for file_metadata in processed_files:
+                # Now create examination for this file and daftar
                 print(f"DEBUG: Processing file: {file_metadata['filename']}")
                 exam_details = parse_dicom_examination_details(file_metadata)
                 print(f"DEBUG: Parsed exam details: {exam_details}")
@@ -1424,13 +1411,13 @@ def upload_dicom_files(request):
                     daftar=daftar,
                     exam=exam,
                     accession_number=accession_number or None,
-                    no_xray=accession_number or f"UPL{timezone.now().strftime('%Y%m%d%H%M%S')}_{len(created_examinations)+1}",
+                    no_xray=accession_number or f"UPL{timezone.now().strftime('%Y%m%d%H%M%S')}_{len(all_results['examinations'])+1}",
                     patient_position=patient_position_mapped,
                     catatan=", ".join(notes_parts),
                     jxr=radiographer,
                     exam_status='COMPLETED'
                 )
-                created_examinations.append(pemeriksaan)
+                all_results['examinations'].append(pemeriksaan)
             
         except Exception as e:
             # Clean up temp files on error
@@ -1520,16 +1507,28 @@ def upload_dicom_files(request):
         
         return Response({
             'success': True,
-            'message': f'Successfully processed {success_count}/{total_count} DICOM files',
+            'message': f'Successfully processed {success_count}/{total_count} DICOM files for {len(all_results["patients"])} patients',
             'data': {
-                'patient_id': patient.id,
-                'patient_name': patient.nama,
-                'patient_mrn': patient.mrn,
-                'study_id': daftar.id,
-                'study_accession': daftar.parent_accession_number,
-                'study_instance_uid': daftar.study_instance_uid,
-                'examination_ids': [exam.id for exam in created_examinations],
-                'examination_count': len(created_examinations),
+                'patients_created': len(all_results["patients"]),
+                'patients': [
+                    {
+                        'id': patient.id,
+                        'name': patient.nama,
+                        'nric': patient.nric,
+                        'mrn': patient.mrn
+                    } for patient in all_results["patients"].values()
+                ],
+                'daftars_created': len(all_results["daftars"]),
+                'daftars': [
+                    {
+                        'id': daftar.id,
+                        'patient_id': daftar.pesakit.id,
+                        'accession_number': daftar.parent_accession_number,
+                        'study_instance_uid': daftar.study_instance_uid
+                    } for daftar in all_results["daftars"].values()
+                ],
+                'examination_ids': [exam.id for exam in all_results["examinations"]],
+                'examination_count': len(all_results["examinations"]),
                 'uploaded_files': uploaded_instances,
                 'pacs_status': 'uploaded' if success_count > 0 else 'failed'
             }
