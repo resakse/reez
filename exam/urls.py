@@ -6,7 +6,7 @@ from .views import (
     DaftarViewSet, PemeriksaanViewSet, 
     RegistrationWorkflowView, MWLWorklistView,
     GroupedExaminationView, GroupedMWLView, PositionChoicesView,
-    DicomWorklistExportView
+    DicomWorklistExportView, upload_dicom_files
 )
 from .settings_views import PacsConfigListCreateAPIView, PacsConfigDetailAPIView, get_current_pacs_config, get_pacs_orthanc_url
 from .examination_views import ExaminationListAPIView, ExaminationDetailAPIView
@@ -54,7 +54,7 @@ urlpatterns = [
     # api
     path("api/modaliti", api.modalitiApi, name="api-modaliti"),
     path("api/exam", api.examlistApi, name="api-exam"),
-    path("api/rujukan", api.rujukanApi, name="api-rujukan"),
+    path("api/rujukan/", api.rujukanApi, name="api-rujukan"),
 
     #orthanc
     path("senarai/pesakit/", views.orthanc_list, name="orthanc-list"),
@@ -106,4 +106,7 @@ urlpatterns = [
     # CT Scan Bulk Retrieval API endpoints (NEW)
     path('pacs/studies/<str:study_uid>/series/', get_study_series_metadata, name='get-study-series-metadata'),
     path('pacs/studies/<str:study_uid>/series/<str:series_uid>/images/bulk', get_series_bulk_images, name='get-series-bulk-images'),
+    
+    # DICOM Upload API endpoint
+    path('upload/dicom/', upload_dicom_files, name='upload-dicom-files'),
 ]

@@ -935,50 +935,16 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
         // Fit image to viewport while preserving aspect ratio and centering
         stackViewport.resetCamera();
         
-        // Proper image fitting and centering
-        try {
-          // Reset camera first
-          stackViewport.resetCamera();
-          
-          // Reset camera immediately
-          try {
-              // Get current canvas dimensions
-              const canvas = stackViewport.canvas;
-              
-              // Use the built-in fit method if available
-              if (typeof stackViewport.fitToCanvas === 'function') {
-                stackViewport.fitToCanvas();
-              } else {
-                // Calculate appropriate zoom to fit image in canvas
-                const currentImage = stackViewport.getImageData();
-                if (currentImage && currentImage.dimensions) {
-                  const imageWidth = currentImage.dimensions[0];
-                  const imageHeight = currentImage.dimensions[1];
-                  const canvasWidth = canvas.clientWidth;
-                  const canvasHeight = canvas.clientHeight;
-                  
-                  // Calculate scale to fit image in canvas
-                  const scaleX = canvasWidth / imageWidth;
-                  const scaleY = canvasHeight / imageHeight;
-                  const scale = Math.min(scaleX, scaleY) * 0.9; // 0.9 for some padding
-                  
-                  // Set camera properties for proper centering
-                  const camera = stackViewport.getCamera();
-                  stackViewport.setCamera({
-                    ...camera,
-                    parallelScale: Math.max(imageHeight, imageWidth) / (2 * scale),
-                    position: [imageWidth / 2, imageHeight / 2, camera.position[2]],
-                    focalPoint: [imageWidth / 2, imageHeight / 2, camera.focalPoint[2]]
-                  });
-                }
-              }
-              
-              stackViewport.render();
-            } catch (fitError) {
-              // Ignore fit errors
-            }
-        } catch (displayError) {
-          stackViewport.resetCamera();
+        // Simple: just reset camera and render
+        stackViewport.resetCamera();
+        stackViewport.render();
+        
+        // Apply CSS to prevent canvas stretching
+        const canvas = stackViewport.canvas;
+        if (canvas) {
+          canvas.style.objectFit = 'contain';
+          canvas.style.maxWidth = '100%';
+          canvas.style.maxHeight = '100%';
         }
         
         stackViewport.render();
@@ -988,19 +954,32 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
         if (element && !resizeObserverRef.current) {
           resizeObserverRef.current = new ResizeObserver((entries) => {
             if (engine && stackViewport) {
-              // Resize the rendering engine first
-              engine.resize(true, false);
-              
-              // Then refit the image to prevent wrapping/cropping
-              try {
-                stackViewport.resetCamera();
-                if (typeof stackViewport.fitToCanvas === 'function') {
-                  stackViewport.fitToCanvas();
+              // Use a small delay to ensure proper resize handling, especially after fullscreen exit
+              setTimeout(() => {
+                try {
+                  // Resize the rendering engine first with force flag
+                  engine.resize(true, true); // Force immediate resize
+                  
+                  // Simple resize handling - just reset camera
+                  setTimeout(() => {
+                    stackViewport.resetCamera();
+                    stackViewport.render();
+                    
+                    // Force canvas to maintain aspect ratio via CSS
+                    const canvas = stackViewport.canvas;
+                    if (canvas) {
+                      canvas.style.objectFit = 'contain';
+                      canvas.style.maxWidth = '100%';
+                      canvas.style.maxHeight = '100%';
+                    }
+                  }, 50);
+                  
+                } catch (engineResizeError) {
+                  // Fallback if engine resize fails
+                  stackViewport.resetCamera();
+                  stackViewport.render();
                 }
-                stackViewport.render();
-              } catch (resizeError) {
-                // Ignore resize errors
-              }
+              }, 100); // Small delay to handle fullscreen transition
             }
           });
           
@@ -1827,7 +1806,11 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
             style={{ 
               minHeight: '400px',
               position: 'relative',
-              overflow: 'hidden' // Prevent image wrapping/overflow
+              overflow: 'hidden',
+              // Force the canvas to maintain aspect ratio
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
             }}
           >
             {/* Loading Overlay */}
@@ -2212,13 +2195,11 @@ const ThumbnailImage: React.FC<ThumbnailImageProps> = ({ imageId, index, isActiv
         
         const attemptRender = () => {
           try {
-            // Reset camera and center thumbnail image
+            // Reset camera and apply fixed aspect ratio for thumbnail
             thumbViewport.resetCamera();
             
-            // Try to fit to canvas for proper centering
-            if (typeof thumbViewport.fitToCanvas === 'function') {
-              thumbViewport.fitToCanvas();
-            }
+            // Simple thumbnail - just reset camera
+            thumbViewport.resetCamera();
             
             thumbViewport.render();
             if (mounted) {

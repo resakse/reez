@@ -196,6 +196,11 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
 }
 
+# File Upload Settings for DICOM files
+FILE_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024  # 100MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024  # 100MB
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 1000  # Allow many files in one upload
+
 # DICOM Configuration
 DICOM_ORG_ROOT = '1.2.826.0.1.3680043.8.498'  # Example organization root UID
 DICOM_AE_TITLE = 'RIS_MWL_SCP'  # Application Entity title for MWL server

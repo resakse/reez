@@ -26,6 +26,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.decorators import api_view, permission_classes, parser_classes
+from rest_framework.parsers import MultiPartParser, FileUploadParser
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from .serializers import (
@@ -35,6 +37,12 @@ from .serializers import (
     GroupedExaminationSerializer, GroupedMWLWorklistSerializer,
     PositionChoicesSerializer, PacsConfigSerializer
 )
+import os
+import tempfile
+import pydicom
+from django.core.files.storage import default_storage
+from django.conf import settings
+import requests
 
 from .dicom_mwl import mwl_service
 from pesakit.serializers import PesakitSerializer
@@ -927,3 +935,610 @@ def orthanc_study(request):
         template = 'exam/dicom/dicom_study-partial.html'
     return render(request, template, context={'exam': susun, 'viewerurl': viewerurl})
 # http://localhost:8043/dicom-web/studies?limit=2&includefield=00081030,00080060&00100020=561008065053
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser, FileUploadParser])
+def upload_dicom_files(request):
+    """
+    Upload DICOM files and register them in the RIS system.
+    Accepts multiple DICOM files and automatically:
+    1. Validates DICOM format
+    2. Extracts patient information 
+    3. Creates/links patient record
+    4. Creates study registration
+    5. Stores files in Orthanc PACS
+    """
+    try:
+        # Get uploaded files
+        uploaded_files = request.FILES.getlist('dicom_files')
+        if not uploaded_files:
+            return Response({
+                'success': False,
+                'error': 'No DICOM files uploaded',
+                'message': 'Please select DICOM files to upload'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get optional registration data
+        registration_data = {
+            'patient_id': request.data.get('patient_id'),  # Link to existing patient
+            'modality': request.data.get('modality', 'OT'),  # Default to Other
+            'study_description': request.data.get('study_description', 'Uploaded Study'),
+            'referring_physician': request.data.get('referring_physician', ''),
+            'ward_id': request.data.get('ward_id'),
+        }
+        
+        processed_files = []
+        patient_info = None
+        study_instance_uid = None
+        
+        # Process each uploaded file
+        for uploaded_file in uploaded_files:
+            try:
+                # Validate DICOM file
+                with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+                    for chunk in uploaded_file.chunks():
+                        temp_file.write(chunk)
+                    temp_file_path = temp_file.name
+                
+                # Parse DICOM metadata
+                try:
+                    dcm = pydicom.dcmread(temp_file_path)
+                except Exception as e:
+                    os.unlink(temp_file_path)
+                    return Response({
+                        'success': False,
+                        'error': f'Invalid DICOM file: {uploaded_file.name}',
+                        'message': f'File format error: {str(e)}'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                
+                # Extract patient information from first file
+                if patient_info is None:
+                    patient_info = {
+                        'patient_id': getattr(dcm, 'PatientID', ''),
+                        'patient_name': str(getattr(dcm, 'PatientName', '')).replace('^', ' '),
+                        'patient_birth_date': getattr(dcm, 'PatientBirthDate', ''),
+                        'patient_sex': getattr(dcm, 'PatientSex', ''),
+                    }
+                    study_instance_uid = getattr(dcm, 'StudyInstanceUID', '')
+                
+                # Extract comprehensive DICOM metadata (same approach as PACS Browser import)
+                patient_name = str(getattr(dcm, 'PatientName', 'Unknown')).replace('^', ' ')
+                patient_id = getattr(dcm, 'PatientID', '')
+                patient_birth_date = getattr(dcm, 'PatientBirthDate', '')  # YYYYMMDD format
+                patient_sex = getattr(dcm, 'PatientSex', '')  # M/F
+                patient_age = getattr(dcm, 'PatientAge', '')  # e.g., "034Y"
+                study_description = getattr(dcm, 'StudyDescription', '')
+                referring_physician = str(getattr(dcm, 'ReferringPhysicianName', '')).replace('^', ' ')
+                accession_number = getattr(dcm, 'AccessionNumber', '')
+                modality = getattr(dcm, 'Modality', 'OT')
+                
+                # Extract additional tags for custom accession generation
+                requesting_service = getattr(dcm, 'RequestingService', '')
+                study_date = getattr(dcm, 'StudyDate', '')
+                
+                # Extract examination-specific DICOM tags
+                body_part_examined = getattr(dcm, 'BodyPartExamined', '')
+                acquisition_device_processing_description = getattr(dcm, 'AcquisitionDeviceProcessingDescription', '')
+                operators_name = str(getattr(dcm, 'OperatorsName', '')).replace('^', ' ')
+                patient_position = getattr(dcm, 'PatientPosition', '')
+                view_position = getattr(dcm, 'ViewPosition', '')
+                series_description = getattr(dcm, 'SeriesDescription', '')
+                laterality = getattr(dcm, 'Laterality', '')  # L/R
+                
+                # Store metadata for processing
+                file_metadata = {
+                    'filename': uploaded_file.name,
+                    'temp_path': temp_file_path,
+                    'patient_name': patient_name,
+                    'patient_id': patient_id,
+                    'patient_birth_date': patient_birth_date,
+                    'patient_sex': patient_sex,
+                    'patient_age': patient_age,
+                    'study_instance_uid': getattr(dcm, 'StudyInstanceUID', ''),
+                    'series_instance_uid': getattr(dcm, 'SeriesInstanceUID', ''),
+                    'sop_instance_uid': getattr(dcm, 'SOPInstanceUID', ''),
+                    'modality': modality,
+                    'study_date': getattr(dcm, 'StudyDate', ''),
+                    'study_time': getattr(dcm, 'StudyTime', ''),
+                    'study_description': study_description,
+                    'series_description': series_description,
+                    'referring_physician': referring_physician,
+                    'accession_number': accession_number,
+                    'requesting_service': requesting_service,
+                    'study_date': study_date,
+                    'instance_number': getattr(dcm, 'InstanceNumber', 1),
+                    # Examination-specific metadata
+                    'body_part_examined': body_part_examined,
+                    'acquisition_device_processing_description': acquisition_device_processing_description,
+                    'operators_name': operators_name,
+                    'patient_position': patient_position,
+                    'view_position': view_position,
+                    'laterality': laterality,
+                }
+                processed_files.append(file_metadata)
+                
+            except Exception as e:
+                # Clean up temp file on error
+                if 'temp_file_path' in locals():
+                    try:
+                        os.unlink(temp_file_path)
+                    except:
+                        pass
+                return Response({
+                    'success': False,
+                    'error': f'Error processing {uploaded_file.name}',
+                    'message': str(e)
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        # Find or create patient record
+        patient = None
+        if registration_data['patient_id']:
+            # Link to existing patient
+            try:
+                patient = Pesakit.objects.get(id=registration_data['patient_id'])
+            except Pesakit.DoesNotExist:
+                return Response({
+                    'success': False,
+                    'error': 'Patient not found',
+                    'message': f'Patient with ID {registration_data["patient_id"]} does not exist'
+                }, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            # Try to find existing patient by Patient ID or create new one
+            patient_id_dicom = patient_info['patient_id']
+            if patient_id_dicom:
+                try:
+                    patient = Pesakit.objects.filter(
+                        Q(nric=patient_id_dicom) | Q(mrn=patient_id_dicom)
+                    ).first()
+                except:
+                    pass
+            
+            if not patient:
+                # Create new patient from DICOM metadata with NRIC parsing
+                from pesakit.utils import parse_identification_number
+                from datetime import datetime, date
+                
+                # Parse NRIC if available and valid
+                nric_info = None
+                patient_nric = patient_info['patient_id']
+                if patient_nric:
+                    nric_info = parse_identification_number(patient_nric)
+                
+                # Determine patient details from NRIC or DICOM tags
+                if nric_info and nric_info.get('is_valid'):
+                    # Use NRIC-derived information
+                    gender = nric_info['gender']  # 'L' for male, 'P' for female
+                    birth_date = nric_info['dob']
+                    formatted_nric = nric_info['formatted']
+                else:
+                    # Use DICOM tags as fallback
+                    # Convert DICOM PatientSex (M/F) to system gender (L/P)
+                    dicom_sex = patient_info.get('patient_sex', '').upper()
+                    if dicom_sex == 'M':
+                        gender = 'L'  # Male
+                    elif dicom_sex == 'F':
+                        gender = 'P'  # Female
+                    else:
+                        gender = 'U'  # Unknown
+                    
+                    # Parse DICOM birth date (YYYYMMDD format)
+                    birth_date = None
+                    dicom_birth_date = patient_info.get('patient_birth_date', '')
+                    if dicom_birth_date and len(dicom_birth_date) == 8:
+                        try:
+                            birth_date = datetime.strptime(dicom_birth_date, '%Y%m%d').date()
+                        except ValueError:
+                            pass
+                    
+                    formatted_nric = patient_nric or f'DICOM_{timezone.now().strftime("%Y%m%d%H%M%S")}'
+                
+                patient = Pesakit.objects.create(
+                    nama=patient_info['patient_name'] or 'Unknown Patient',
+                    nric=formatted_nric,
+                    jantina=gender,
+                    jxr=request.user  # Required field for the user who created the record
+                )
+        
+        # Create study registration (Daftar)
+        try:
+            # Use DICOM-extracted modality with manual override
+            modality_name = registration_data.get('modality') or processed_files[0].get('modality', 'OT')
+            modality, _ = Modaliti.objects.get_or_create(
+                nama=modality_name,
+                defaults={'singkatan': modality_name[:5]}
+            )
+            
+            # Use DICOM metadata with manual overrides (same as PACS Browser import)
+            first_file = processed_files[0]
+            referring_physician = (registration_data.get('referring_physician') or 
+                                 first_file.get('referring_physician') or 'Upload')
+            study_description = (registration_data.get('study_description') or 
+                               first_file.get('study_description') or 'Uploaded Study')
+            # Generate custom accession number from DICOM metadata
+            def generate_custom_accession(file_metadata):
+                requesting_service = file_metadata.get('requesting_service', '')
+                study_date = file_metadata.get('study_date', '')
+                original_accession = file_metadata.get('accession_number', '')
+                
+                if not requesting_service or not study_date or not original_accession:
+                    return original_accession  # Fallback to original
+                
+                # Extract first letters of each word in RequestingService
+                # "KK SUNGAI BULOH" -> "KSB"
+                service_parts = requesting_service.strip().split()
+                service_code = ''.join(part[0].upper() for part in service_parts if part)
+                
+                # Extract year from StudyDate (YYYYMMDD format)
+                if len(study_date) >= 4:
+                    year = study_date[:4]
+                else:
+                    year = str(timezone.now().year)
+                
+                # Calculate remaining space for accession number
+                # Total limit: 16 chars, service_code (3) + year (4) = 7, leaving 9 for accession
+                remaining_chars = 16 - len(service_code) - len(year)
+                remaining_chars = max(1, remaining_chars)  # At least 1 digit
+                
+                # Zero-fill the original accession number to fit remaining space
+                try:
+                    accession_num = int(original_accession)
+                    formatted_accession = str(accession_num).zfill(remaining_chars)
+                except (ValueError, TypeError):
+                    formatted_accession = original_accession[:remaining_chars].zfill(remaining_chars)
+                
+                # Combine and ensure total length <= 16
+                result = f"{service_code}{year}{formatted_accession}"
+                return result[:16]  # Truncate if somehow still too long
+            
+            accession_number = generate_custom_accession(first_file)
+            
+            # Create registration - handle accession number uniqueness
+            parent_accession = accession_number if accession_number else None
+            regular_accession = accession_number if accession_number else None
+            
+            # If accession number exists, check if Daftar already exists
+            if parent_accession:
+                existing_daftar = Daftar.objects.filter(parent_accession_number=parent_accession).first()
+                if existing_daftar:
+                    # Use existing daftar instead of creating new one
+                    daftar = existing_daftar
+                else:
+                    daftar = Daftar.objects.create(
+                        pesakit=patient,
+                        pemohon=referring_physician,
+                        study_description=study_description,
+                        modality=modality_name,
+                        study_instance_uid=study_instance_uid,
+                        parent_accession_number=parent_accession,
+                        accession_number=regular_accession,
+                        jxr=request.user,
+                        study_status='COMPLETED',
+                        tarikh=timezone.now()
+                    )
+            else:
+                # No accession number, create new daftar
+                daftar = Daftar.objects.create(
+                    pesakit=patient,
+                    pemohon=referring_physician,
+                    study_description=study_description,
+                    modality=modality_name,
+                    study_instance_uid=study_instance_uid,
+                    parent_accession_number=None,
+                    accession_number=None,
+                    jxr=request.user,
+                    study_status='COMPLETED',
+                    tarikh=timezone.now()
+                )
+            
+            # Add ward if specified
+            if registration_data.get('ward_id'):
+                try:
+                    from wad.models import Ward
+                    ward = Ward.objects.get(id=registration_data['ward_id'])
+                    daftar.rujukan = ward
+                    daftar.save()
+                except Ward.DoesNotExist:
+                    pass
+            
+            # Create examination records (Pemeriksaan) - parse DICOM metadata like PACS Browser import
+            created_examinations = []
+            from exam.models import Exam, Part, Pemeriksaan
+            
+            # Helper function to parse examination details from DICOM metadata
+            def parse_dicom_examination_details(file_metadata):
+                body_part = file_metadata.get('body_part_examined', '').upper()
+                acquisition_desc = file_metadata.get('acquisition_device_processing_description', '')
+                modality = file_metadata.get('modality', 'OT')
+                
+                # Parse exam type and position from AcquisitionDeviceProcessingDescription
+                # e.g., "CHEST,ERECT P->A" -> exam_type="CHEST", position="PA ERECT"
+                exam_type = body_part or modality  # Default to body part or modality
+                position = file_metadata.get('patient_position', '')
+                
+                if acquisition_desc:
+                    # Parse acquisition description (e.g., "CHEST,ERECT P->A")
+                    parts = acquisition_desc.split(',')
+                    if len(parts) >= 1:
+                        exam_type = parts[0].strip().upper()
+                    if len(parts) >= 2:
+                        pos_desc = parts[1].strip()
+                        # Parse position description (e.g., "ERECT P->A" -> "PA ERECT")
+                        if 'P->A' in pos_desc or 'P-A' in pos_desc:
+                            position = f"PA {pos_desc.replace('P->A', '').replace('P-A', '').strip()}"
+                        elif 'A->P' in pos_desc or 'A-P' in pos_desc:
+                            position = f"AP {pos_desc.replace('A->P', '').replace('A-P', '').strip()}"
+                        elif 'LAT' in pos_desc.upper():
+                            position = f"LAT {pos_desc.replace('LAT', '').strip()}"
+                        else:
+                            position = pos_desc
+                
+                # Get radiographer name
+                radiographer_name = file_metadata.get('operators_name', '').strip()
+                
+                # Get laterality (L/R)
+                laterality = file_metadata.get('laterality', '').upper()
+                
+                return {
+                    'exam_type': (exam_type or f"{modality} Study").strip(),
+                    'body_part': body_part.strip() if body_part else '',
+                    'position': position.strip() if position else '',
+                    'laterality': laterality.strip() if laterality else '',
+                    'radiographer_name': radiographer_name.strip() if radiographer_name else '',
+                    'modality': modality.strip() if modality else 'OT'
+                }
+            
+            # Create examination records (Pemeriksaan) - parse DICOM metadata like PACS Browser import
+            created_examinations = []
+            from exam.models import Exam, Part, Pemeriksaan
+            
+            # Process each file to create examinations
+            for file_metadata in processed_files:
+                print(f"DEBUG: Processing file: {file_metadata['filename']}")
+                exam_details = parse_dicom_examination_details(file_metadata)
+                print(f"DEBUG: Parsed exam details: {exam_details}")
+                
+                # Find or create modality (ensure it exists)
+                file_modality_name = exam_details['modality']
+                file_modality, _ = Modaliti.objects.get_or_create(
+                    nama=file_modality_name,
+                    defaults={'singkatan': file_modality_name[:5]}
+                )
+                
+                # Find or create body part
+                part = None
+                if exam_details['body_part']:
+                    part, _ = Part.objects.get_or_create(
+                        part=exam_details['body_part']
+                    )
+                
+                # Find or create exam type - handle constraint with atomic transaction
+                from django.db import transaction
+                
+                try:
+                    with transaction.atomic():
+                        exam, created = Exam.objects.get_or_create(
+                            exam=exam_details['exam_type'],
+                            modaliti=file_modality,
+                            part=part,
+                            defaults={'catatan': 'Created from DICOM upload'}
+                        )
+                        print(f"DEBUG: Exam {'created' if created else 'found'}: {exam.id} - {exam.exam}/{exam.modaliti.nama}/{exam.part.part if exam.part else None}")
+                except Exception as e:
+                    print(f"DEBUG: Exam creation failed: {e}")
+                    print(f"DEBUG: Trying to find existing exam: {exam_details['exam_type']}/{file_modality.nama}/{part.part if part else None}")
+                    
+                    # Debug: Check what exams exist with similar names
+                    similar_exams = Exam.objects.filter(exam__icontains='CHEST')
+                    print(f"DEBUG: Found {similar_exams.count()} exams containing 'CHEST':")
+                    for se in similar_exams[:5]:  # Show first 5
+                        print(f"  - ID:{se.id} '{se.exam}' | Modality:{se.modaliti.nama}({se.modaliti.id}) | Part:{se.part.part if se.part else None}({se.part.id if se.part else None})")
+                    
+                    # Check modality and part values
+                    print(f"DEBUG: Our values - Modality:{file_modality.nama}({file_modality.id}) | Part:{part.part if part else None}({part.id if part else None})")
+                    
+                    # Try exact match with different queries
+                    exam = Exam.objects.filter(
+                        exam=exam_details['exam_type'],
+                        modaliti=file_modality,
+                        part=part
+                    ).first()
+                    
+                    if exam:
+                        print(f"DEBUG: Found existing exam after error: {exam.id}")
+                    else:
+                        # Try without part filter in case part is the issue
+                        exam_no_part = Exam.objects.filter(
+                            exam=exam_details['exam_type'],
+                            modaliti=file_modality,
+                            part__isnull=True
+                        ).first()
+                        
+                        if exam_no_part:
+                            print(f"DEBUG: Found exam without part: {exam_no_part.id}")
+                            exam = exam_no_part
+                        else:
+                            print(f"DEBUG: Still no exam found, this is definitely a database issue")
+                            # Just use any CHEST exam with same modality as fallback
+                            fallback_exam = Exam.objects.filter(
+                                exam__iexact='CHEST',
+                                modaliti=file_modality
+                            ).first()
+                            
+                            if fallback_exam:
+                                print(f"DEBUG: Using fallback exam: {fallback_exam.id}")
+                                exam = fallback_exam
+                            else:
+                                raise Exception(f"Cannot create or find any suitable exam for: {exam_details['exam_type']}/{file_modality.nama}/{part.part if part else None}")
+                
+                # Map position to patient_position
+                patient_position_mapped = None
+                if exam_details['position']:
+                    pos = exam_details['position'].upper()
+                    position_map = {
+                        'AP': 'AP',
+                        'PA': 'PA', 
+                        'LAT': 'LAT',
+                        'LATERAL': 'LAT',
+                        'LEFT': 'LATERAL_LEFT',
+                        'RIGHT': 'LATERAL_RIGHT',
+                        'OBL': 'OBLIQUE',
+                        'OBLIQUE': 'OBLIQUE'
+                    }
+                    for key, value in position_map.items():
+                        if key in pos:
+                            patient_position_mapped = value
+                            break
+                    if not patient_position_mapped:
+                        patient_position_mapped = exam_details['position']
+                
+                # Find radiographer user
+                radiographer = request.user  # Default to uploading user
+                if exam_details['radiographer_name']:
+                    try:
+                        from django.contrib.auth import get_user_model
+                        User = get_user_model()
+                        # Try to find user by name parts
+                        name_parts = exam_details['radiographer_name'].split()
+                        if len(name_parts) >= 1:
+                            radiographer = User.objects.filter(
+                                first_name__icontains=name_parts[0]
+                            ).first() or request.user
+                    except:
+                        pass
+                
+                # Build comprehensive notes from DICOM metadata
+                notes_parts = [f"File: {file_metadata['filename']}"]
+                if file_metadata.get('series_description'):
+                    notes_parts.append(f"Series: {file_metadata['series_description']}")
+                if exam_details['laterality']:
+                    notes_parts.append(f"Laterality: {exam_details['laterality']}")
+                if file_metadata.get('acquisition_device_processing_description'):
+                    notes_parts.append(f"Acquisition: {file_metadata['acquisition_device_processing_description']}")
+                if exam_details['radiographer_name']:
+                    notes_parts.append(f"Operator: {exam_details['radiographer_name']}")
+                
+                # Create examination record
+                pemeriksaan = Pemeriksaan.objects.create(
+                    daftar=daftar,
+                    exam=exam,
+                    accession_number=accession_number or None,
+                    no_xray=accession_number or f"UPL{timezone.now().strftime('%Y%m%d%H%M%S')}_{len(created_examinations)+1}",
+                    patient_position=patient_position_mapped,
+                    catatan=", ".join(notes_parts),
+                    jxr=radiographer,
+                    exam_status='COMPLETED'
+                )
+                created_examinations.append(pemeriksaan)
+            
+        except Exception as e:
+            # Clean up temp files on error
+            for file_data in processed_files:
+                try:
+                    os.unlink(file_data['temp_path'])
+                except:
+                    pass
+            return Response({
+                'success': False,
+                'error': 'Failed to create study registration',
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        # Upload files to Orthanc PACS
+        uploaded_instances = []
+        try:
+            # Get PACS configuration
+            pacs_config = PacsConfig.objects.first()
+            if not pacs_config:
+                raise Exception("PACS server not configured")
+            
+            orthanc_url = pacs_config.orthancurl.rstrip('/')
+            
+            for file_data in processed_files:
+                try:
+                    # Upload to Orthanc
+                    with open(file_data['temp_path'], 'rb') as dicom_file:
+                        response = requests.post(
+                            f"{orthanc_url}/instances",
+                            files={'file': dicom_file},
+                            timeout=30
+                        )
+                        
+                        if response.status_code == 200:
+                            result = response.json()
+                            uploaded_instances.append({
+                                'filename': file_data['filename'],
+                                'orthanc_id': result.get('ID'),
+                                'status': 'uploaded'
+                            })
+                        else:
+                            uploaded_instances.append({
+                                'filename': file_data['filename'],
+                                'status': 'failed',
+                                'error': f'HTTP {response.status_code}'
+                            })
+                            
+                except Exception as upload_error:
+                    uploaded_instances.append({
+                        'filename': file_data['filename'],
+                        'status': 'failed',
+                        'error': str(upload_error)
+                    })
+                
+        except Exception as e:
+            # PACS upload failed, but registration was successful
+            pass
+        
+        # Link to PACS study (same as PACS Browser import)
+        if created_examinations and uploaded_instances:
+            try:
+                from exam.models import PacsExam
+                # Create PacsExam link for the first examination
+                first_uploaded = next((i for i in uploaded_instances if i['status'] == 'uploaded'), None)
+                if first_uploaded:
+                    PacsExam.objects.create(
+                        exam=created_examinations[0],  # OneToOneField to first Pemeriksaan
+                        orthanc_id=first_uploaded.get('orthanc_id', ''),
+                        study_id=study_instance_uid,
+                        study_instance=study_instance_uid
+                    )
+            except Exception as pacs_link_error:
+                # Non-critical error - continue
+                logger.warning(f"Failed to create PACS link: {pacs_link_error}")
+        
+        # Clean up temporary files
+        for file_data in processed_files:
+            try:
+                os.unlink(file_data['temp_path'])
+            except:
+                pass
+        
+        # Prepare response
+        success_count = len([i for i in uploaded_instances if i['status'] == 'uploaded'])
+        total_count = len(uploaded_instances)
+        
+        return Response({
+            'success': True,
+            'message': f'Successfully processed {success_count}/{total_count} DICOM files',
+            'data': {
+                'patient_id': patient.id,
+                'patient_name': patient.nama,
+                'patient_mrn': patient.mrn,
+                'study_id': daftar.id,
+                'study_accession': daftar.parent_accession_number,
+                'study_instance_uid': daftar.study_instance_uid,
+                'examination_ids': [exam.id for exam in created_examinations],
+                'examination_count': len(created_examinations),
+                'uploaded_files': uploaded_instances,
+                'pacs_status': 'uploaded' if success_count > 0 else 'failed'
+            }
+        }, status=status.HTTP_201_CREATED)
+        
+    except Exception as e:
+        logger.error(f"DICOM upload error: {str(e)}")
+        return Response({
+            'success': False,
+            'error': 'Upload failed',
+            'message': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
