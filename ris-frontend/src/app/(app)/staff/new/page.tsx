@@ -38,9 +38,7 @@ export default function NewStaffPage() {
   const { user } = useAuth();
   const isCurrentSuperuser = user?.is_superuser || false;
   
-  // Debug logging
-  console.log('Current user:', user);
-  console.log('Is superuser:', isCurrentSuperuser);
+  // Debug: Check user permissions
   
   const [formData, setFormData] = useState<StaffFormData>({
     username: '',

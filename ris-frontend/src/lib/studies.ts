@@ -56,7 +56,7 @@ export async function fetchStudies(): Promise<Study[]> {
     
     return studies;
   } catch (error) {
-    console.error('Error fetching studies from backend:', error);
+    // Error fetching studies from backend
     
     // Return empty array on error - UI should handle gracefully
     return [];
@@ -71,7 +71,7 @@ export async function fetchStudy(studyInstanceUID: string): Promise<Study | null
     const studies = await fetchStudies();
     return studies.find(study => study.studyInstanceUID === studyInstanceUID) || null;
   } catch (error) {
-    console.error('Error fetching study:', error);
+    // Error fetching study
     return null;
   }
 }

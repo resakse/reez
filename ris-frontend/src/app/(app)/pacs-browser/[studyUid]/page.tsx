@@ -123,7 +123,7 @@ export default function LegacyStudyViewerPage() {
               setRisExaminations(examData);
             }
           } catch (err) {
-            console.error('Error fetching examination details:', err);
+            // Error fetching examination details
           }
         } else {
           setIsImportedToRis(false);
@@ -135,7 +135,7 @@ export default function LegacyStudyViewerPage() {
         setRisStudyId(null);
       }
     } catch (err) {
-      console.error('Error checking RIS import status:', err);
+      // Error checking RIS import status
       // Don't set error state for this check, just assume not imported
       setIsImportedToRis(false);
     }
@@ -155,21 +155,18 @@ export default function LegacyStudyViewerPage() {
         setEnhancedDicomData(data.series || []);
       }
     } catch (err) {
-      console.error('Error fetching enhanced DICOM data:', err);
+      // Error fetching enhanced DICOM data
     }
   }, [studyUid]);
 
   const fetchStudyData = useCallback(async () => {
     if (!studyUid) return;
     
-    console.log(`Checking cache for study ${studyUid}...`);
-    
     // Check if we have cached data that's still fresh
     const cachedData = studyDataCache.get(studyUid);
     const now = Date.now();
     
     if (cachedData && (now - cachedData.timestamp) < CACHE_DURATION) {
-      console.log(`Using cached data for study ${studyUid}`);
       setMetadata(cachedData.metadata);
       setImageIds(cachedData.imageIds);
       setLoading(false);
@@ -178,13 +175,11 @@ export default function LegacyStudyViewerPage() {
 
     // Prevent duplicate fetches for the same study
     if (fetchedStudiesRef.current.has(studyUid)) {
-      console.log(`Study ${studyUid} already being fetched, skipping...`);
       return;
     }
 
     // Mark this study as being fetched
     fetchedStudiesRef.current.add(studyUid);
-    console.log('Fetching study data for UID:', studyUid);
 
     try {
       setLoading(true);
@@ -192,15 +187,11 @@ export default function LegacyStudyViewerPage() {
 
       // First fetch study metadata to determine if it's a large CT/MRI study
       const studyMetadata = await getStudyMetadata(studyUid);
-      console.log('Study metadata:', studyMetadata);
 
       // ONLY use series endpoint - NO FALLBACKS
-      console.log('🔍 DEBUG: Attempting to fetch series metadata');
       const seriesResponse = await AuthService.authenticatedFetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/pacs/studies/${studyUid}/series/`
       );
-      
-      console.log('🔍 DEBUG: Series response status:', seriesResponse.status);
       
       if (!seriesResponse.ok) {
         throw new Error(`Series endpoint failed with status ${seriesResponse.status}`);
@@ -209,8 +200,6 @@ export default function LegacyStudyViewerPage() {
       const seriesData = await seriesResponse.json();
       const totalImages = seriesData.series?.reduce((sum: number, s: any) => sum + s.imageCount, 0) || 0;
       const seriesCount = seriesData.series?.length || 0;
-      
-      console.log(`Study: ${totalImages} images across ${seriesCount} series`);
       
       // Create data with ONLY first image of each series
       const firstImages = seriesData.series?.map((s: any) => `wadors:${s.firstImageUrl}`) || [];
@@ -231,8 +220,6 @@ export default function LegacyStudyViewerPage() {
       };
       
       toast.success(`Study loaded: ${totalImages} images across ${seriesCount} series. Showing 1 thumbnail per series.`);
-
-      console.log('Final study image data:', studyImageData);
 
       // Cache the fetched data
       studyDataCache.set(studyUid, {
@@ -261,7 +248,7 @@ export default function LegacyStudyViewerPage() {
         }
       }
     } catch (err) {
-      console.error('Error loading legacy study:', err);
+      // Error loading legacy study
       setError(err instanceof Error ? err.message : 'Failed to load legacy study');
       toast.error('Failed to load legacy study');
     } finally {
@@ -273,7 +260,7 @@ export default function LegacyStudyViewerPage() {
 
   useEffect(() => {
     if (studyUid && user) {
-      console.log(`useEffect triggered for study: ${studyUid}`);
+      // Fetching study data
       fetchStudyData();
       checkRisImportStatus();
       fetchEnhancedDicomData();
@@ -371,9 +358,7 @@ export default function LegacyStudyViewerPage() {
         }
         
         // Optionally redirect to the imported study in RIS
-        setTimeout(() => {
-          router.push(`/studies/${result.registrationId}`);
-        }, 2000);
+        router.push(`/studies/${result.registrationId}`);
       } else {
         // Handle specific error cases
         if (response.status === 403) {
@@ -385,15 +370,13 @@ export default function LegacyStudyViewerPage() {
           setIsImportedToRis(true);
           setRisStudyId(result.registrationId);
           
-          setTimeout(() => {
-            router.push(`/studies/${result.registrationId}`);
-          }, 2000);
+          router.push(`/studies/${result.registrationId}`);
         } else {
           toast.error(result.error || 'Failed to import study');
         }
       }
     } catch (err) {
-      console.error('Error importing study:', err);
+      // Error importing study
       toast.error('Network error: Failed to import study');
     } finally {
       setImporting(false);

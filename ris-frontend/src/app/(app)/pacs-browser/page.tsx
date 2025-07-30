@@ -88,8 +88,6 @@ export default function PacsBrowserPage() {
       setSearching(true);
       setError(null);
       
-      console.log('🔍 Starting PACS search via backend API...');
-      
       // Build search parameters
       const searchParams = {
         patientName: patientName.trim() || undefined,
@@ -106,7 +104,7 @@ export default function PacsBrowserPage() {
         searchParams[key] === undefined && delete searchParams[key]
       );
 
-      console.log('📤 Sending search params:', searchParams);
+      // Searching with built parameters
 
       // Use Django API endpoint instead of direct Orthanc connection
       const response = await AuthService.authenticatedFetch(
@@ -120,16 +118,12 @@ export default function PacsBrowserPage() {
         }
       );
 
-      console.log('📥 Response status:', response.status);
-
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('❌ Response error:', errorData);
         throw new Error(errorData.error || `Failed to search PACS: ${response.statusText}`);
       }
 
       const data = await response.json();
-      console.log('📊 API response:', data);
       
       if (!data.success) {
         throw new Error(data.error || 'Search failed');
@@ -152,21 +146,18 @@ export default function PacsBrowserPage() {
         InstitutionName: study.institutionName
       }));
 
-      console.log('✅ Formatted studies count:', formattedStudies.length);
-      console.log('✅ First formatted study:', formattedStudies[0]);
+      // Successfully formatted studies
 
       setStudies(formattedStudies);
       setTotalStudies(formattedStudies.length);
       
       if (formattedStudies.length === 0) {
-        console.log('ℹ️ No studies found');
         toast.success('Search completed - no studies found matching criteria');
       } else {
-        console.log(`✅ Found ${formattedStudies.length} studies`);
         toast.success(`Found ${formattedStudies.length} legacy studies`);
       }
     } catch (err) {
-      console.error('❌ Error searching legacy studies:', err);
+      // Error searching legacy studies
       setError(err instanceof Error ? err.message : 'Failed to search legacy studies');
       toast.error('Failed to search legacy studies');
     } finally {

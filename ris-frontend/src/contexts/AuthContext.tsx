@@ -56,7 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser({ id: currentUser.user_id, username: currentUser.username });
         }
       } catch (error) {
-        console.error('Failed to fetch user profile:', error);
+        // Failed to fetch user profile
         // Fallback to token data
         setUser({ id: currentUser.user_id, username: currentUser.username });
       }

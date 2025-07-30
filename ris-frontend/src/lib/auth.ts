@@ -37,7 +37,7 @@ class AuthService {
       this.setTokens(tokens);
       return true;
     } catch (error) {
-      console.error('Login error:', error);
+      // Login error occurred
       return false;
     }
   }
@@ -93,7 +93,7 @@ class AuthService {
       this.setTokens({ access: data.access, refresh: refreshToken });
       return true;
     } catch (error) {
-      console.error('Token refresh error:', error);
+      // Token refresh error occurred
       this.logout();
       return false;
     }

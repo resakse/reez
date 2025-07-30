@@ -46,13 +46,19 @@ async function preRegisterWadorsMetadata(imageIds: string[]): Promise<void> {
       return;
     }
     
-    // Process images in smaller batches to avoid overwhelming the server
-    const batchSize = 5;
+    // Process all images concurrently with higher parallelism
+    const maxConcurrent = 10;
+    const semaphore = Array(maxConcurrent).fill(0);
+    let activeRequests = 0;
     
-    for (let i = 0; i < imageIds.length; i += batchSize) {
-      const batch = imageIds.slice(i, Math.min(i + batchSize, imageIds.length));
+    await Promise.all(imageIds.map(async (imageId, index) => {
+      // Wait for available slot
+      while (activeRequests >= maxConcurrent) {
+        await new Promise(resolve => requestAnimationFrame(() => resolve(undefined)));
+      }
+      activeRequests++;
       
-      await Promise.all(batch.map(async (imageId, batchIndex) => {
+      try {
         if (!imageId.startsWith('wadors:')) {
           return; // Skip non-WADO-RS images
         }
@@ -83,14 +89,12 @@ async function preRegisterWadorsMetadata(imageIds: string[]): Promise<void> {
           
           for (const tag of criticalTags) {
             if (!metadata[tag]?.Value || !Array.isArray(metadata[tag].Value)) {
-              console.warn(`Missing or invalid critical tag ${tag} for image ${imageId}`);
               isValid = false;
             }
           }
           
           // Add additional validation for samplesPerPixel (00280002)
           if (metadata['00280002']?.Value?.[0] === undefined) {
-            console.warn(`samplesPerPixel missing for ${imageId}, defaulting to 1`);
             // Provide default value
             if (!metadata['00280002']) metadata['00280002'] = { vr: 'US', Value: [1] };
             else if (!metadata['00280002'].Value) metadata['00280002'].Value = [1];
@@ -99,31 +103,24 @@ async function preRegisterWadorsMetadata(imageIds: string[]): Promise<void> {
           
           // Add photometricInterpretation if missing (00280004)
           if (!metadata['00280004']?.Value?.[0]) {
-            console.warn(`photometricInterpretation missing for ${imageId}, defaulting to MONOCHROME2`);
             if (!metadata['00280004']) metadata['00280004'] = { vr: 'CS', Value: ['MONOCHROME2'] };
             else if (!metadata['00280004'].Value) metadata['00280004'].Value = ['MONOCHROME2'];
           }
           
           if (!isValid) {
-            console.warn(`Skipping metadata registration for ${imageId} due to missing critical tags`);
             return;
           }
           
           // Register metadata with Cornerstone WADO-RS metadata manager
-          console.log(`🔧 Registering metadata for ${imageId}`);
           dicomImageLoader.wadors.metaDataManager.add(imageId, metadata);
           
         } catch (error) {
-          console.warn(`Failed to register metadata for ${imageId}:`, error);
           // Continue with other images even if one fails
         }
-      }));
-      
-      // Small delay between batches to avoid overwhelming the server
-      if (i + batchSize < imageIds.length) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+      } finally {
+        activeRequests--;
       }
-    }
+    }));
     
   } catch (error) {
     throw error; // Re-throw to handle at higher level
@@ -163,7 +160,7 @@ const initializeCornerstone = async () => {
         },
         // Optimize for performance and multi-image loading
         useWebWorkers: true,
-        maxWebWorkers: 2, // Reduce to prevent memory/worker issues
+        maxWebWorkers: 4, // Increase for better concurrent loading
         strict: false, // Allow more lenient DICOM parsing
         decodeConfig: {
           convertFloatPixelDataToInt: false,
@@ -176,11 +173,11 @@ const initializeCornerstone = async () => {
           // Don't throw - let the viewer handle gracefully
           return error;
         },
-        // Simplified web worker config
+        // Optimized web worker config for better performance
         webWorkerTaskPools: {
           decodeTask: {
-            maxConcurrency: 2,
-            targetUtilization: 0.6 // Lower utilization to prevent overload
+            maxConcurrency: 4,
+            targetUtilization: 0.8 // Higher utilization for better throughput
           }
         }
       });
@@ -305,16 +302,8 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
     studyMetadata: JSON.stringify(prevProps.studyMetadata) !== JSON.stringify(currentProps.studyMetadata)
   };
   
-  console.log(`🔍 SimpleDicomViewer render #${renderCountRef.current}`, {
-    imageIds: initialImageIds.length,
-    seriesInfo: seriesInfo.length,
-    studyUID: studyMetadata.studyInstanceUID
-  });
-  
   if (propsChanged.imageIds || propsChanged.seriesInfo || propsChanged.studyMetadata) {
-    console.log(`📝 Props changed:`, propsChanged);
-  } else if (renderCountRef.current > 1) {
-    console.log(`🔄 Internal state change caused render #${renderCountRef.current}`);
+    // Props have changed, component will re-render
   }
   
   prevPropsRef.current = currentProps;
@@ -323,7 +312,6 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
   // Add debugging wrapper for state setters
   const createDebugSetter = (name: string, setter: any) => {
     return (...args: any[]) => {
-      console.log(`🔄 STATE UPDATE: ${name}`, args[0]);
       return setter(...args);
     };
   };
@@ -363,15 +351,12 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
   
   // Ref setters for non-UI state - no re-renders
   const setRenderingEngine = (engine: RenderingEngine | null) => {
-    console.log('🔄 REF UPDATE: renderingEngine', engine);
     renderingEngineRef.current = engine;
   };
   const setViewport = (viewport: any) => {
-    console.log('🔄 REF UPDATE: viewport', viewport);
     viewportRef.current = viewport;
   };
   const setToolGroup = (toolGroup: any) => {
-    console.log('🔄 REF UPDATE: toolGroup', toolGroup);
     toolGroupRef.current = toolGroup;
   };
   const setCurrentImageIndex = createDebugSetter('currentImageIndex', setCurrentImageIndexRaw);
@@ -387,10 +372,8 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
     }
     
     if (isLoading) {
-      // Delay showing loading indicator for 150ms
-      loadingTimeoutRef.current = setTimeout(() => {
-        setLoadingNavigation(true);
-      }, 150);
+      // Show loading indicator immediately
+      setLoadingNavigation(true);
     } else {
       // Immediately hide loading indicator
       setLoadingNavigation(false);
@@ -399,11 +382,9 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
   
   // Ref setters for internal loading states
   const setBackgroundLoading = (value: boolean) => {
-    console.log('🔄 REF UPDATE: backgroundLoading', value);
     backgroundLoadingRef.current = value;
   };
   const setIsStackLoading = (value: boolean) => {
-    console.log('🔄 REF UPDATE: isStackLoading', value);
     isStackLoadingRef.current = value;
   };
   const setActiveTool = createDebugSetter('activeTool', setActiveToolRaw);
@@ -475,7 +456,6 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
   const loadSeriesInBackground = useCallback(async (seriesKey: string, series: any) => {
     // Prevent duplicate loading of same series
     if (activeSeriesLoaders.current.has(seriesKey)) {
-      console.log(`⏭️ Series ${seriesKey} already loading, skipping duplicate`);
       return;
     }
     
@@ -483,7 +463,6 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
     
     try {
       const totalImages = series.instanceCount || 1;
-      console.log(`🎯 Starting batch-by-batch loading for series ${seriesKey} (${totalImages} images)`);
       
       // Initialize progress with total from series info
       setSeriesLoadingProgress(prev => ({ 
@@ -492,90 +471,108 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
       }));
       
       const { imageLoader } = await import('@cornerstonejs/core');
-      const batchSize = 10; // Fixed batch size for consistent UX
+      const batchSize = 20; // Larger batch size for better performance
+      const maxConcurrentBatches = 3; // Process multiple batches concurrently
       let loaded = 0;
-      let actualTotalImages = totalImages; // Will be updated from first API response
+      let actualTotalImages = totalImages;
       
-      // Batch-by-batch loading: fetch URLs -> load metadata -> preload images -> repeat
-      for (let start = 0; start < actualTotalImages; start += batchSize) {
-        console.log(`📦 Loading batch ${Math.floor(start/batchSize) + 1}: images ${start+1} to ${Math.min(start + batchSize, actualTotalImages)}`);
-        
-        // Step 1: Fetch batch of image URLs from backend
-        const response = await AuthService.authenticatedFetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/pacs/studies/${studyMetadata?.studyInstanceUID}/series/${series.seriesInstanceUID}/images/bulk?start=${start}&count=${batchSize}`
-        );
-        
-        if (!response.ok) {
-          throw new Error(`Failed to fetch batch ${start}-${start + batchSize}: ${response.status}`);
-        }
-        
-        const batchData = await response.json();
-        const batchImages = batchData.images || [];
-        const batchImageUrls = batchImages.map((img: any) => img.imageUrl);
-        
-        // Update total count from first API response
-        if (start === 0 && batchData.totalImages) {
-          actualTotalImages = batchData.totalImages;
+      // First, get the total count quickly
+      const initialResponse = await AuthService.authenticatedFetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/pacs/studies/${studyMetadata?.studyInstanceUID}/series/${series.seriesInstanceUID}/images/bulk?start=0&count=1`
+      );
+      
+      if (initialResponse.ok) {
+        const initialData = await initialResponse.json();
+        if (initialData.totalImages) {
+          actualTotalImages = initialData.totalImages;
           setSeriesLoadingProgress(prev => ({ 
             ...prev, 
             [seriesKey]: { loaded: 0, total: actualTotalImages } 
           }));
-          console.log(`📊 Updated total images count: ${actualTotalImages}`);
-        }
-        
-        if (batchImageUrls.length === 0) {
-          console.log(`📭 No more images in batch starting at ${start}, ending loading`);
-          break;
-        }
-        
-        // Step 2: Convert to WADORS format and register metadata
-        const wadorsImageIds = batchImageUrls.map((url: string) => `wadors:${url}`);
-        console.log(`🔧 Registering metadata for batch of ${wadorsImageIds.length} images`);
-        await preRegisterWadorsMetadata(wadorsImageIds);
-        
-        // Step 3: Load and cache images in this batch
-        console.log(`⬇️ Loading and caching batch of ${wadorsImageIds.length} images`);
-        await Promise.all(wadorsImageIds.map(async (imageId) => {
-          try {
-            await imageLoader.loadAndCacheImage(imageId);
-            loaded++;
-            
-            // Update progress immediately for responsive feedback
-            setSeriesLoadingProgress(prev => ({ 
-              ...prev, 
-              [seriesKey]: { loaded, total: actualTotalImages } 
-            }));
-            
-          } catch (err) {
-            console.warn(`Failed to load image ${imageId}:`, err);
-            loaded++; // Count failed images to keep progress moving
-            
-            // Still update progress for failed images
-            setSeriesLoadingProgress(prev => ({ 
-              ...prev, 
-              [seriesKey]: { loaded, total: actualTotalImages } 
-            }));
-          }
-        }));
-        
-        // Step 4: Add batch to main imageIds for immediate scrolling (series-specific)
-        setImageIds(prevImageIds => {
-          // For the current series, just append the new batch
-          const newImageIds = [...prevImageIds, ...wadorsImageIds];
-          
-          console.log(`📝 Added batch to current series imageIds: ${newImageIds.length} total (${wadorsImageIds.length} new) for series ${seriesKey}`);
-          return newImageIds;
-        });
-        
-        console.log(`✅ Batch complete: ${loaded}/${actualTotalImages} images loaded (${Math.round((loaded/actualTotalImages)*100)}%)`);
-        
-        // Short delay between batches to prevent overwhelming the browser
-        if (start + batchSize < actualTotalImages) {
-          await new Promise(resolve => setTimeout(resolve, 50));
         }
       }
       
-      console.log(`🎉 Series ${seriesKey} fully loaded: ${loaded}/${actualTotalImages} images`);
+      // Create batch loading promises for concurrent processing
+      const batchPromises: Promise<void>[] = [];
+      const semaphore = new Array(maxConcurrentBatches).fill(0);
+      let activeBatches = 0;
+      
+      // Function to process a single batch
+      const processBatch = async (start: number, batchIndex: number) => {
+        try {
+          // Wait for available slot
+          while (activeBatches >= maxConcurrentBatches) {
+            await new Promise(resolve => requestAnimationFrame(() => resolve(undefined)));
+          }
+          activeBatches++;
+          
+          // Fetch batch URLs
+          const response = await AuthService.authenticatedFetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/api/pacs/studies/${studyMetadata?.studyInstanceUID}/series/${series.seriesInstanceUID}/images/bulk?start=${start}&count=${batchSize}`
+          );
+          
+          if (!response.ok) {
+            return;
+          }
+          
+          const batchData = await response.json();
+          const batchImages = batchData.images || [];
+          const batchImageUrls = batchImages.map((img: any) => img.imageUrl);
+          
+          if (batchImageUrls.length === 0) {
+            return;
+          }
+          
+          // Convert to WADORS format and register metadata
+          const wadorsImageIds = batchImageUrls.map((url: string) => `wadors:${url}`);
+          await preRegisterWadorsMetadata(wadorsImageIds);
+          
+          // Load images concurrently with limited parallelism per batch
+          const imageLoadPromises = wadorsImageIds.map(async (imageId) => {
+            try {
+              await imageLoader.loadAndCacheImage(imageId);
+              loaded++;
+              
+              // Throttled progress updates to avoid excessive re-renders
+              if (loaded % 5 === 0 || loaded === actualTotalImages) {
+                setSeriesLoadingProgress(prev => ({ 
+                  ...prev, 
+                  [seriesKey]: { loaded, total: actualTotalImages } 
+                }));
+              }
+              
+            } catch (err) {
+              loaded++; // Count failed images to keep progress moving
+            }
+          });
+          
+          // Wait for all images in this batch to load
+          await Promise.all(imageLoadPromises);
+          
+          // Add batch to main imageIds for immediate scrolling
+          setImageIds(prevImageIds => {
+            const newImageIds = [...prevImageIds, ...wadorsImageIds];
+            return newImageIds;
+          });
+          
+        } finally {
+          activeBatches--;
+        }
+      };
+      
+      // Start all batches concurrently
+      for (let start = 0; start < actualTotalImages; start += batchSize) {
+        batchPromises.push(processBatch(start, Math.floor(start / batchSize)));
+      }
+      
+      // Wait for all batches to complete
+      await Promise.all(batchPromises);
+      
+      // Final progress update
+      setSeriesLoadingProgress(prev => ({ 
+        ...prev, 
+        [seriesKey]: { loaded: actualTotalImages, total: actualTotalImages } 
+      }));
       
       // Keep progress visible briefly then remove
       setTimeout(() => {
@@ -584,10 +581,9 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
           delete updated[seriesKey];
           return updated;
         });
-      }, 2000);
+      }, 1000);
       
     } catch (err) {
-      console.error(`❌ Failed to load series ${seriesKey}:`, err);
       // Clean up on error
       setSeriesLoadingProgress(prev => {
         const updated = { ...prev };
@@ -601,7 +597,6 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
 
   // Start loading current series when user switches series
   const switchToSeries = useCallback((seriesKey: string, series: any) => {
-    console.log(`🔄 Switching to series: ${seriesKey} - clearing imageIds for new series`);
     
     // Clear imageIds when switching to a new series to prevent mixing
     setImageIds([]);
@@ -630,19 +625,16 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
   useEffect(() => {
     // Prevent duplicate execution of this useEffect
     if (bulkLoadingInitiatedRef.current) {
-      console.log(`⏭️ Smart loading already initiated, skipping duplicate useEffect execution`);
       return;
     }
     
     if (seriesInfo.length > 0 && studyMetadata?.studyInstanceUID) {
-      console.log(`🚀 Initializing Smart Windowed Loading for ${seriesInfo.length} series`);
       bulkLoadingInitiatedRef.current = true; // Mark as initiated
       
       // Automatically start loading the first series (active series)
       if (seriesInfo[0]) {
         const firstSeries = seriesInfo[0];
         const firstSeriesKey = firstSeries.seriesInstanceUID || 'series-0';
-        console.log(`🎯 Auto-loading first series: ${firstSeriesKey} (${firstSeries.instanceCount} images)`);
         
         // Switch to and start loading first series
         switchToSeries(firstSeriesKey, firstSeries);
@@ -754,18 +746,16 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
         // Common error: "Cannot read properties of null (reading 'join')" from RenderWindow.js
         if (renderError.message?.includes('join') || renderError.message?.includes('RenderWindow')) {
           // This is a known VTK issue, try alternative render approach
-          setTimeout(() => {
-            try {
-              if (viewportToRender && viewportToRender.getRenderingEngine) {
-                const engine = viewportToRender.getRenderingEngine();
-                if (engine) {
-                  engine.renderViewports([viewportToRender.id]);
-                }
+          try {
+            if (viewportToRender && viewportToRender.getRenderingEngine) {
+              const engine = viewportToRender.getRenderingEngine();
+              if (engine) {
+                engine.renderViewports([viewportToRender.id]);
               }
-            } catch (altError) {
-              // Completely ignore if alternative also fails
             }
-          }, 50);
+          } catch (altError) {
+            // Completely ignore if alternative also fails
+          }
         }
       }
     }
@@ -779,13 +769,11 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
     if (errorMessage && (errorMessage.includes('buffer overrun') || errorMessage.includes('parsedicomdatasetexplicit'))) {
       toast.error('DICOM data corruption detected. This may be due to network issues with remote PACS server.');
       
-      // For buffer overrun errors, we can try to reload after a delay
+      // For buffer overrun errors, try to reload immediately
       if (retryCallback) {
-        setTimeout(() => {
-          retryCallback().catch(retryError => {
-            // Ignore retry errors
-          });
-        }, 2000);
+        retryCallback().catch(retryError => {
+          // Ignore retry errors
+        });
       }
       
       return 'buffer_overrun';
@@ -834,7 +822,6 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
 
     // If viewport already exists, just add new images to the stack instead of reinitializing
     if (viewport) {
-      console.log(`📌 Viewport already exists, updating stack with ${imageIds.length} images`);
       try {
         // Update the existing viewport with new images (setStack is not async)
         viewport.setStack(imageIds, Math.min(currentImageIndex, imageIds.length - 1));
@@ -842,7 +829,6 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
         setLoading(false);
         return;
       } catch (error) {
-        console.warn('Failed to update existing viewport, reinitializing...', error);
         // Fall through to full reinitialization
       }
     }
@@ -854,7 +840,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
         if (mainViewportRef.current && mainViewportRef.current.offsetParent !== null) {
           return mainViewportRef.current;
         }
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => requestAnimationFrame(() => resolve(undefined)));
       }
       throw new Error('Viewport element not found after waiting');
     };
@@ -930,7 +916,6 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
           // Use our enhanced error handler
           const errorType = handleDicomError(stackError, imageIds[startIndex] || 'unknown', async () => {
             // Retry logic for stack loading
-            await new Promise(resolve => setTimeout(resolve, 1000));
             await stackViewport.setStack(imageIds, startIndex);
           });
           
@@ -955,9 +940,8 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
           // Reset camera first
           stackViewport.resetCamera();
           
-          // Wait a moment for the reset to take effect
-          setTimeout(() => {
-            try {
+          // Reset camera immediately
+          try {
               // Get current canvas dimensions
               const canvas = stackViewport.canvas;
               
@@ -993,7 +977,6 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
             } catch (fitError) {
               // Ignore fit errors
             }
-          }, 50);
         } catch (displayError) {
           stackViewport.resetCamera();
         }
@@ -1009,17 +992,15 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
               engine.resize(true, false);
               
               // Then refit the image to prevent wrapping/cropping
-              setTimeout(() => {
-                try {
-                  stackViewport.resetCamera();
-                  if (typeof stackViewport.fitToCanvas === 'function') {
-                    stackViewport.fitToCanvas();
-                  }
-                  stackViewport.render();
-                } catch (resizeError) {
-                  // Ignore resize errors
+              try {
+                stackViewport.resetCamera();
+                if (typeof stackViewport.fitToCanvas === 'function') {
+                  stackViewport.fitToCanvas();
                 }
-              }, 10);
+                stackViewport.render();
+              } catch (resizeError) {
+                // Ignore resize errors
+              }
             }
           });
           
@@ -1082,11 +1063,8 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
         // Add event listener for window/level changes
         const viewportElement = stackViewport.element;
         viewportElement.addEventListener('cornerstoneimagerendered', () => {
-          // Debounce saving to avoid too frequent saves during dragging
-          clearTimeout(saveSettingsTimeoutRef.current);
-          saveSettingsTimeoutRef.current = setTimeout(() => {
-            saveCurrentImageSettings();
-          }, 500);
+          // Save settings immediately
+          saveCurrentImageSettings();
         });
 
         // Batch final state updates to reduce re-renders
@@ -1196,11 +1174,9 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
   
   // Smart Navigation with windowed loading support
   const goToImage = useCallback(async (index: number) => {
-    console.log(`🎯 goToImage called with index ${index}, viewport exists: ${!!viewport}`);
     
     // Read current index from state functional update to avoid dependency
     setCurrentImageIndex(prevIndex => {
-      console.log(`🔄 goToImage: prevIndex=${prevIndex}, targetIndex=${index}, viewport=${!!viewport}`);
       
       if (viewport && index >= 0 && index !== prevIndex) {
         (async () => {
@@ -1209,7 +1185,6 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
             saveCurrentImageSettings();
             
             // Simple approach: just try to load the image directly
-            console.log(`🎯 Attempting to load image ${index}`);
             
             // Update performance metrics
             setPerformanceMetrics(prev => ({
@@ -1227,44 +1202,38 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
                 try {
                   // Navigate directly to the target image
                   await viewport.setStack([targetImageId], 0);
-                  console.log(`🎯 Navigated to image ${index}: ${targetImageId}`);
                   
                   // Stay within current series - no automatic series switching
                 } catch (err) {
-                  console.warn('Navigation failed:', err);
                   // Don't throw error, just log it
                 }
               } else {
-                console.warn(`No image available at index ${index}`);
               }
             
-            // Wait a moment for the image to load, then restore settings
-            setTimeout(() => {
-              restoreImageSettings(index);
-              try {
-                const image = viewport.getCurrentImageData();
-                if (image && image.metadata) {
-                  const photometricInterpretation = image.metadata.PhotometricInterpretation;
-                  const shouldInvert = photometricInterpretation === 'MONOCHROME1';
+            // Restore settings immediately
+            restoreImageSettings(index);
+            try {
+              const image = viewport.getCurrentImageData();
+              if (image && image.metadata) {
+                const photometricInterpretation = image.metadata.PhotometricInterpretation;
+                const shouldInvert = photometricInterpretation === 'MONOCHROME1';
+                
+                if (shouldInvert !== isInverted) {
+                  setIsInverted(shouldInvert);
                   
-                  if (shouldInvert !== isInverted) {
-                    setIsInverted(shouldInvert);
-                    
-                    const properties = viewport.getProperties();
-                    viewport.setProperties({
-                      ...properties,
-                      invert: shouldInvert
-                    });
-                    viewport.render();
-                  }
+                  const properties = viewport.getProperties();
+                  viewport.setProperties({
+                    ...properties,
+                    invert: shouldInvert
+                  });
+                  viewport.render();
                 }
-              } catch (photoError) {
-                // Ignore photometric interpretation errors
               }
-            }, 150);
+            } catch (photoError) {
+              // Ignore photometric interpretation errors
+            }
             
           } catch (error) {
-            console.warn('Navigation error:', error);
             // Try to stay on current image if navigation fails
           } finally {
             setLoadingNavigationDelayed(false);
@@ -1310,12 +1279,10 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
       const { endIndex, seriesImageCount } = getCurrentSeriesBounds();
       const nextIndex = prevIndex + 1;
       
-      console.log(`⏭️ Next image: ${prevIndex} → ${nextIndex} (series bounds: 0-${endIndex}, total in series: ${seriesImageCount})`);
       
       if (nextIndex <= endIndex) {
         goToImage(nextIndex);
       } else {
-        console.log(`🚫 Already at last image of current series (${prevIndex}/${endIndex}) - NOT switching series`);
       }
       return prevIndex; // Return previous index since goToImage will update it
     });
@@ -1326,12 +1293,10 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
       const { startIndex } = getCurrentSeriesBounds();
       const newIndex = prevIndex - 1;
       
-      console.log(`⏮️ Previous image: ${prevIndex} → ${newIndex} (series bounds: ${startIndex}-up)`);
       
       if (newIndex >= startIndex) {
         goToImage(newIndex);
       } else {
-        console.log(`🚫 Already at first image of current series (${prevIndex}) - NOT switching series`);
       }
       return prevIndex; // Return previous index since goToImage will update it
     });
@@ -1435,9 +1400,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
         }
         
         // Save settings after flip
-        setTimeout(() => {
-          saveCurrentImageSettings();
-        }, 50);
+        saveCurrentImageSettings();
         
       } catch (error) {
         // Ignore flip errors
@@ -1462,9 +1425,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
         safeRender(viewport);
         
         // Save settings after invert
-        setTimeout(() => {
-          saveCurrentImageSettings();
-        }, 50);
+        saveCurrentImageSettings();
         
       } catch (error) {
         // Ignore invert errors
@@ -1637,10 +1598,8 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
     }
     setViewport(null);
     
-    // Trigger re-initialization
-    setTimeout(() => {
-      // This will trigger the useEffect to run again
-    }, 100);
+    // Trigger re-initialization immediately
+    // The useEffect will run again naturally
   }, [renderingEngine, toolGroup, imageIds]);
 
   if (error) {
@@ -2034,7 +1993,6 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
                       
                       const handleSeriesClick = async () => {
                         const seriesKey = series.seriesInstanceUID || `series-${seriesIndex}`;
-                        console.log(`🔄 User clicked series: ${seriesKey}`);
                         
                         // Switch to this series and start loading it
                         switchToSeries(seriesKey, series);
@@ -2157,19 +2115,15 @@ const getSharedThumbnailEngine = async () => {
 const releaseSharedThumbnailEngine = () => {
   thumbnailEngineRefCount--;
   if (thumbnailEngineRefCount <= 0 && sharedThumbnailEngine) {
-    // Add delay before destroying to allow for quick re-use
-    setTimeout(() => {
-      if (thumbnailEngineRefCount <= 0 && sharedThumbnailEngine) {
-        try {
-          sharedThumbnailEngine.destroy();
-        } catch (e) {
-          // Ignore destruction errors
-        }
-        sharedThumbnailEngine = null;
-        thumbnailEngineInitPromise = null;
-        thumbnailEngineRefCount = 0;
-      }
-    }, 1000);
+    // Destroy immediately to free resources
+    try {
+      sharedThumbnailEngine.destroy();
+    } catch (e) {
+      // Ignore destruction errors
+    }
+    sharedThumbnailEngine = null;
+    thumbnailEngineInitPromise = null;
+    thumbnailEngineRefCount = 0;
   }
 };
 
@@ -2220,8 +2174,7 @@ const ThumbnailImage: React.FC<ThumbnailImageProps> = ({ imageId, index, isActiv
     
     const loadThumbnail = async () => {
       try {
-        // Small delay to stagger thumbnail loading
-        await new Promise(resolve => setTimeout(resolve, index * 100));
+        // Load thumbnails immediately without staggering
         
         if (!mounted) return;
         
@@ -2244,9 +2197,10 @@ const ThumbnailImage: React.FC<ThumbnailImageProps> = ({ imageId, index, isActiv
         
         // Load the single image with shorter timeout for thumbnails
         const loadPromise = (thumbViewport as any).setStack([imageId], 0);
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Thumbnail load timeout')), 8000)
-        );
+        const timeoutPromise = new Promise((_, reject) => {
+          const timer = setTimeout(() => reject(new Error('Thumbnail load timeout')), 8000);
+          return timer;
+        });
         
         await Promise.race([loadPromise, timeoutPromise]);
         
@@ -2274,7 +2228,7 @@ const ThumbnailImage: React.FC<ThumbnailImageProps> = ({ imageId, index, isActiv
           } catch (renderError) {
             renderAttempts++;
             if (renderAttempts < maxRenderAttempts && mounted) {
-              setTimeout(attemptRender, 200 * renderAttempts);
+              requestAnimationFrame(attemptRender);
             } else {
               isLoadingRef.current = false;
             }

@@ -9,14 +9,13 @@ const REQUEST_THROTTLE_MS = 500; // Minimum time between identical requests
 function throttleRequest<T>(key: string, requestFn: () => Promise<T>): Promise<T> {
   // If request is already in progress, return the existing promise
   if (requestCache.has(key)) {
-    console.log(`DEBUG: Throttling duplicate request: ${key}`);
     return requestCache.get(key)!;
   }
 
   // Execute the request and cache the promise
   const promise = requestFn().finally(() => {
     // Remove from cache after throttle period to allow future requests
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       requestCache.delete(key);
     }, REQUEST_THROTTLE_MS);
   });
@@ -93,33 +92,33 @@ export async function getStudyImageIds(studyInstanceUID: string): Promise<StudyI
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       
-      console.log('Fetching image IDs for study:', studyInstanceUID);
+      // Fetching image IDs for study
       
       const response = await AuthService.authenticatedFetch(
         `${API_URL}/api/pacs/studies/${studyInstanceUID}/image-ids/`
       );
 
     if (!response.ok) {
-      console.warn('API endpoint not available, returning empty data');
+      // API endpoint not available, returning empty data
       return { imageIds: [], seriesInfo: [] };
     }
 
     const result = await response.json();
-    console.log('Received study data:', result);
+    // Received study data
 
     // Check for warnings about stale metadata or storage issues
     if (result.warning) {
-      console.warn('DICOM Study Warning:', result.warning);
+      // DICOM Study Warning
       if (result.debug_info?.database_inconsistency) {
-        console.error('Orthanc database inconsistency detected');
+        // Orthanc database inconsistency detected
         // Show user-friendly error for database issues
         throw new Error('The PACS server has database inconsistency issues. DICOM instances are listed but not accessible. Contact your system administrator to repair the Orthanc database.');
       } else if (result.debug_info?.systemic_storage_issue) {
-        console.error('Systemic Orthanc storage issue detected');
+        // Systemic Orthanc storage issue detected
         // Show user-friendly error for storage issues
         throw new Error('The PACS server has storage configuration issues. Contact your system administrator to resolve Orthanc storage problems.');
       } else if (result.debug_info?.instance_verification_failed) {
-        console.error('Instance verification failed - likely stale Orthanc metadata');
+        // Instance verification failed - likely stale Orthanc metadata
         // Show user-friendly error
         throw new Error('This study contains invalid or deleted DICOM files. The study may need to be re-imported to PACS.');
       }
@@ -128,13 +127,13 @@ export async function getStudyImageIds(studyInstanceUID: string): Promise<StudyI
     // Validate and filter image IDs to prevent corrupted data issues
     const validImageIds = (result.imageIds || []).filter((imageId: string) => {
       if (!imageId || typeof imageId !== 'string') {
-        console.warn('Invalid image ID found:', imageId);
+        // Invalid image ID found
         return false;
       }
       
       // Basic validation for WADO URI or WADO-RS format
       if (!imageId.startsWith('wadouri:') && !imageId.startsWith('wadors:')) {
-        console.warn('Invalid WADO format - must start with wadouri: or wadors:', imageId);
+        // Invalid WADO format - must start with wadouri: or wadors:
         return false;
       }
       
@@ -142,29 +141,29 @@ export async function getStudyImageIds(studyInstanceUID: string): Promise<StudyI
       try {
         const url = new URL(imageId.replace(/^(wadouri:|wadors:)/, ''));
         if (!url.pathname.includes('/api/pacs/instances/')) {
-          console.warn('Unexpected DICOM proxy URL format:', imageId);
+          // Unexpected DICOM proxy URL format
           return false;
         }
       } catch (e) {
-        console.warn('Invalid URL in image ID:', imageId);
+        // Invalid URL in image ID
         return false;
       }
       
       return true;
     });
     
-    console.log(`Validated ${validImageIds.length} valid image IDs out of ${result.imageIds?.length || 0}`);
+    // Validated image IDs
     
     // Extract series information
     const seriesInfo: SeriesInfo[] = result.series_info || [];
-    console.log(`Found ${seriesInfo.length} series in study`);
+    // Found series in study
     
       return {
         imageIds: validImageIds,
         seriesInfo: seriesInfo
       };
     } catch (error) {
-      console.error('Error fetching image IDs:', error);
+      // Error fetching image IDs
       // Return empty data instead of throwing to prevent infinite loading
       return { imageIds: [], seriesInfo: [] };
     }
@@ -230,7 +229,7 @@ export async function getStudyMetadata(studyInstanceUID: string): Promise<StudyM
 
       return metadata;
     } catch (error) {
-      console.error('Error fetching study metadata:', error);
+      // Error fetching study metadata
       throw error;
     }
   });

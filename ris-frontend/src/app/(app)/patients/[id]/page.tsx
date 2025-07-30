@@ -118,14 +118,14 @@ export default function PatientDetailPage() {
       
       if (registrationsRes.ok) {
         const registrationsData = await registrationsRes.json();
-        console.log('Registrations API response:', registrationsData);
+        // Processing registrations API response
         
         // Handle both array and paginated response formats
         const registrationsArray = Array.isArray(registrationsData) 
           ? registrationsData 
           : registrationsData.results || registrationsData.items || [];
         
-        console.log('Processed registrations:', registrationsArray);
+        // Processed registrations data
         // Fetch examinations for each registration
         const registrationsWithExams = await Promise.all(
           registrationsArray.map(async (reg: Registration) => {
@@ -135,23 +135,23 @@ export default function PatientDetailPage() {
               );
               if (examsRes.ok) {
                 const exams = await examsRes.json();
-                console.log(`Exams for registration ${reg.id}:`, exams);
+                // Successfully fetched exams for registration
                 return { ...reg, pemeriksaan: exams };
               }
             } catch (err) {
-              console.error(`Failed to fetch exams for registration ${reg.id}:`, err);
+              // Failed to fetch exams for registration
             }
             return { ...reg, pemeriksaan: [] };
           })
         );
         
-        console.log('Registrations with examinations:', registrationsWithExams);
+        // Fetched all registrations with examinations
         setRegistrations(registrationsWithExams);
       } else {
-        console.error('Registrations API failed:', registrationsRes.status);
+        // Registrations API failed
       }
     } catch (err) {
-      console.error('Error loading patient data:', err);
+      // Error loading patient data
       setError(err instanceof Error ? err.message : 'Failed to load patient data');
     } finally {
       setLoading(false);

@@ -82,9 +82,11 @@ export default function RegistrationWorkflowPage() {
     setToastMessage(message);
     setToastType(type);
     setShowToast(true);
-    setTimeout(() => {
+    // Auto-hide toast after 5 seconds
+    const timer = setTimeout(() => {
       setShowToast(false);
     }, 5000);
+    return () => clearTimeout(timer);
   };
   
   // Patient search/creation states
@@ -157,7 +159,7 @@ export default function RegistrationWorkflowPage() {
       if (modalitiesRes.ok) setModalities(await modalitiesRes.json());
       if (bodyPartsRes.ok) setBodyParts(await bodyPartsRes.json());
     } catch (error) {
-      console.error('Error fetching configuration:', error);
+      // Error fetching configuration
       showToastNotification('Failed to load configuration data. Please refresh the page.', 'error');
     }
   };
@@ -177,7 +179,7 @@ export default function RegistrationWorkflowPage() {
         showToastNotification(errorData.detail || 'Failed to search patients', 'error');
       }
     } catch (error) {
-      console.error('Error searching patients:', error);
+      // Error searching patients
       showToastNotification('Failed to search patients. Please try again.', 'error');
     }
   };
@@ -248,7 +250,7 @@ export default function RegistrationWorkflowPage() {
         showToastNotification(errorData.detail || 'Failed to create patient', 'error');
       }
     } catch (error) {
-      console.error('Error creating patient:', error);
+      // Error creating patient
       showToastNotification('Failed to create patient. Please check your connection and try again.', 'error');
     } finally {
       setLoading(false);
@@ -303,11 +305,9 @@ export default function RegistrationWorkflowPage() {
       const result = await res.json();
       
       showToastNotification('Registration completed successfully!', 'success');
-      setTimeout(() => {
-        router.push(`/patients/${result.patient.id}`);
-      }, 1000);
+      router.push(`/patients/${result.patient.id}`);
     } catch (error) {
-      console.error('Error completing registration:', error);
+      // Error completing registration
       showToastNotification(error instanceof Error ? error.message : 'Failed to complete registration. Please try again.', 'error');
     } finally {
       setLoading(false);

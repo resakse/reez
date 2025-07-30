@@ -1554,12 +1554,16 @@ def get_series_bulk_images(request, study_uid, series_uid):
         start = int(request.GET.get('start', 0))
         count = int(request.GET.get('count', 50))
         
-        # Get Orthanc URL from configuration
-        pacs_config = PacsConfig.objects.first()
-        if not pacs_config:
-            return Response({'error': 'PACS configuration not found'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        # Get Orthanc URL from configuration (with caching)
+        from django.core.cache import cache
         
-        orthanc_url = pacs_config.orthancurl
+        orthanc_url = cache.get('orthanc_url')
+        if not orthanc_url:
+            pacs_config = PacsConfig.objects.first()
+            if not pacs_config:
+                return Response({'error': 'PACS configuration not found'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            orthanc_url = pacs_config.orthancurl
+            cache.set('orthanc_url', orthanc_url, 300)  # Cache for 5 minutes
         
         # Find the series
         find_response = requests.post(
@@ -1582,28 +1586,40 @@ def get_series_bulk_images(request, study_uid, series_uid):
         if not instances:
             return Response({'error': f'No instances found in series: {series_uid}'}, status=status.HTTP_404_NOT_FOUND)
         
-        # Sort instances by instance number if available
+        # Efficiently get instance details using bulk operations
         instance_details = []
-        for instance_id in instances:
+        
+        # Use concurrent requests to get instance metadata
+        import concurrent.futures
+        import threading
+        
+        def fetch_instance_metadata(instance_id):
             try:
-                instance_response = requests.get(f"{orthanc_url}/instances/{instance_id}", timeout=10)
+                instance_response = requests.get(f"{orthanc_url}/instances/{instance_id}", timeout=5)
                 if instance_response.ok:
                     instance_data = instance_response.json()
                     instance_tags = instance_data.get('MainDicomTags', {})
                     instance_number = int(instance_tags.get('InstanceNumber', 0)) if instance_tags.get('InstanceNumber') else 0
                     
-                    instance_details.append({
+                    return {
                         'instanceId': instance_id,
                         'instanceNumber': instance_number,
                         'sopInstanceUid': instance_tags.get('SOPInstanceUID', '')
-                    })
+                    }
             except:
-                # Add instance without metadata if fetch fails
-                instance_details.append({
-                    'instanceId': instance_id,
-                    'instanceNumber': 0,
-                    'sopInstanceUid': ''
-                })
+                pass
+            
+            # Return basic info if fetch fails
+            return {
+                'instanceId': instance_id,
+                'instanceNumber': 0,
+                'sopInstanceUid': ''
+            }
+        
+        # Fetch metadata concurrently with max 10 workers to avoid overwhelming Orthanc
+        max_workers = min(10, len(instances))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            instance_details = list(executor.map(fetch_instance_metadata, instances))
         
         # Sort by instance number
         instance_details.sort(key=lambda x: x['instanceNumber'])

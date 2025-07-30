@@ -37,7 +37,7 @@ export async function getPacsConfig(): Promise<PacsConfig> {
     
     return config;
   } catch (error) {
-    console.error('Failed to fetch PACS config from database, using fallback:', error);
+    // Failed to fetch PACS config from database, using fallback
     
     // Fallback to environment variable or default
     const fallbackConfig: PacsConfig = {

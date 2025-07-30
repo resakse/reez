@@ -17,7 +17,7 @@ const DicomViewer: React.FC<DicomViewerProps> = ({ studyId }) => {
   const router = useRouter();
 
   useEffect(() => {
-    console.warn('DicomViewer is deprecated. Redirecting to PACS browser with SimpleDicomViewer.');
+    // DicomViewer is deprecated. Use PACS browser with SimpleDicomViewer.
   }, []);
 
   const handleRedirect = () => {
