@@ -452,7 +452,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
   // Track which series are currently being loaded to avoid duplicates
   const activeSeriesLoaders = useRef<Set<string>>(new Set());
   
-  // Load entire series in background with progress tracking
+  // Progressive series loading: immediate first batch + background loading of remaining batches
   const loadSeriesInBackground = useCallback(async (seriesKey: string, series: any) => {
     // Prevent duplicate loading of same series
     if (activeSeriesLoaders.current.has(seriesKey)) {
@@ -463,20 +463,18 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
     
     try {
       const totalImages = series.instanceCount || 1;
+      const { imageLoader } = await import('@cornerstonejs/core');
+      const batchSize = 20;
+      let loaded = 0;
+      let actualTotalImages = totalImages;
       
-      // Initialize progress with total from series info
+      // Initialize progress tracking
       setSeriesLoadingProgress(prev => ({ 
         ...prev, 
         [seriesKey]: { loaded: 0, total: totalImages } 
       }));
       
-      const { imageLoader } = await import('@cornerstonejs/core');
-      const batchSize = 20; // Larger batch size for better performance
-      const maxConcurrentBatches = 3; // Process multiple batches concurrently
-      let loaded = 0;
-      let actualTotalImages = totalImages;
-      
-      // First, get the total count quickly
+      // Get actual total image count quickly
       const initialResponse = await AuthService.authenticatedFetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/pacs/studies/${studyMetadata?.studyInstanceUID}/series/${series.seriesInstanceUID}/images/bulk?start=0&count=1`
       );
@@ -492,83 +490,118 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
         }
       }
       
-      // Store all batches with their correct positions
-      const orderedBatches: {start: number, imageIds: string[]}[] = [];
-      
-      // Function to process a single batch and return it with position info
-      const processBatch = async (start: number, batchIndex: number): Promise<{start: number, imageIds: string[]}> => {
+      // PHASE 1: Load first batch synchronously for immediate display
+      const loadFirstBatch = async (): Promise<string[]> => {
         try {
-          // Fetch batch URLs
           const response = await AuthService.authenticatedFetch(
-            `${process.env.NEXT_PUBLIC_API_URL}/api/pacs/studies/${studyMetadata?.studyInstanceUID}/series/${series.seriesInstanceUID}/images/bulk?start=${start}&count=${batchSize}`
+            `${process.env.NEXT_PUBLIC_API_URL}/api/pacs/studies/${studyMetadata?.studyInstanceUID}/series/${series.seriesInstanceUID}/images/bulk?start=0&count=${batchSize}`
           );
           
-          if (!response.ok) {
-            return {start, imageIds: []};
-          }
+          if (!response.ok) return [];
           
           const batchData = await response.json();
           const batchImages = batchData.images || [];
           const batchImageUrls = batchImages.map((img: any) => img.imageUrl);
           
-          if (batchImageUrls.length === 0) {
-            return {start, imageIds: []};
-          }
+          if (batchImageUrls.length === 0) return [];
           
           // Convert to WADORS format and register metadata
           const wadorsImageIds = batchImageUrls.map((url: string) => `wadors:${url}`);
           await preRegisterWadorsMetadata(wadorsImageIds);
           
-          // Load images concurrently with limited parallelism per batch
+          // Load all images in first batch
           const imageLoadPromises = wadorsImageIds.map(async (imageId) => {
             try {
               await imageLoader.loadAndCacheImage(imageId);
               loaded++;
-              
-              // Throttled progress updates to avoid excessive re-renders
-              if (loaded % 5 === 0 || loaded === actualTotalImages) {
-                setSeriesLoadingProgress(prev => ({ 
-                  ...prev, 
-                  [seriesKey]: { loaded, total: actualTotalImages } 
-                }));
-              }
-              
             } catch (err) {
               loaded++; // Count failed images to keep progress moving
             }
           });
           
-          // Wait for all images in this batch to load
           await Promise.all(imageLoadPromises);
           
-          return {start, imageIds: wadorsImageIds};
+          // Update progress for first batch
+          setSeriesLoadingProgress(prev => ({ 
+            ...prev, 
+            [seriesKey]: { loaded, total: actualTotalImages } 
+          }));
           
+          return wadorsImageIds;
         } catch (error) {
-          return {start, imageIds: []};
+          return [];
         }
       };
       
-      // Process batches with limited concurrency
-      const batchPromises: Promise<{start: number, imageIds: string[]}>[] = [];
+      // Load and display first batch immediately
+      const firstBatchImageIds = await loadFirstBatch();
+      setImageIds(firstBatchImageIds); // Show first batch immediately
       
-      for (let start = 0; start < actualTotalImages; start += batchSize) {
-        batchPromises.push(processBatch(start, Math.floor(start / batchSize)));
+      // Clear loading state once first batch is available
+      if (firstBatchImageIds.length > 0) {
+        setLoading(false);
       }
       
-      // Wait for all batches to complete and collect results
-      const batchResults = await Promise.all(batchPromises);
-      
-      // Sort batches by start position to maintain correct order
-      batchResults.sort((a, b) => a.start - b.start);
-      
-      // Combine all batch results in correct order
-      const allOrderedImageIds: string[] = [];
-      batchResults.forEach(batch => {
-        allOrderedImageIds.push(...batch.imageIds);
-      });
-      
-      // Add all images to imageIds in correct order
-      setImageIds(allOrderedImageIds);
+      // PHASE 2: Load remaining batches sequentially in background
+      if (actualTotalImages > batchSize) {
+        let currentImageIds = [...firstBatchImageIds]; // Start with first batch
+        
+        // Sequential batch loading function
+        const loadBatchSequentially = async (start: number, batchIndex: number): Promise<string[]> => {
+          try {
+            const response = await AuthService.authenticatedFetch(
+              `${process.env.NEXT_PUBLIC_API_URL}/api/pacs/studies/${studyMetadata?.studyInstanceUID}/series/${series.seriesInstanceUID}/images/bulk?start=${start}&count=${batchSize}`
+            );
+            
+            if (!response.ok) return [];
+            
+            const batchData = await response.json();
+            const batchImages = batchData.images || [];
+            const batchImageUrls = batchImages.map((img: any) => img.imageUrl);
+            
+            if (batchImageUrls.length === 0) return [];
+            
+            const wadorsImageIds = batchImageUrls.map((url: string) => `wadors:${url}`);
+            await preRegisterWadorsMetadata(wadorsImageIds);
+            
+            // Load images in this batch
+            const imageLoadPromises = wadorsImageIds.map(async (imageId) => {
+              try {
+                await imageLoader.loadAndCacheImage(imageId);
+                loaded++;
+                
+                // Throttled progress updates
+                if (loaded % 5 === 0 || loaded === actualTotalImages) {
+                  setSeriesLoadingProgress(prev => ({ 
+                    ...prev, 
+                    [seriesKey]: { loaded, total: actualTotalImages } 
+                  }));
+                }
+              } catch (err) {
+                loaded++;
+              }
+            });
+            
+            await Promise.all(imageLoadPromises);
+            return wadorsImageIds;
+            
+          } catch (error) {
+            return [];
+          }
+        };
+        
+        // Load batches sequentially starting from batch 1
+        for (let start = batchSize; start < actualTotalImages; start += batchSize) {
+          const batchIndex = Math.floor(start / batchSize);
+          const batchImageIds = await loadBatchSequentially(start, batchIndex);
+          
+          if (batchImageIds.length > 0) {
+            // Add this batch to current images and update UI immediately
+            currentImageIds = [...currentImageIds, ...batchImageIds];
+            setImageIds(currentImageIds);
+          }
+        }
+      }
       
       // Final progress update
       setSeriesLoadingProgress(prev => ({ 
@@ -576,7 +609,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
         [seriesKey]: { loaded: actualTotalImages, total: actualTotalImages } 
       }));
       
-      // Keep progress visible briefly then remove
+      // Remove progress indicator after brief delay
       setTimeout(() => {
         setSeriesLoadingProgress(prev => {
           const updated = { ...prev };
@@ -599,6 +632,9 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
 
   // Start loading current series when user switches series
   const switchToSeries = useCallback((seriesKey: string, series: any) => {
+    
+    // Set loading state before clearing images to show loading instead of "No Images Available"
+    setLoading(true);
     
     // Clear imageIds when switching to a new series to prevent mixing
     setImageIds([]);
@@ -1835,11 +1871,29 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
               <div className="absolute inset-0 flex items-center justify-center bg-background/80">
                 <Card className="w-96">
                   <CardHeader>
-                    <CardTitle>Loading DICOM Viewer...</CardTitle>
+                    <CardTitle>Loading DICOM Images...</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                    <p className="text-center mt-2">Initializing Cornerstone3D</p>
+                    {(() => {
+                      const progressData = seriesLoadingProgress[currentSeriesId];
+                      if (progressData && progressData.total > 0) {
+                        const loadPercentage = Math.round((progressData.loaded / progressData.total) * 100);
+                        return (
+                          <div className="text-center mt-2">
+                            <p>Loading images: {progressData.loaded}/{progressData.total}</p>
+                            <div className="w-full bg-muted rounded-full h-2 mt-2">
+                              <div 
+                                className="bg-primary h-2 rounded-full transition-all duration-300" 
+                                style={{ width: `${loadPercentage}%` }}
+                              ></div>
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-1">{loadPercentage}% complete</p>
+                          </div>
+                        );
+                      }
+                      return <p className="text-center mt-2">Preparing first images...</p>;
+                    })()}
                   </CardContent>
                 </Card>
               </div>
