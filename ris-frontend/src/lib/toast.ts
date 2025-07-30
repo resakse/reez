@@ -92,11 +92,15 @@ export class ToastService {
     container.appendChild(toast);
 
     // Auto-remove after duration
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       if (toast.parentNode) {
         toast.remove();
       }
     }, duration);
+    
+    // Allow early cleanup if needed
+    const cleanup = () => clearTimeout(timer);
+    (toast as any).cleanup = cleanup;
   }
 
   public success(message: string, duration?: number) {
