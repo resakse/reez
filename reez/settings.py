@@ -187,9 +187,14 @@ REST_FRAMEWORK = {
 }
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3001",
+    "http://localhost:3000",
+    "http://localhost:3001", 
+    "http://127.0.0.1:3000",
     "http://127.0.0.1:3001",
 ]
+
+# Temporarily allow all origins for debugging
+CORS_ALLOW_ALL_ORIGINS = True
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=1),

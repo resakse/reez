@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Removed rewrites since we're using direct API calls with CORS
   webpack: (config, { isServer }) => {
     if (!isServer) {
       // Tell Webpack to ignore Node.js modules in client-side code

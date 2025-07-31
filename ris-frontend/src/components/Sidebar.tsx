@@ -1,6 +1,7 @@
 'use client';
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { LayoutDashboard, Users, Settings, BarChart, Home, Stethoscope, X, Bone, FileText, ClipboardList, ListChecks, UserCog, Archive, Upload } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -11,45 +12,73 @@ interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
 
 export default function Sidebar({ className, isCollapsed }: SidebarProps) {
   const { user } = useAuth();
+  const pathname = usePathname();
   const isSupervisor = user?.is_superuser || false;
+
+  // Helper function to determine if a link is active
+  const isActive = (href: string) => {
+    if (href === '/') {
+      return pathname === '/';
+    }
+    // Check if current path starts with the href and is followed by either end of string or a slash
+    return pathname === href || pathname.startsWith(href + '/');
+  };
+
+  // Helper function to get link classes
+  const getLinkClasses = (href: string) => {
+    return cn(
+      "flex items-center p-2 rounded transition-all duration-200 relative",
+      isActive(href) 
+        ? "bg-white/20 text-white font-medium border-l-4 border-white/60 shadow-sm" 
+        : "hover:bg-white/10 text-white/90 hover:text-white"
+    );
+  };
+
+  // Helper function to get icon classes
+  const getIconClasses = (href: string) => {
+    return cn(
+      "h-5 w-5 mr-2 transition-all duration-200",
+      isActive(href) ? "text-white" : "text-white/80"
+    );
+  };
 
   return (
     <aside className={cn("hidden md:block text-white bg-sidebar", isCollapsed ? "w-20" : "w-64", "transition-all duration-300", className)}>
       <nav className="p-4">
         <ul className="space-y-2">
           <li>
-            <Link href="/" className="flex items-center p-2 rounded hover:bg-white/10">
-              <LayoutDashboard className="h-5 w-5 mr-2" />
+            <Link href="/" className={getLinkClasses("/")}>
+              <LayoutDashboard className={getIconClasses("/")} />
               {!isCollapsed && "Dashboard"}
             </Link>
           </li>
           <li>
-            <Link href="/patients" className="flex items-center p-2 rounded hover:bg-white/10">
-              <Users className="h-5 w-5 mr-2" />
+            <Link href="/patients" className={getLinkClasses("/patients")}>
+              <Users className={getIconClasses("/patients")} />
               {!isCollapsed && "Patients"}
             </Link>
           </li>
           <li>
-            <Link href="/register" className="flex items-center p-2 rounded hover:bg-white/10">
-              <ClipboardList className="h-5 w-5 mr-2" />
+            <Link href="/register" className={getLinkClasses("/register")}>
+              <ClipboardList className={getIconClasses("/register")} />
               {!isCollapsed && "Registration"}
             </Link>
           </li>
           <li>
-            <Link href="/examinations" className="flex items-center p-2 rounded hover:bg-white/10">
-              <Stethoscope className="h-5 w-5 mr-2" />
+            <Link href="/examinations" className={getLinkClasses("/examinations")}>
+              <Stethoscope className={getIconClasses("/examinations")} />
               {!isCollapsed && "Examinations"}
             </Link>
           </li>
           <li>
-            <Link href="/pacs-browser" className="flex items-center p-2 rounded hover:bg-white/10">
-              <Archive className="h-5 w-5 mr-2" />
+            <Link href="/pacs-browser" className={getLinkClasses("/pacs-browser")}>
+              <Archive className={getIconClasses("/pacs-browser")} />
               {!isCollapsed && "PACS Browser"}
             </Link>
           </li>
           <li>
-            <Link href="/upload" className="flex items-center p-2 rounded hover:bg-white/10">
-              <Upload className="h-5 w-5 mr-2" />
+            <Link href="/upload" className={getLinkClasses("/upload")}>
+              <Upload className={getIconClasses("/upload")} />
               {!isCollapsed && "Upload DICOM"}
             </Link>
           </li>
@@ -61,31 +90,32 @@ export default function Sidebar({ className, isCollapsed }: SidebarProps) {
           </li>
           
           <li>
-            <Link href="/wards" className="flex items-center p-2 rounded hover:bg-white/10">
-              <Home className="h-5 w-5 mr-2" />
+            <Link href="/wards" className={getLinkClasses("/wards")}>
+              <Home className={getIconClasses("/wards")} />
               {!isCollapsed && "Wards"}
             </Link>
           </li>
           <li>
-            <Link href="/modalities" className="flex items-center p-2 rounded hover:bg-white/10">
-              <X className="h-5 w-5 mr-2" />
-              {!isCollapsed && "Modalities"}</Link>
+            <Link href="/modalities" className={getLinkClasses("/modalities")}>
+              <X className={getIconClasses("/modalities")} />
+              {!isCollapsed && "Modalities"}
+            </Link>
           </li>
           <li>
-            <Link href="/body-parts" className="flex items-center p-2 rounded hover:bg-white/10">
-              <Bone className="h-5 w-5 mr-2" />
+            <Link href="/body-parts" className={getLinkClasses("/body-parts")}>
+              <Bone className={getIconClasses("/body-parts")} />
               {!isCollapsed && "Body Parts"}
             </Link>
           </li>
           <li>
-            <Link href="/exams" className="flex items-center p-2 rounded hover:bg-white/10">
-              <FileText className="h-5 w-5 mr-2" />
+            <Link href="/exams" className={getLinkClasses("/exams")}>
+              <FileText className={getIconClasses("/exams")} />
               {!isCollapsed && "Exam Types"}
             </Link>
           </li>
           <li>
-            <Link href="/mwl" className="flex items-center p-2 rounded hover:bg-white/10">
-              <ListChecks className="h-5 w-5 mr-2" />
+            <Link href="/mwl" className={getLinkClasses("/mwl")}>
+              <ListChecks className={getIconClasses("/mwl")} />
               {!isCollapsed && "MWL Worklist"}
             </Link>
           </li>
@@ -96,15 +126,15 @@ export default function Sidebar({ className, isCollapsed }: SidebarProps) {
             </div>
           </li>
           <li>
-            <Link href="/staff" className="flex items-center p-2 rounded hover:bg-white/10">
-              <UserCog className="h-5 w-5 mr-2" />
+            <Link href="/staff" className={getLinkClasses("/staff")}>
+              <UserCog className={getIconClasses("/staff")} />
               {!isCollapsed && "Staff Management"}
             </Link>
           </li>
           {isSupervisor && (
             <li>
-              <Link href="/settings" className="flex items-center p-2 rounded hover:bg-white/10">
-                <Settings className="h-5 w-5 mr-2" />
+              <Link href="/settings" className={getLinkClasses("/settings")}>
+                <Settings className={getIconClasses("/settings")} />
                 {!isCollapsed && "Settings"}
               </Link>
             </li>

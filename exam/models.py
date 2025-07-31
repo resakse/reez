@@ -14,6 +14,97 @@ User = settings.AUTH_USER_MODEL
 
 
 # Create your models here.
+class DashboardConfig(models.Model):
+    """
+    Configuration model for dashboard settings including storage monitoring
+    """
+    # Storage configuration
+    storage_root_paths = models.JSONField(
+        default=list, 
+        help_text="List of storage paths to monitor for capacity and usage analysis"
+    )
+    
+    # Alert thresholds
+    storage_warning_threshold = models.PositiveIntegerField(
+        default=80, 
+        help_text="Storage usage percentage that triggers warning alerts"
+    )
+    storage_critical_threshold = models.PositiveIntegerField(
+        default=90, 
+        help_text="Storage usage percentage that triggers critical alerts"
+    )
+    
+    # KPI targets for performance monitoring
+    target_turnaround_time = models.PositiveIntegerField(
+        default=60, 
+        help_text="Target turnaround time in minutes from registration to completion"
+    )
+    target_daily_throughput = models.PositiveIntegerField(
+        default=50, 
+        help_text="Target number of examinations per day"
+    )
+    target_equipment_utilization = models.PositiveIntegerField(
+        default=75, 
+        help_text="Target equipment utilization percentage"
+    )
+    
+    # Storage size estimates by modality (in GB)
+    modality_size_estimates = models.JSONField(
+        default=dict,
+        help_text="Average storage size per examination by modality type (in GB)"
+    )
+    
+    # Dashboard refresh settings
+    auto_refresh_interval = models.PositiveIntegerField(
+        default=300,  # 5 minutes
+        help_text="Auto-refresh interval for dashboard in seconds"
+    )
+    
+    # Notification settings
+    email_notifications = models.BooleanField(
+        default=True,
+        help_text="Enable email notifications for alerts"
+    )
+    notification_emails = models.JSONField(
+        default=list,
+        help_text="List of email addresses to receive notifications"
+    )
+    
+    created = models.DateTimeField(auto_now_add=True)
+    modified = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Dashboard Configuration"
+        verbose_name_plural = "Dashboard Configurations"
+    
+    def __str__(self):
+        return f"Dashboard Config - {self.modified.strftime('%Y-%m-%d %H:%M')}"
+    
+    def save(self, *args, **kwargs):
+        # Ensure default modality size estimates
+        if not self.modality_size_estimates:
+            self.modality_size_estimates = {
+                'X-RAY': 0.03,  # 30MB average
+                'CR': 0.03,     # 30MB average  
+                'DX': 0.03,     # 30MB average
+                'CT': 0.3,      # 300MB average
+                'MRI': 0.5,     # 500MB average
+                'US': 0.1,      # 100MB average
+                'MG': 0.05,     # 50MB average (Mammography)
+                'RF': 0.1,      # 100MB average (Fluoroscopy)
+            }
+        
+        # Ensure default storage paths if empty
+        if not self.storage_root_paths:
+            self.storage_root_paths = [
+                '/var/lib/orthanc/db',
+                '/data/orthanc',
+                '/opt/orthanc/data'
+            ]
+        
+        super().save(*args, **kwargs)
+
+
 class PacsConfig(models.Model):
     ENDPOINT_STYLE_CHOICES = [
         ('dicomweb', 'DICOMweb (OHIF-style) - Standard WADO-RS'),
