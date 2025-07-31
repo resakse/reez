@@ -17,7 +17,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Badge } from '@/components/ui/badge';
-import { Search, Filter, Calendar, User, Building2, Stethoscope, Eye, Edit, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Filter, Calendar, User, Building2, Stethoscope, Eye, Edit, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import AuthService from '@/lib/auth';
 import Link from 'next/link';
 import flatpickr from 'flatpickr';
@@ -661,35 +661,64 @@ export default function ExaminationsPage() {
                   Previous
                 </Button>
                 
-                {/* Page numbers */}
+                {/* Page numbers with ellipsis */}
                 <div className="flex items-center gap-1">
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    let pageNum;
-                    if (totalPages <= 5) {
-                      pageNum = i + 1;
-                    } else if (currentPage <= 3) {
-                      pageNum = i + 1;
-                    } else if (currentPage >= totalPages - 2) {
-                      pageNum = totalPages - 4 + i;
-                    } else {
-                      pageNum = currentPage - 2 + i;
+                  {(() => {
+                    const delta = 2; // Number of pages to show around current page
+                    const range = [];
+                    const rangeWithDots = [];
+
+                    // Always show first page
+                    range.push(1);
+
+                    // Add pages around current page
+                    for (let i = Math.max(2, currentPage - delta); i <= Math.min(totalPages - 1, currentPage + delta); i++) {
+                      range.push(i);
                     }
-                    
-                    return (
-                      <Button
-                        key={`page-${pageNum}`}
-                        variant={currentPage === pageNum ? "default" : "outline"}
-                        size="sm"
-                        className="w-8 h-8 p-0"
-                        onClick={() => {
-                          console.log('Clicking page:', pageNum);
-                          setCurrentPage(pageNum);
-                        }}
-                      >
-                        {pageNum}
-                      </Button>
-                    );
-                  })}
+
+                    // Always show last page (if more than 1 page)
+                    if (totalPages > 1) {
+                      range.push(totalPages);
+                    }
+
+                    // Remove duplicates and sort
+                    const uniqueRange = [...new Set(range)].sort((a, b) => a - b);
+
+                    // Add ellipsis where there are gaps
+                    let prev = 0;
+                    for (const page of uniqueRange) {
+                      if (page - prev > 1) {
+                        rangeWithDots.push('...');
+                      }
+                      rangeWithDots.push(page);
+                      prev = page;
+                    }
+
+                    return rangeWithDots.map((page, index) => {
+                      if (page === '...') {
+                        return (
+                          <span key={`ellipsis-${index}`} className="px-2 py-1 text-sm text-muted-foreground">
+                            ...
+                          </span>
+                        );
+                      }
+
+                      return (
+                        <Button
+                          key={`page-${page}`}
+                          variant={currentPage === page ? "default" : "outline"}
+                          size="sm"
+                          className="w-8 h-8 p-0"
+                          onClick={() => {
+                            console.log('Clicking page:', page);
+                            setCurrentPage(page as number);
+                          }}
+                        >
+                          {page}
+                        </Button>
+                      );
+                    });
+                  })()}
                 </div>
                 
                 <Button
