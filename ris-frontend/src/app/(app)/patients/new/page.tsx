@@ -14,6 +14,8 @@ import { parseNric, formatNric, type NricInfo } from '@/lib/nric';
 import { autoPopulateRace } from '@/lib/raceInference';
 import { ArrowLeft, User, Calendar, MapPin, Phone, Mail, Brain } from 'lucide-react';
 import Link from 'next/link';
+import Flatpickr from 'react-flatpickr';
+import 'flatpickr/dist/themes/dark.css';
 
 export default function NewPatientPage() {
     const router = useRouter();
@@ -242,13 +244,21 @@ export default function NewPatientPage() {
                             <div className="space-y-2">
                                 <Label htmlFor="t_lahir">Date of Birth</Label>
                                 <div className="relative">
-                                    <Calendar className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                                    <Input
-                                        id="t_lahir"
-                                        type="date"
+                                    <Calendar className="absolute left-3 top-3 h-4 w-4 text-muted-foreground z-10" />
+                                    <Flatpickr
                                         value={formData.t_lahir}
-                                        onChange={(e) => handleSelectChange('t_lahir', e.target.value)}
-                                        className="pl-10"
+                                        onChange={(date) => {
+                                            const dateStr = date[0] ? date[0].toISOString().split('T')[0] : '';
+                                            handleSelectChange('t_lahir', dateStr);
+                                        }}
+                                        options={{
+                                            dateFormat: 'd/m/Y',
+                                            allowInput: true,
+                                            clickOpens: true,
+                                            maxDate: 'today'
+                                        }}
+                                        className="file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input flex h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive pl-10"
+                                        placeholder="Select date of birth"
                                     />
                                 </div>
                             </div>
