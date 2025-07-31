@@ -457,6 +457,9 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
   // Track which series have been fully loaded
   const loadedSeries = useRef<Map<string, string[]>>(new Map());
   
+  // Track representative images for thumbnails (one per series)
+  const representativeImages = useRef<Map<string, string>>(new Map());
+  
   // Track current loading controller to cancel previous loads
   const currentLoadingController = useRef<AbortController | null>(null);
   
@@ -481,6 +484,10 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
       // We're resuming - skip the first batch loading and go straight to sequential loading
       try {
         setImageIds(existingCached); // Show existing progress immediately
+        // Ensure representative image is stored for thumbnail
+        if (existingCached.length > 0) {
+          representativeImages.current.set(seriesKey, existingCached[0]);
+        }
         
         // Jump directly to sequential loading from where we left off
         let currentImageIds = [...existingCached];
@@ -643,9 +650,11 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
       
       setImageIds(firstBatchImageIds); // Show first batch immediately
       
-      // Store first batch in cache
+      // Store first batch in cache and representative image for thumbnails
       if (firstBatchImageIds.length > 0) {
         loadedSeries.current.set(seriesKey, [...firstBatchImageIds]);
+        // Store first image as representative for thumbnail
+        representativeImages.current.set(seriesKey, firstBatchImageIds[0]);
         setLoading(false);
         setSwitchingSeries(false);
       }
@@ -2305,12 +2314,13 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
                   // ONLY show series thumbnails if seriesInfo exists
                   if (seriesInfo.length > 0) {
                     return seriesInfo.map((series, seriesIndex) => {
-                      // Since we only load first image per series, use seriesIndex directly
-                      const representativeImageId = imageIds[seriesIndex];
+                      // Get representative image for this series
+                      const seriesKey = series.seriesInstanceUID || `series-${seriesIndex}`;
+                      const representativeImageId = representativeImages.current.get(seriesKey);
                       if (!representativeImageId) return null;
                       
-                      // Check if this series is currently active (simple index match)
-                      const isActiveSeries = currentImageIndex === seriesIndex;
+                      // Check if this series is currently active
+                      const isActiveSeries = currentSeriesId === seriesKey;
                       
                       const handleSeriesClick = async () => {
                         const seriesKey = series.seriesInstanceUID || `series-${seriesIndex}`;
