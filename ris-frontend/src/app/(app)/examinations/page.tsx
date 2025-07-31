@@ -110,7 +110,7 @@ export default function ExaminationsPage() {
   const [totalPages, setTotalPages] = useState(0);
   
   // Sorting state
-  const [sortField, setSortField] = useState<string>('-no_xray'); // Default sort by X-ray number descending
+  const [sortField, setSortField] = useState<string>('-daftar__tarikh'); // Default sort by date descending
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   
   // Debounced search effect for search field
@@ -571,6 +571,17 @@ export default function ExaminationsPage() {
                       variant="ghost" 
                       size="sm" 
                       className="font-medium hover:bg-transparent p-0 h-auto justify-start"
+                      onClick={() => handleSort('daftar__tarikh')}
+                    >
+                      Date & Time
+                      {getSortIcon('daftar__tarikh')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="font-medium hover:bg-transparent p-0 h-auto justify-start"
                       onClick={() => handleSort('no_xray')}
                     >
                       X-Ray No.
@@ -608,17 +619,6 @@ export default function ExaminationsPage() {
                     >
                       Modality
                       {getSortIcon('exam__modaliti__nama')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="font-medium hover:bg-transparent p-0 h-auto justify-start"
-                      onClick={() => handleSort('daftar__tarikh')}
-                    >
-                      Date
-                      {getSortIcon('daftar__tarikh')}
                     </Button>
                   </TableHead>
                   <TableHead>
@@ -667,6 +667,7 @@ export default function ExaminationsPage() {
                 ) : (
                   examinations.map((exam) => (
                     <TableRow key={exam.id}>
+                      <TableCell>{formatDate(exam.daftar_info.tarikh)}</TableCell>
                       <TableCell className="font-medium">
                         <Badge variant="outline">{exam.no_xray}</Badge>
                       </TableCell>
@@ -689,7 +690,6 @@ export default function ExaminationsPage() {
                       <TableCell>
                         <Badge variant="outline">{exam.exam.modaliti.nama}</Badge>
                       </TableCell>
-                      <TableCell>{formatDateOnly(exam.daftar_info.tarikh)}</TableCell>
                       <TableCell>{exam.daftar_info.pemohon || 'N/A'}</TableCell>
                       <TableCell>{exam.daftar_info.rujukan?.wad || 'N/A'}</TableCell>
                       <TableCell>

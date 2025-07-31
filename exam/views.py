@@ -182,7 +182,11 @@ class PemeriksaanViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = PemeriksaanFilter
     search_fields = ['no_xray', 'daftar__pesakit__nama', 'daftar__pemohon', 'exam__exam']
-    ordering_fields = ['no_xray', 'created', 'daftar__tarikh']
+    ordering_fields = [
+        'no_xray', 'created', 'daftar__tarikh', 'daftar__pesakit__nama', 
+        'exam__exam', 'exam__modaliti__nama', 'daftar__pemohon', 
+        'daftar__rujukan__wad', 'daftar__jxr__first_name'
+    ]
     ordering = ['-no_xray']  # Default ordering by X-ray number descending
     pagination_class = CustomPagination
 
