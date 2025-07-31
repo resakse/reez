@@ -11,44 +11,59 @@ from custom.katanama import titlecase
 
 def generate_custom_accession(file_metadata):
     """
-    Generate custom accession number from DICOM metadata
+    Generate custom accession number from DICOM metadata for import
+    Preserves original DICOM accession number with proper formatting
     
     Args:
-        file_metadata (dict): DICOM metadata containing requesting_service, study_date, accession_number
+        file_metadata (dict): DICOM metadata containing requesting_service, study_date, accession_number, institution_name
         
     Returns:
         str: Custom formatted accession number (max 16 chars)
     """
+    from django.conf import settings
+    
+    # Get service code from RequestingService or InstitutionName
     requesting_service = file_metadata.get('requesting_service', '')
+    institution_name = file_metadata.get('institution_name', '')
     study_date = file_metadata.get('study_date', '')
     original_accession = file_metadata.get('accession_number', '')
     
-    if not requesting_service or not study_date or not original_accession:
-        return original_accession  # Fallback to original
+    # Use requesting_service first, fallback to institution_name, then default
+    service_source = requesting_service or institution_name
     
-    # Extract first letters of each word in RequestingService
-    service_parts = requesting_service.strip().split()
-    service_code = ''.join(part[0].upper() for part in service_parts if part)
+    if service_source:
+        # Extract first letters of each word in service name
+        service_parts = service_source.strip().split()
+        service_code = ''.join(part[0].upper() for part in service_parts if part)
+    else:
+        # Fallback to settings
+        service_code = getattr(settings, 'KLINIKSHORT', 'KKP')
     
     # Extract year from StudyDate (YYYYMMDD format)
-    if len(study_date) >= 4:
+    if study_date and len(study_date) >= 4:
         year = study_date[:4]
     else:
         year = str(timezone.now().year)
     
-    # Calculate remaining space for accession number
-    remaining_chars = 16 - len(service_code) - len(year)
+    # Use original accession or fallback
+    if not original_accession:
+        original_accession = '1'
+    
+    # Calculate remaining space for accession number (max 16 total)
+    prefix = f"{service_code}{year}"
+    remaining_chars = 16 - len(prefix)
     remaining_chars = max(1, remaining_chars)  # At least 1 digit
     
-    # Zero-fill the original accession number to fit remaining space
+    # Zero-pad the original accession number to fit remaining space
     try:
         accession_num = int(original_accession)
         formatted_accession = str(accession_num).zfill(remaining_chars)
     except (ValueError, TypeError):
+        # If not a number, truncate and pad
         formatted_accession = original_accession[:remaining_chars].zfill(remaining_chars)
     
     # Combine and ensure total length <= 16
-    result = f"{service_code}{year}{formatted_accession}"
+    result = f"{prefix}{formatted_accession}"
     return result[:16]
 
 

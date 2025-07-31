@@ -1044,6 +1044,7 @@ def upload_dicom_files(request):
                 
                 # Extract additional tags for custom accession generation
                 requesting_service = getattr(dcm, 'RequestingService', '')
+                institution_name = getattr(dcm, 'InstitutionName', '')
                 study_date = getattr(dcm, 'StudyDate', '')
                 
                 # Extract examination-specific DICOM tags
@@ -1075,6 +1076,7 @@ def upload_dicom_files(request):
                     'referring_physician': referring_physician,
                     'accession_number': accession_number,
                     'requesting_service': requesting_service,
+                    'institution_name': institution_name,
                     'study_date': study_date,
                     'instance_number': getattr(dcm, 'InstanceNumber', 1),
                     # Examination-specific metadata
@@ -1150,7 +1152,22 @@ def upload_dicom_files(request):
                     study_description = (registration_data.get('study_description') or 
                                        file_metadata.get('study_description') or 'Uploaded Study')
                     
-                    print(f"DEBUG: About to create daftar with pesakit={patient.id}, modality='{modality_name}', study_uid='{study_instance_uid}', accession='{accession_number}'")
+                    # Parse StudyDate from DICOM or fallback to today
+                    study_date_str = file_metadata.get('study_date', '')
+                    if study_date_str and len(study_date_str) == 8:
+                        try:
+                            # Convert DICOM date format (YYYYMMDD) to Django datetime
+                            from datetime import datetime
+                            study_date = datetime.strptime(study_date_str, '%Y%m%d').date()
+                            tarikh = timezone.make_aware(datetime.combine(study_date, datetime.min.time()))
+                        except ValueError:
+                            # Invalid date format, use today
+                            tarikh = timezone.now()
+                    else:
+                        # No valid StudyDate, use today
+                        tarikh = timezone.now()
+                    
+                    print(f"DEBUG: About to create daftar with pesakit={patient.id}, modality='{modality_name}', study_uid='{study_instance_uid}', accession='{accession_number}', study_date='{study_date_str}'")
                     daftar = Daftar.objects.create(
                         pesakit=patient,
                         pemohon=referring_physician,
@@ -1161,7 +1178,7 @@ def upload_dicom_files(request):
                         accession_number=accession_number or None,
                         jxr=request.user,
                         study_status='COMPLETED',
-                        tarikh=timezone.now()
+                        tarikh=tarikh
                     )
                     print(f"DEBUG: Created daftar ID {daftar.id} for patient {patient.id} with accession '{daftar.parent_accession_number}'")
                     

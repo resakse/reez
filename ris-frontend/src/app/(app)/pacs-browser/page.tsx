@@ -93,43 +93,6 @@ export default function PacsBrowserPage() {
     return `${timeString.substring(0, 2)}:${timeString.substring(2, 4)}:${timeString.substring(4, 6)}`;
   };
 
-  const extractKlinikFromDescription = (text: string): string => {
-    if (!text) return '';
-    
-    // Multiple patterns to match different klinik formats
-    const patterns = [
-      // "KLINIK KESIHATAN BUKIT KUDA" - standard format
-      /KLINIK\s+[A-Z][A-Z\s]*/i,
-      // "RUJUKAN: KLINIK MATA" - with rujukan prefix
-      /RUJUKAN[:\s]*KLINIK\s+[A-Z][A-Z\s]*/i,
-      // "Klinik Ortopedik" - mixed case
-      /Klinik\s+[A-Za-z][A-Za-z\s]*/,
-      // "WARD 3A" or "WAD 5B" - ward references
-      /W[A-Z]*D\s+[A-Z0-9][A-Z0-9\s]*/i,
-      // "Unit Rawatan Rapi" - unit references
-      /UNIT\s+[A-Z][A-Z\s]*/i,
-      // "Jabatan Emergency" - department references
-      /JABATAN\s+[A-Z][A-Z\s]*/i
-    ];
-    
-    for (const pattern of patterns) {
-      const match = text.match(pattern);
-      if (match) {
-        let result = match[0].trim();
-        // Clean up common prefixes
-        result = result.replace(/^RUJUKAN[:\s]*/i, '');
-        return result;
-      }
-    }
-    
-    // If no specific pattern matches, look for any capitalized department-like words
-    const fallbackMatch = text.match(/\b[A-Z]{2,}(?:\s+[A-Z]{2,})*\b/);
-    if (fallbackMatch && fallbackMatch[0].length > 3) {
-      return fallbackMatch[0];
-    }
-    
-    return '';
-  };
 
   const checkImportStatus = useCallback(async (studies: LegacyStudy[]): Promise<LegacyStudy[]> => {
     try {
@@ -310,7 +273,7 @@ export default function PacsBrowserPage() {
         ImageCount: study.imageCount,
         InstitutionName: study.institutionName,
         Ward: study.ward,
-        Klinik: extractKlinikFromDescription(study.institutionName || study.studyDescription)
+        Klinik: study.institutionName || 'Unknown'
       }));
 
       // Check import status for all studies
@@ -613,7 +576,7 @@ export default function PacsBrowserPage() {
           ImageCount: study.imageCount,
           InstitutionName: study.institutionName,
           Ward: study.ward,
-          Klinik: extractKlinikFromDescription(study.institutionName || study.studyDescription)
+          Klinik: study.institutionName || 'Unknown'
         }));
 
         // Check import status for all studies
