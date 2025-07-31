@@ -219,7 +219,7 @@ export default function LegacyStudyViewerPage() {
         total: totalImages
       };
       
-      toast.success(`Study loaded: ${totalImages} images across ${seriesCount} series. Showing 1 thumbnail per series.`);
+      // Removed toast notification
 
       // Cache the fetched data
       studyDataCache.set(studyUid, {
@@ -233,24 +233,24 @@ export default function LegacyStudyViewerPage() {
       setSeriesInfo(studyImageData.seriesInfo || []);
       
       if (studyImageData.imageIds.length === 0) {
-        toast.warning('No DICOM images found in this study');
+        // Removed toast notification
       } else if (studyImageData.total && studyImageData.total > studyImageData.imageIds.length) {
         // Large study with lazy loading
         const seriesCount = studyImageData.seriesInfo?.length || 0;
-        toast.success(`Study loaded: ${studyImageData.total} images across ${seriesCount} series. Images will load on demand.`);
+        // Removed toast notification
       } else {
         // Regular study
         const seriesCount = studyImageData.seriesInfo?.length || 0;
         if (seriesCount > 1) {
-          toast.success(`Loaded ${studyImageData.imageIds.length} images across ${seriesCount} series from study`);
+          // Removed toast notification
         } else {
-          toast.success(`Loaded ${studyImageData.imageIds.length} images from study`);
+          // Removed toast notification
         }
       }
     } catch (err) {
       // Error loading legacy study
       setError(err instanceof Error ? err.message : 'Failed to load legacy study');
-      toast.error('Failed to load legacy study');
+      // Removed toast notification
     } finally {
       setLoading(false);
       // Remove from fetching set after completion (success or failure)

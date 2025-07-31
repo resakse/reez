@@ -12,7 +12,6 @@ import {
   FlipHorizontal, Palette
 } from 'lucide-react';
 import AuthService from '@/lib/auth';
-import { toast } from '@/lib/toast';
 
 // Modern Cornerstone3D imports
 import { init as coreInit, RenderingEngine, Enums as CoreEnums, type Types } from '@cornerstonejs/core';
@@ -994,7 +993,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
     
     // Check for specific error types - ensure errorMessage is a string
     if (errorMessage && (errorMessage.includes('buffer overrun') || errorMessage.includes('parsedicomdatasetexplicit'))) {
-      toast.error('DICOM data corruption detected. This may be due to network issues with remote PACS server.');
+      // Removed toast notification
       
       // For buffer overrun errors, try to reload immediately
       if (retryCallback) {
@@ -1005,13 +1004,13 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
       
       return 'buffer_overrun';
     } else if (errorMessage && (errorMessage.includes('timeout') || errorMessage.includes('network'))) {
-      toast.warning('Network timeout. Please check connection to PACS server.');
+      // Removed toast notification
       return 'network_timeout';
     } else if (errorMessage && (errorMessage.includes('404') || errorMessage.includes('not found'))) {
-      toast.warning('DICOM file not found on server.');
+      // Removed toast notification
       return 'not_found';
     } else {
-      toast.error('Failed to load DICOM image.');
+      // Removed toast notification
       return 'unknown';
     }
   }, []);
@@ -1150,7 +1149,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
           if (errorType === 'buffer_overrun' && imageIds.length > 0) {
             try {
               await stackViewport.setStack([imageIds[startIndex]], 0);
-              toast.warning('Loaded single image due to data corruption. Navigation may be limited.');
+              // Removed toast notification
             } catch (singleImageError) {
               throw singleImageError;
             }
@@ -2308,11 +2307,114 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
                 </Button>
               </div>
 
-              {/* Thumbnails - ONLY 1 per series, NO FALLBACKS */}
+              {/* Thumbnails - Show individual images for current series, or series thumbnails if multiple series */}
               <div className="flex gap-1 flex-1 overflow-x-auto">
                 {(() => {
-                  // ONLY show series thumbnails if seriesInfo exists
-                  if (seriesInfo.length > 0) {
+                  // Debug logging
+                  console.log('🔍 THUMBNAIL DEBUG - X-RAY FIX:', {
+                    seriesInfoLength: seriesInfo.length,
+                    imageIdsLength: imageIds.length,
+                    currentSeriesId,
+                    modality: studyMetadata?.modality,
+                    imageIds: imageIds.slice(0, 3) // First 3 for debugging
+                  });
+                  
+                  // Check if this is an X-ray study (CR, DR, XR) with few series that should show individual images
+                  const isXRayStudy = studyMetadata?.modality && ['CR', 'DR', 'XR', 'DX'].includes(studyMetadata.modality);
+                  const shouldShowIndividualImages = isXRayStudy && seriesInfo.length <= 5;
+                  
+                  // If we have multiple series but it's an X-ray study with few series, treat each series as individual image
+                  if (shouldShowIndividualImages) {
+                    console.log('🔍 X-RAY THUMBNAILS:', {
+                      seriesInfo: seriesInfo.map(s => ({
+                        uid: s.seriesInstanceUID, 
+                        desc: s.seriesDescription,
+                        count: s.instanceCount
+                      })),
+                      representativeImages: Array.from(representativeImages.current.entries())
+                    });
+                    
+                    return seriesInfo.map((series, seriesIndex) => {
+                      // Get representative image for this series  
+                      const seriesKey = series.seriesInstanceUID || `series-${seriesIndex}`;
+                      let representativeImageId = representativeImages.current.get(seriesKey);
+                      
+                      console.log(`🔍 Series ${seriesIndex}:`, {
+                        seriesKey,
+                        representativeImageId,
+                        hasImage: !!representativeImageId
+                      });
+                      
+                      // If no representative image stored, create one by fetching the first instance of this series
+                      if (!representativeImageId) {
+                        // For X-ray studies, we need to fetch the first instance ID of this series
+                        // For now, show a placeholder and load the actual image asynchronously
+                        console.log(`🔧 Need to load first instance for series ${seriesIndex}: ${series.seriesInstanceUID}`);
+                        
+                        // Try to fetch the first image of this series asynchronously
+                        (async () => {
+                          try {
+                            const response = await AuthService.authenticatedFetch(
+                              `${process.env.NEXT_PUBLIC_API_URL}/api/pacs/studies/${studyMetadata?.studyInstanceUID}/series/${series.seriesInstanceUID}/images/bulk?start=0&count=1`
+                            );
+                            
+                            if (response.ok) {
+                              const data = await response.json();
+                              const firstImage = data.images?.[0];
+                              if (firstImage?.imageUrl) {
+                                const representativeImageUrl = `wadors:${firstImage.imageUrl}`;
+                                representativeImages.current.set(seriesKey, representativeImageUrl);
+                                console.log(`✅ Loaded representative image for series ${seriesIndex}:`, representativeImageUrl);
+                                
+                                // Force a re-render to show the new thumbnail
+                                setImageIds(prev => [...prev]); // Trigger re-render
+                              }
+                            }
+                          } catch (error) {
+                            console.log(`❌ Failed to load representative image for series ${seriesIndex}:`, error);
+                          }
+                        })();
+                        
+                        // For now, skip this thumbnail until the image loads
+                        return null;
+                      }
+                      
+                      // Check if this series is currently active
+                      const isActiveSeries = currentSeriesId === seriesKey;
+                      
+                      const handleSeriesClick = async () => {
+                        const seriesKey = series.seriesInstanceUID || `series-${seriesIndex}`;
+                        
+                        // Switch to this series
+                        switchToSeries(seriesKey, series);
+                        
+                        // Navigate to first image of this series
+                        goToImage(0);
+                      };
+                      
+                      return (
+                        <div
+                          key={series.seriesId}
+                          className="flex-shrink-0 flex flex-col items-center"
+                          title={`${series.seriesDescription} (${series.instanceCount} images)`}
+                        >
+                          <ThumbnailImage
+                            imageId={representativeImageId}
+                            index={seriesIndex}
+                            isActive={isActiveSeries}
+                            onClick={handleSeriesClick}
+                          />
+                          
+                          {/* Series name below thumbnail - shorter for X-ray */}
+                          <div className="text-xs text-center mt-1 max-w-16 truncate">
+                            {series.seriesDescription?.split(' ')[0] || `View ${seriesIndex + 1}`}
+                          </div>
+                        </div>
+                      );
+                    });
+                  } 
+                  // If we have multiple series, show series thumbnails
+                  else if (seriesInfo.length > 1) {
                     return seriesInfo.map((series, seriesIndex) => {
                       // Get representative image for this series
                       const seriesKey = series.seriesInstanceUID || `series-${seriesIndex}`;
@@ -2402,11 +2504,50 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
                         </div>
                       );
                     });
-                  } else {
-                    // NO FALLBACK - only show message
+                  } else if (imageIds.length > 1 && imageIds.length <= 10) {
+                    // Single series with few images - show individual image thumbnails (for X-ray, etc.)
+                    // Limit to 10 images to avoid UI clutter for CT/MRI slices
+                    return imageIds.map((imageId, imageIndex) => {
+                      const isActiveImage = currentImageIndex === imageIndex;
+                      
+                      const handleImageClick = () => {
+                        if (imageIndex !== currentImageIndex) {
+                          goToImage(imageIndex);
+                        }
+                      };
+                      
+                      return (
+                        <div
+                          key={`image-${imageIndex}`}
+                          className="flex-shrink-0 flex flex-col items-center"
+                          title={`Image ${imageIndex + 1} of ${imageIds.length}`}
+                        >
+                          <ThumbnailImage
+                            imageId={imageId}
+                            index={imageIndex}
+                            isActive={isActiveImage}
+                            onClick={handleImageClick}
+                          />
+                          
+                          {/* Image number below thumbnail */}
+                          <div className="text-xs text-center mt-1">
+                            Image {imageIndex + 1}
+                          </div>
+                        </div>
+                      );
+                    });
+                  } else if (imageIds.length > 10) {
+                    // Single series with many images (like CT slices) - show navigation message
                     return (
                       <div className="flex items-center justify-center p-4 text-sm text-muted-foreground">
                         Use mouse wheel or arrow keys to navigate {imageIds.length} images
+                      </div>
+                    );
+                  } else {
+                    // Single image - show navigation message
+                    return (
+                      <div className="flex items-center justify-center p-4 text-sm text-muted-foreground">
+                        Single image - no navigation needed
                       </div>
                     );
                   }
