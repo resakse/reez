@@ -11,7 +11,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AuthService from '@/lib/auth';
 import { parseNric, formatNric, type NricInfo } from '@/lib/nric';
-import { ArrowLeft, User, Calendar, MapPin, Phone, Mail } from 'lucide-react';
+import { autoPopulateRace } from '@/lib/raceInference';
+import { ArrowLeft, User, Calendar, MapPin, Phone, Mail, Brain } from 'lucide-react';
 import Link from 'next/link';
 
 export default function NewPatientPage() {
@@ -36,6 +37,8 @@ export default function NewPatientPage() {
     const [nricError, setNricError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [raceInference, setRaceInference] = useState<{ race: string; confidence: string } | null>(null);
+    const [isRaceAutoPopulated, setIsRaceAutoPopulated] = useState(true); // Track if race was auto-populated
 
     const handleNricChange = (value: string) => {
         const formatted = formatNric(value);
@@ -62,14 +65,55 @@ export default function NewPatientPage() {
             setNricInfo(null);
             setNricError('');
         }
+        
+        // Always check race logic when NRIC changes (whether valid, invalid, or empty)
+        if (formData.nama.trim() && isRaceAutoPopulated) {
+            const info = value.trim() ? parseNric(value) : null;
+            
+            if (value.trim() && info) {
+                if (!info.isValid || info.type === 'passport') {
+                    // NRIC invalid OR passport format, change to Warga Asing
+                    setFormData(prev => ({ ...prev, bangsa: 'Warga Asing' }));
+                    setRaceInference(null); // Clear inference since we're overriding
+                } else if (info.isValid && info.type === 'nric') {
+                    // Valid Malaysian NRIC, use name-based inference
+                    const inference = autoPopulateRace(formData.nama, true);
+                    setRaceInference(inference);
+                    setFormData(prev => ({ ...prev, bangsa: inference.race }));
+                }
+            } else if (!value.trim()) {
+                // No NRIC entered, use name-based inference
+                const inference = autoPopulateRace(formData.nama, true);
+                setRaceInference(inference);
+                setFormData(prev => ({ ...prev, bangsa: inference.race }));
+            }
+        }
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        setFormData({ ...formData, [e.target.id]: e.target.value });
+        const { id, value } = e.target;
+        setFormData({ ...formData, [id]: value });
+        
+        // Auto-populate race when name changes (don't consider NRIC validity here)
+        if (id === 'nama' && value.trim()) {
+            const inference = autoPopulateRace(value, true); // Always use true for name-only inference
+            setRaceInference(inference);
+            
+            // Auto-set race if it was previously auto-populated or still default
+            if (isRaceAutoPopulated) {
+                setFormData(prev => ({ ...prev, bangsa: inference.race }));
+            }
+        }
     };
 
     const handleSelectChange = (id: string, value: string) => {
         setFormData({ ...formData, [id]: value });
+        
+        // Clear race inference and auto-population when user manually changes race
+        if (id === 'bangsa') {
+            setRaceInference(null);
+            setIsRaceAutoPopulated(false);
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -174,7 +218,7 @@ export default function NewPatientPage() {
                                     </Alert>
                                 )}
                                 {nricInfo?.isValid && (
-                                    <Alert className="py-2 bg-green-50 border-green-200">
+                                    <Alert className="py-2 border-green-500">
                                         <AlertDescription className="text-sm">
                                             {nricInfo.type === 'nric' 
                                                 ? `✓ Valid NRIC - Age: ${nricInfo.age}, Gender: ${nricInfo.gender === 'male' ? 'L' : 'P'}`
@@ -228,12 +272,17 @@ export default function NewPatientPage() {
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="bangsa">Race</Label>
+                                <Label htmlFor="bangsa" className="flex items-center gap-2">
+                                    Race
+                                    {raceInference && (
+                                        <Brain className="h-4 w-4 text-blue-500" title="AI inferred from name" />
+                                    )}
+                                </Label>
                                 <Select
                                     value={formData.bangsa}
                                     onValueChange={(value) => handleSelectChange('bangsa', value)}
                                 >
-                                    <SelectTrigger>
+                                    <SelectTrigger className={raceInference ? 'border-blue-500' : ''}>
                                         <SelectValue placeholder="Select race" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -244,6 +293,14 @@ export default function NewPatientPage() {
                                         <SelectItem value="Warga Asing">Warga Asing</SelectItem>
                                     </SelectContent>
                                 </Select>
+                                {raceInference && (
+                                    <Alert className="py-2 border-blue-500">
+                                        <Brain className="h-4 w-4" />
+                                        <AlertDescription className="text-sm">
+                                            AI suggestion: <strong>{raceInference.race}</strong> (confidence: {raceInference.confidence})
+                                        </AlertDescription>
+                                    </Alert>
+                                )}
                             </div>
 
                             <div className="space-y-2">
@@ -254,7 +311,7 @@ export default function NewPatientPage() {
                                     value={formData.umur}
                                     onChange={(e) => handleSelectChange('umur', e.target.value)}
                                     placeholder="Auto-calculated from NRIC"
-                                    readOnly={!!nricInfo?.age}
+                                    readOnly
                                 />
                             </div>
                         </div>

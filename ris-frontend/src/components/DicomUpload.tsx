@@ -15,6 +15,7 @@ import {
 import Select, { SingleValue } from 'react-select';
 import AuthService from '@/lib/auth';
 import { toast } from '@/lib/toast';
+import { autoPopulateRace } from '@/lib/raceInference';
 
 interface DicomFile {
   file: File;

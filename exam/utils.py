@@ -7,6 +7,7 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 from django.conf import settings
 from custom.katanama import titlecase
+import re
 
 
 def generate_custom_accession(file_metadata):
@@ -174,6 +175,10 @@ def find_or_create_patient(file_metadata, manual_patient_id=None):
     print(f"DEBUG: Creating patient with data: {patient_data}")
     patient = Pesakit.objects.create(**patient_data)
     print(f"DEBUG: Created new patient ID {patient.id}: {patient.nama}")
+    
+    # Try to infer race from name if not already set
+    if not patient.bangsa:
+        update_patient_race_if_empty(patient)
     
     return patient
 
@@ -467,3 +472,129 @@ def create_pemeriksaan_from_dicom(daftar, file_metadata, user=None):
     
     print(f"DEBUG: Created Pemeriksaan ID {pemeriksaan.id} with accession '{pemeriksaan.accession_number}'")
     return pemeriksaan
+
+
+def infer_race_from_name(full_name):
+    """
+    Infer race/ethnicity from Malaysian names using pattern matching
+    
+    Args:
+        full_name (str): Patient's full name
+        
+    Returns:
+        str: Inferred race ('MALAY', 'CHINESE', 'INDIAN', 'OTHER')
+    """
+    if not full_name or not isinstance(full_name, str):
+        return 'OTHER'
+    
+    # Normalize name: remove extra spaces, convert to uppercase
+    name = re.sub(r'\s+', ' ', full_name.strip().upper())
+    
+    # Malaysian Malay patterns
+    malay_patterns = [
+        # Common Malay prefixes and suffixes
+        r'\bBIN\b', r'\bBINTI\b', r'\bABD\b', r'\bABDUL\b', r'\bABDULLAH\b',
+        # Common Malay names
+        r'\bMUHAMMAD\b', r'\bMOHAMMAD\b', r'\bAHMAD\b', r'\bMOHD\b', r'\bMD\b',
+        r'\bSITI\b', r'\bNUR\b', r'\bNURUL\b', r'\bFATIMAH\b', r'\bAISHAH\b',
+        # Malay surnames/components
+        r'\bRAHMAN\b', r'\bRAHIM\b', r'\bRASHID\b', r'\bHASAN\b', r'\bHUSAIN\b',
+        r'\bISMAIL\b', r'\bYUSUF\b', r'\bIBRAHIM\b', r'\bOTHMAN\b', r'\bOMARB\b',
+        # Regional Malay names
+        r'\bWAN\b', r'\bCHE\b', r'\bMAT\b', r'\bNIK\b'
+    ]
+    
+    # Chinese patterns (transliterated names)
+    chinese_patterns = [
+        # Common Chinese surnames
+        r'\bLIM\b', r'\bTAN\b', r'\bLEE\b', r'\bWONG\b', r'\bCHAN\b', r'\bLAU\b',
+        r'\bTEO\b', r'\bNG\b', r'\bONG\b', r'\bYAP\b', r'\bSIM\b', r'\bHO\b',
+        r'\bKOH\b', r'\bGOH\b', r'\bCHUA\b', r'\bTAY\b', r'\bLOW\b', r'\bKUEK\b',
+        r'\bCHIN\b', r'\bLOOI\b', r'\bTONG\b', r'\bFOO\b', r'\bYEO\b', r'\bKHOO\b',
+        r'\bCHEN\b', r'\bLIU\b', r'\bZHANG\b', r'\bWANG\b', r'\bLI\b', r'\bZHAO\b',
+        # Hokkien/Teochew variations
+        r'\bLIAW\b', r'\bLIEW\b', r'\bTIAW\b', r'\bCHOW\b', r'\bHOW\b',
+        # Cantonese variations
+        r'\bYAM\b', r'\bLAM\b', r'\bMOK\b', r'\bCHEUNG\b', r'\bLEUNG\b',
+        # Hakka variations  
+        r'\bTHONG\b', r'\bCHONG\b', r'\bFONG\b', r'\bYONG\b'
+    ]
+    
+    # Indian patterns (Tamil, Malayalam, Telugu, Punjabi, etc.)
+    indian_patterns = [
+        # Common Tamil names and components
+        r'\bA\/L\b', r'\bA\/P\b', r'\bS\/O\b', r'\bD\/O\b',  # Anak Lelaki/Perempuan, Son Of/Daughter Of
+        r'\bRAMAN\b', r'\bKRISHNAN\b', r'\bSUBRAMANIAM\b', r'\bRAJU\b',
+        r'\bNAIR\b', r'\bKUMAR\b', r'\bDEVI\b', r'\bPRIYA\b', r'\bVANI\b',
+        # Telugu/Malayalam
+        r'\bRAO\b', r'\bREDDY\b', r'\bMENON\b', r'\bPILLAI\b', r'\bNAMBIAR\b',
+        # Punjabi/Sikh names
+        r'\bSINGH\b', r'\bKAUR\b', r'\bJIT\b', r'\bPAL\b', r'\bDEEP\b',
+        # General Indian patterns
+        r'\bSHARMA\b', r'\bGUPTA\b', r'\bVERMA\b', r'\bAGARWAL\b', r'\bMISHRA\b',
+        # South Indian specific
+        r'\bBALAKRISHNAN\b', r'\bRAMAKRISHNAN\b', r'\bVENKATESH\b', r'\bSRINIVASAN\b',
+        r'\bMURALI\b', r'\bSUNIL\b', r'\bANIL\b', r'\bVIJAY\b', r'\bRAJESH\b'
+    ]
+    
+    # Score each race based on pattern matches
+    malay_score = sum(1 for pattern in malay_patterns if re.search(pattern, name))
+    chinese_score = sum(1 for pattern in chinese_patterns if re.search(pattern, name))
+    indian_score = sum(1 for pattern in indian_patterns if re.search(pattern, name))
+    
+    # Additional logic for mixed names or ambiguous cases
+    
+    # If multiple BIN/BINTI found, strongly Malay
+    if len(re.findall(r'\b(BIN|BINTI)\b', name)) >= 2:
+        malay_score += 3
+    
+    # If single Chinese character names (common pattern)
+    chinese_single_char_pattern = r'\b[A-Z]\s+[A-Z]{2,4}\s+[A-Z]{2,6}\b'
+    if re.search(chinese_single_char_pattern, name):
+        chinese_score += 2
+        
+    # Special case: Names with both patterns (mixed heritage)
+    if malay_score > 0 and chinese_score > 0:
+        # Favor the higher score but reduce confidence
+        if malay_score > chinese_score:
+            malay_score += 1
+        else:
+            chinese_score += 1
+    
+    # Determine race based on highest score
+    max_score = max(malay_score, chinese_score, indian_score)
+    
+    if max_score == 0:
+        return 'OTHER'  # No clear patterns found
+    elif malay_score == max_score:
+        return 'MALAY'
+    elif chinese_score == max_score:
+        return 'CHINESE'
+    elif indian_score == max_score:
+        return 'INDIAN'
+    else:
+        return 'OTHER'
+
+
+def update_patient_race_if_empty(patient):
+    """
+    Update patient's race field if it's empty by inferring from name
+    
+    Args:
+        patient: Pesakit object
+        
+    Returns:
+        bool: True if race was updated, False otherwise
+    """
+    if patient.bangsa or not patient.nama:
+        return False  # Race already set or no name to work with
+    
+    inferred_race = infer_race_from_name(patient.nama)
+    
+    if inferred_race != 'OTHER':
+        patient.bangsa = inferred_race
+        patient.save(update_fields=['bangsa'])
+        print(f"DEBUG: Updated patient {patient.id} race to {inferred_race} based on name '{patient.nama}'")
+        return True
+    
+    return False
