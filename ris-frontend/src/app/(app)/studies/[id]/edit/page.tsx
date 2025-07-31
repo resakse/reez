@@ -211,6 +211,11 @@ export default function EditStudyPage() {
 
   useEffect(() => {
     if (studyId && user) {
+      // Check if user has permission to edit studies
+      if (!user.is_superuser && !user.is_staff) {
+        setError('Access denied. Only staff members can edit studies.');
+        return;
+      }
       fetchStudyData();
     }
   }, [studyId, user, fetchStudyData]);

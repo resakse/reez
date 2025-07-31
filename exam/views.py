@@ -32,6 +32,12 @@ from rest_framework.parsers import MultiPartParser, FileUploadParser
 from rest_framework.renderers import JSONRenderer
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
+from rest_framework.pagination import PageNumberPagination
+
+class CustomPagination(PageNumberPagination):
+    page_size = 25
+    page_size_query_param = 'page_size'
+    max_page_size = 100
 from .serializers import (
     ModalitiSerializer, PartSerializer, ExamSerializer, 
     DaftarSerializer, PemeriksaanSerializer, 
@@ -178,6 +184,7 @@ class PemeriksaanViewSet(viewsets.ModelViewSet):
     search_fields = ['no_xray', 'daftar__pesakit__nama', 'daftar__pemohon', 'exam__exam']
     ordering_fields = ['no_xray', 'created', 'daftar__tarikh']
     ordering = ['-no_xray']  # Default ordering by X-ray number descending
+    pagination_class = CustomPagination
 
     def get_queryset(self):
         queryset = super().get_queryset()

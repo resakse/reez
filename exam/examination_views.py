@@ -4,7 +4,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django_filters import rest_framework as filters
 from django.db.models import Q
-from .models import Pemeriksaan, Exam, Daftar
+from .models import Pemeriksaan, Exam, Daftar, Modaliti
 from .serializers import PemeriksaanSerializer
 from wad.models import Ward
 
@@ -17,13 +17,14 @@ class PemeriksaanFilter(filters.FilterSet):
     exam_type = filters.ModelChoiceFilter(field_name='exam', queryset=Exam.objects.all())
     pemohon = filters.CharFilter(field_name='daftar__pemohon', lookup_expr='icontains')
     ward = filters.ModelChoiceFilter(field_name='daftar__rujukan', queryset=Ward.objects.all())
+    modality = filters.ModelChoiceFilter(field_name='exam__modaliti', queryset=Modaliti.objects.all())
     klinik = filters.CharFilter(method='filter_klinik')
     patient_name = filters.CharFilter(field_name='daftar__pesakit__nama', lookup_expr='icontains')
     no_xray = filters.CharFilter(field_name='no_xray', lookup_expr='icontains')
     
     class Meta:
         model = Pemeriksaan
-        fields = ['date_from', 'date_to', 'exam_type', 'pemohon', 'ward', 'klinik', 'patient_name', 'no_xray']
+        fields = ['date_from', 'date_to', 'exam_type', 'pemohon', 'ward', 'modality', 'klinik', 'patient_name', 'no_xray']
     
     def filter_klinik(self, queryset, name, value):
         """

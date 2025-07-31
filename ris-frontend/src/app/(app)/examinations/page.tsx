@@ -17,7 +17,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Badge } from '@/components/ui/badge';
-import { Search, Filter, Calendar, User, Building2, Stethoscope, Eye } from 'lucide-react';
+import { Search, Filter, Calendar, User, Building2, Stethoscope, Eye, Edit, ChevronLeft, ChevronRight } from 'lucide-react';
 import AuthService from '@/lib/auth';
 import Link from 'next/link';
 import flatpickr from 'flatpickr';
@@ -38,10 +38,12 @@ interface Examination {
   laterality?: string;
   created: string;
   modified: string;
+  study_instance_uid?: string;
   daftar_info: {
     id: number;
     tarikh: string;
     pemohon?: string;
+    study_instance_uid?: string;
     rujukan?: {
       id: number;
       wad: string;
@@ -98,6 +100,15 @@ export default function ExaminationsPage() {
     modality: '',
   });
   
+  const [dateRange, setDateRange] = useState<string[]>([]);
+  const dateRangeRef = useRef<HTMLInputElement>(null);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  
   // Debounced search effect for search field
   useEffect(() => {
     if (filters.search === '') {
@@ -113,8 +124,25 @@ export default function ExaminationsPage() {
 
     return () => clearTimeout(timeoutId);
   }, [filters.search]);
-  const [dateRange, setDateRange] = useState<string[]>([]);
-  const dateRangeRef = useRef<HTMLInputElement>(null);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters, pageSize]);
+
+  // Fetch data when filters change
+  useEffect(() => {
+    if (user) {
+      fetchExaminationsWithFilters(filters);
+    }
+  }, [user, filters]);
+
+  // Fetch data when page or pageSize changes
+  useEffect(() => {
+    if (user) {
+      fetchExaminationsWithFilters(filters);
+    }
+  }, [currentPage, pageSize, user]);
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -129,18 +157,28 @@ export default function ExaminationsPage() {
         if (examTypesRes.ok) {
           const examTypesData = await examTypesRes.json();
           console.log('Exam Types Data:', examTypesData);
-          console.log('Exam Names:', examTypesData.map(exam => exam.exam));
-          setExamTypes(examTypesData);
+          
+          // Handle paginated response
+          const examTypesArray = examTypesData.results || examTypesData;
+          if (Array.isArray(examTypesArray)) {
+            console.log('Exam Names:', examTypesArray.map(exam => exam.exam));
+            setExamTypes(examTypesArray);
+          } else {
+            console.error('Exam Types API did not return an array:', examTypesData);
+            setExamTypes([]);
+          }
         }
 
         if (wardsRes.ok) {
           const wardsData = await wardsRes.json();
-          setWards(wardsData);
+          const wardsArray = wardsData.results || wardsData;
+          setWards(Array.isArray(wardsArray) ? wardsArray : []);
         }
 
         if (modalitiesRes.ok) {
           const modalitiesData = await modalitiesRes.json();
-          setModalities(modalitiesData);
+          const modalitiesArray = modalitiesData.results || modalitiesData;
+          setModalities(Array.isArray(modalitiesArray) ? modalitiesArray : []);
         }
 
         // Fetch examinations
@@ -209,9 +247,14 @@ export default function ExaminationsPage() {
       console.log('fetchExaminations called with filters:', filtersToUse);
       setLoading(true);
       
-      // Build query parameters
+      // Build query parameters with proper pagination
       const params = new URLSearchParams();
       params.append('ordering', '-no_xray'); // Sort by x-ray number descending
+      
+      // Add pagination parameters
+      params.append('page', currentPage.toString());
+      params.append('page_size', pageSize.toString());
+      
       if (filtersToUse.search) params.append('search', filtersToUse.search);
       
       // Handle date range
@@ -241,10 +284,30 @@ export default function ExaminationsPage() {
       }
 
       const data = await res.json();
+      console.log('Raw API response:', data);
+      
       const results = data.results || data;
+      console.log('Results array length:', results.length);
+      console.log('First few results:', results.slice(0, 3));
+      
       setExaminations(results);
       
-      // Extract unique pemohon values
+      // Update pagination info from API response
+      if (data.count !== undefined) {
+        console.log('Server-side pagination - API returned count:', data.count, 'pageSize:', pageSize);
+        console.log('Setting examinations to', results.length, 'items');
+        setTotalCount(data.count);
+        setTotalPages(Math.ceil(data.count / pageSize));
+      } else {
+        // Fallback if API doesn't provide count
+        console.log('No count in API response, using results length:', results.length);
+        setTotalCount(results.length);
+        setTotalPages(1);
+      }
+      
+      console.log('Final state - examinations:', results.length, 'totalCount:', data.count || results.length, 'totalPages:', Math.ceil((data.count || results.length) / pageSize));
+      
+      // Extract unique pemohon values from current page results
       const pemohonSet = new Set<string>();
       
       results.forEach((exam: Examination) => {
@@ -524,12 +587,29 @@ export default function ExaminationsPage() {
                         }
                       </TableCell>
                       <TableCell>
-                        <Button asChild variant="outline" size="sm">
-                          <Link href={`/examinations/${exam.id}`}>
-                            <Eye className="h-4 w-4 mr-1" />
-                            View
-                          </Link>
-                        </Button>
+                        <div className="flex gap-2">
+                          {exam.daftar_info.study_instance_uid ? (
+                            <Button asChild variant="outline" size="sm">
+                              <Link href={`/pacs-browser/${exam.daftar_info.study_instance_uid}`}>
+                                <Eye className="h-4 w-4 mr-1" />
+                                View
+                              </Link>
+                            </Button>
+                          ) : (
+                            <Button variant="outline" size="sm" disabled>
+                              <Eye className="h-4 w-4 mr-1" />
+                              View
+                            </Button>
+                          )}
+                          {(user?.is_superuser || user?.is_staff) && (
+                            <Button asChild variant="outline" size="sm">
+                              <Link href={`/studies/${exam.daftar_info.id}/edit`}>
+                                <Edit className="h-4 w-4 mr-1" />
+                                Edit
+                              </Link>
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -538,11 +618,102 @@ export default function ExaminationsPage() {
             </Table>
           </div>
 
-          {examinations.length > 0 && (
+          {/* Pagination Controls - Bottom (DataTable Style) */}
+          {totalCount > 0 && (
             <div className="flex items-center justify-between pt-4">
-              <p className="text-sm text-gray-600">
-                Showing {examinations.length} examination(s)
-              </p>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="pageSize" className="text-sm">Show</Label>
+                <Select value={pageSize.toString()} onValueChange={(value) => setPageSize(parseInt(value))}>
+                  <SelectTrigger id="pageSize" className="w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span className="text-sm text-muted-foreground">entries</span>
+              </div>
+              
+              <div className="text-sm text-muted-foreground">
+                Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalCount)} of {totalCount} examinations
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                >
+                  First
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(currentPage - 1)}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Previous
+                </Button>
+                
+                {/* Page numbers */}
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    
+                    return (
+                      <Button
+                        key={`page-${pageNum}`}
+                        variant={currentPage === pageNum ? "default" : "outline"}
+                        size="sm"
+                        className="w-8 h-8 p-0"
+                        onClick={() => {
+                          console.log('Clicking page:', pageNum);
+                          setCurrentPage(pageNum);
+                        }}
+                      >
+                        {pageNum}
+                      </Button>
+                    );
+                  })}
+                </div>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    console.log('Next clicked - currentPage:', currentPage, 'totalPages:', totalPages);
+                    setCurrentPage(currentPage + 1);
+                  }}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage === totalPages}
+                >
+                  Last
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>
