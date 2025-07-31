@@ -74,6 +74,11 @@ export default function PacsBrowserPage() {
   const [studyDescription, setStudyDescription] = useState('');
   const [klinik, setKlinik] = useState('all');
 
+  // Debounced text filters
+  const [debouncedPatientName, setDebouncedPatientName] = useState('');
+  const [debouncedPatientId, setDebouncedPatientId] = useState('');
+  const [debouncedStudyDescription, setDebouncedStudyDescription] = useState('');
+
   const formatDate = (dateString: string): string => {
     if (!dateString || dateString.length !== 8) return dateString;
     return `${dateString.substring(0, 4)}-${dateString.substring(4, 6)}-${dateString.substring(6, 8)}`;
@@ -122,26 +127,52 @@ export default function PacsBrowserPage() {
     return '';
   };
 
+  // Debounce text inputs to prevent excessive filtering
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedPatientName(patientName);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [patientName]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedPatientId(patientId);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [patientId]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedStudyDescription(studyDescription);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [studyDescription]);
+
   // Auto-filter studies based on current filter values
   const filteredStudies = useMemo(() => {
-    let filtered = [...allStudies];
+    if (allStudies.length === 0) return [];
+    
+    let filtered = allStudies;
 
-    // Apply text filters only if they meet minimum length requirement
-    if (patientName.length >= 3) {
+    // Apply text filters only if they meet minimum length requirement (use debounced values)
+    if (debouncedPatientName.length >= 3) {
+      const searchTerm = debouncedPatientName.toLowerCase();
       filtered = filtered.filter(study => 
-        study.PatientName?.toLowerCase().includes(patientName.toLowerCase())
+        study.PatientName?.toLowerCase().includes(searchTerm)
       );
     }
 
-    if (patientId.length >= 3) {
+    if (debouncedPatientId.length >= 3) {
       filtered = filtered.filter(study => 
-        study.PatientID?.includes(patientId)
+        study.PatientID?.includes(debouncedPatientId)
       );
     }
 
-    if (studyDescription.length >= 3) {
+    if (debouncedStudyDescription.length >= 3) {
+      const searchTerm = debouncedStudyDescription.toLowerCase();
       filtered = filtered.filter(study => 
-        study.StudyDescription?.toLowerCase().includes(studyDescription.toLowerCase())
+        study.StudyDescription?.toLowerCase().includes(searchTerm)
       );
     }
 
@@ -151,8 +182,9 @@ export default function PacsBrowserPage() {
     }
 
     if (klinik && klinik !== 'all') {
+      const searchTerm = klinik.toLowerCase();
       filtered = filtered.filter(study => 
-        study.Klinik && study.Klinik.toLowerCase().includes(klinik.toLowerCase())
+        study.Klinik && study.Klinik.toLowerCase().includes(searchTerm)
       );
     }
 
@@ -168,7 +200,7 @@ export default function PacsBrowserPage() {
     }
 
     return filtered;
-  }, [allStudies, patientName, patientId, studyDescription, modality, klinik, dateFrom, dateTo]);
+  }, [allStudies, debouncedPatientName, debouncedPatientId, debouncedStudyDescription, modality, klinik, dateFrom, dateTo]);
 
   // Update displayed studies when filtered studies change
   useEffect(() => {
@@ -274,7 +306,10 @@ export default function PacsBrowserPage() {
     setStudyDescription('');
     setKlinik('all');
     setError(null);
-    // Studies will be automatically filtered by the useMemo
+    // Clear debounced values immediately
+    setDebouncedPatientName('');
+    setDebouncedPatientId('');
+    setDebouncedStudyDescription('');
   };
 
   const viewStudy = (study: LegacyStudy) => {
