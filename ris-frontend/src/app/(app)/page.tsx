@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, memo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -61,6 +61,184 @@ interface BodypartsExamTypes {
   exam_types: { exam_type: string; count: number; percentage: number }[];
 }
 
+// Memoized chart components to prevent re-renders when only system resources change
+const ModalityChart = memo(({ data, period }: { data: ModalityStats[], period: string }) => (
+  <Card>
+    <CardHeader>
+      <CardTitle>Modality Distribution</CardTitle>
+    </CardHeader>
+    <CardContent>
+      {data && data.length > 0 ? (
+        <div className="h-64">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={data}
+                dataKey="count"
+                nameKey="modality"
+                cx="50%"
+                cy="50%"
+                innerRadius={40}
+                outerRadius={80}
+                label={({modality, count, percentage}) => `${modality}: ${count} (${percentage}%)`}
+              >
+                {data.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={`hsl(${index * 137.5 % 360}, 70%, 50%)`} />
+                ))}
+              </Pie>
+              <Tooltip formatter={(value, name) => [value, `${name} examinations`]} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      ) : (
+        <div className="text-center text-muted-foreground py-8">
+          No data available for {period.toLowerCase()}
+        </div>
+      )}
+    </CardContent>
+  </Card>
+));
+
+const AgeChart = memo(({ data, period }: { data: any[], period: string }) => (
+  <Card>
+    <CardHeader>
+      <CardTitle>Age Demographics</CardTitle>
+    </CardHeader>
+    <CardContent>
+      {data && data.length > 0 ? (
+        <div className="h-64">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="range" />
+              <YAxis />
+              <Tooltip formatter={(value, name) => [value, name === 'count' ? 'Patients' : name]} />
+              <Bar dataKey="count" fill="#3b82f6">
+                <LabelList dataKey="count" position="top" />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      ) : (
+        <div className="text-center text-muted-foreground py-8">
+          No data available for {period.toLowerCase()}
+        </div>
+      )}
+    </CardContent>
+  </Card>
+));
+
+const GenderChart = memo(({ data, period }: { data: any[], period: string }) => (
+  <Card>
+    <CardHeader>
+      <CardTitle>Gender Distribution</CardTitle>
+    </CardHeader>
+    <CardContent>
+      {data && data.length > 0 ? (
+        <div className="h-64">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={data}
+                dataKey="count"
+                nameKey="gender"
+                cx="50%"
+                cy="50%"
+                innerRadius={40}
+                outerRadius={80}
+                label={({gender, count, percentage}) => `${gender === 'M' ? 'Male' : 'Female'}: ${count} (${percentage}%)`}
+              >
+                {data.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.gender === 'M' ? '#3b82f6' : '#ec4899'} />
+                ))}
+              </Pie>
+              <Tooltip formatter={(value, name) => [value, `${name === 'M' ? 'Male' : 'Female'} patients`]} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      ) : (
+        <div className="text-center text-muted-foreground py-8">
+          No data available for {period.toLowerCase()}
+        </div>
+      )}
+    </CardContent>
+  </Card>
+));
+
+const BodypartsChart = memo(({ data, period }: { data: any[], period: string }) => (
+  <Card>
+    <CardHeader>
+      <CardTitle>Body Parts Distribution</CardTitle>
+    </CardHeader>
+    <CardContent>
+      {data && data.length > 0 ? (
+        <div className="h-64">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={data}
+                dataKey="count"
+                nameKey="bodypart"
+                cx="50%"
+                cy="50%"
+                innerRadius={40}
+                outerRadius={80}
+                label={({bodypart, count, percentage}) => `${bodypart}: ${count} (${percentage}%)`}
+              >
+                {data.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={`hsl(${200 + index * 45}, 70%, 50%)`} />
+                ))}
+              </Pie>
+              <Tooltip formatter={(value, name) => [value, `${name} examinations`]} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      ) : (
+        <div className="text-center text-muted-foreground py-8">
+          No data available for {period.toLowerCase()}
+        </div>
+      )}
+    </CardContent>
+  </Card>
+));
+
+const ExamTypesChart = memo(({ data, period }: { data: any[], period: string }) => (
+  <Card>
+    <CardHeader>
+      <CardTitle>Exam Types Distribution</CardTitle>
+    </CardHeader>
+    <CardContent>
+      {data && data.length > 0 ? (
+        <div className="h-64">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={data}
+                dataKey="count"
+                nameKey="exam_type"
+                cx="50%"
+                cy="50%"
+                innerRadius={40}
+                outerRadius={80}
+                label={({exam_type, count, percentage}) => `${exam_type}: ${count} (${percentage}%)`}
+              >
+                {data.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={`hsl(${280 + index * 50}, 70%, 50%)`} />
+                ))}
+              </Pie>
+              <Tooltip formatter={(value, name) => [value, `${name} examinations`]} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      ) : (
+        <div className="text-center text-muted-foreground py-8">
+          No data available for {period.toLowerCase()}
+        </div>
+      )}
+    </CardContent>
+  </Card>
+));
+
 export default function Dashboard() {
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('today');
   const [stats, setStats] = useState<Record<TimePeriod, DashboardStats>>({
@@ -87,6 +265,7 @@ export default function Dashboard() {
     all_time: [],
   });
 
+
   const [storageInfo, setStorageInfo] = useState<StorageInfo>({
     primary_storage: { total_gb: 0, used_gb: 0, free_gb: 0, usage_percentage: 0 },
     growth_analysis: { daily_growth_gb: 0, monthly_growth_gb: 0, days_until_full: 0, months_until_full: 0, daily_exam_count: 0 },
@@ -104,16 +283,59 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [dataLoaded, setDataLoaded] = useState(false);
+
   useEffect(() => {
-    fetchDashboardData();
+    // Only fetch initial data once
+    if (!dataLoaded) {
+      fetchDashboardData();
+    }
     
-    // Set up auto-refresh for system resources every 5 seconds
-    const interval = setInterval(() => {
-      fetchSystemResources();
-    }, 5000);
+    // Set up WebSocket connection for ALL live dashboard updates
+    const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const wsUrl = API_BASE.replace('http://', 'ws://').replace('https://', 'wss://') + '/ws/dashboard/';
+    const ws = new WebSocket(wsUrl);
     
-    return () => clearInterval(interval);
-  }, []);
+    ws.onopen = () => {
+      console.log('WebSocket connected for live dashboard updates');
+    };
+    
+    ws.onmessage = (event) => {
+      try {
+        const dashboardUpdate = JSON.parse(event.data);
+        
+        // ONLY update system resources and storage - NEVER touch chart data
+        if (dashboardUpdate.type === 'system_resources') {
+          setStorageInfo(prev => ({
+            ...prev,
+            system_resources: dashboardUpdate.data
+          }));
+        } else if (dashboardUpdate.type === 'storage_info') {
+          setStorageInfo(prev => ({
+            ...prev,
+            primary_storage: dashboardUpdate.data.primary_storage,
+            growth_analysis: dashboardUpdate.data.growth_analysis
+          }));
+        }
+        // Explicitly ignore all chart-related updates to prevent flashing
+        
+      } catch (err) {
+        console.warn('Failed to parse WebSocket message:', err);
+      }
+    };
+    
+    ws.onerror = (error) => {
+      console.warn('WebSocket error:', error);
+    };
+    
+    ws.onclose = () => {
+      console.log('WebSocket connection closed');
+    };
+    
+    return () => {
+      ws.close();
+    };
+  }, [dataLoaded]);
 
   const fetchDashboardData = async () => {
     try {
@@ -184,75 +406,94 @@ export default function Dashboard() {
         bodypartsRes.json()
       ]);
 
+      // Update stats (metric cards)
       setStats(statsData || {});
+      
+      // Check if chart data has actually changed before updating
+      const periods: TimePeriod[] = ['today', 'week', 'month', 'year', 'all_time'];
       
       // Handle demographics data structure
       const demographicsWithDefaults: Record<TimePeriod, Demographics> = {} as Record<TimePeriod, Demographics>;
-      const periods: TimePeriod[] = ['today', 'week', 'month', 'year', 'all_time'];
       periods.forEach(period => {
         demographicsWithDefaults[period] = demographicsData.by_period?.[period] || { age_groups: [], gender: [], race: [] };
       });
-      setDemographics(demographicsWithDefaults);
+      
+      // Compare actual data values from API, not current state
+      const currentDemographicsStr = JSON.stringify(demographics);
+      const newDemographicsStr = JSON.stringify(demographicsWithDefaults);
+      
+      console.log('Current demographics:', currentDemographicsStr.substring(0, 100));
+      console.log('New demographics:', newDemographicsStr.substring(0, 100));
+      console.log('Are they equal?', currentDemographicsStr === newDemographicsStr);
+      
+      // Only update if the stringified data is actually different
+      if (currentDemographicsStr !== newDemographicsStr) {
+        console.log('Demographics data ACTUALLY changed, updating charts');
+        setDemographics(demographicsWithDefaults);
+      } else {
+        console.log('Demographics data is SAME, NOT updating');
+      }
       
       // Handle modality stats data structure  
       const modalityWithDefaults: Record<TimePeriod, ModalityStats[]> = {} as Record<TimePeriod, ModalityStats[]>;
       periods.forEach(period => {
         modalityWithDefaults[period] = modalityData.by_period?.[period] || [];
       });
-      setModalityStats(modalityWithDefaults);
       
-      setStorageInfo(storageData || {
-        primary_storage: { total_gb: 0, used_gb: 0, free_gb: 0, usage_percentage: 0 },
-        growth_analysis: { daily_growth_gb: 0, monthly_growth_gb: 0, days_until_full: 0, months_until_full: 0, daily_exam_count: 0 },
-        system_resources: { cpu_usage_percent: 0, ram_total_gb: 0, ram_used_gb: 0, ram_available_gb: 0, ram_usage_percent: 0, disk_read_mb: 0, disk_write_mb: 0 }
-      });
+      const currentModalityStr = JSON.stringify(modalityStats);
+      const newModalityStr = JSON.stringify(modalityWithDefaults);
+      
+      if (currentModalityStr !== newModalityStr) {
+        console.log('Modality data ACTUALLY changed, updating charts');
+        setModalityStats(modalityWithDefaults);
+      } else {
+        console.log('Modality data is SAME, NOT updating');
+      }
 
       // Handle bodyparts and exam types data structure
       const bodypartsWithDefaults: Record<TimePeriod, BodypartsExamTypes> = {} as Record<TimePeriod, BodypartsExamTypes>;
       periods.forEach(period => {
         bodypartsWithDefaults[period] = bodypartsData.by_period?.[period] || { bodyparts: [], exam_types: [] };
       });
-      setBodypartsExamTypes(bodypartsWithDefaults);
+      
+      const currentBodypartsStr = JSON.stringify(bodypartsExamTypes);
+      const newBodypartsStr = JSON.stringify(bodypartsWithDefaults);
+      
+      if (currentBodypartsStr !== newBodypartsStr) {
+        console.log('Bodyparts data ACTUALLY changed, updating charts');
+        setBodypartsExamTypes(bodypartsWithDefaults);
+      } else {
+        console.log('Bodyparts data is SAME, NOT updating');
+      }
+      
+      // ALWAYS set storage info (but only non-system-resources parts on initial load)
+      setStorageInfo(prev => ({
+        primary_storage: storageData.primary_storage || prev.primary_storage,
+        growth_analysis: storageData.growth_analysis || prev.growth_analysis,
+        system_resources: prev.system_resources // Keep existing system resources from WebSocket
+      }));
 
     } catch (err) {
       console.error('Dashboard fetch error:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setLoading(false);
+      setDataLoaded(true);
     }
   };
 
-  const fetchSystemResources = async () => {
-    try {
-      const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      
-      const response = await fetch(`${API_BASE}/api/dashboard/storage/`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (response.ok) {
-        const storageData = await response.json();
-        
-        // Only update system resources, keep other storage data intact
-        setStorageInfo(prev => ({
-          ...prev,
-          system_resources: storageData.system_resources || prev.system_resources
-        }));
-      }
-    } catch (err) {
-      // Silently fail for system resource updates to avoid disrupting main dashboard
-      console.warn('Failed to update system resources:', err);
-    }
-  };
 
   const currentStats = stats[selectedPeriod];
   const currentDemographics = demographics[selectedPeriod];
   const currentModalities = modalityStats[selectedPeriod];
   const currentBodypartsExamTypes = bodypartsExamTypes[selectedPeriod];
+
+  // Memoize chart data to prevent re-renders when only system resources change
+  const memoizedChartData = useMemo(() => ({
+    demographics: currentDemographics,
+    modalities: currentModalities,
+    bodypartsExamTypes: currentBodypartsExamTypes
+  }), [currentDemographics, currentModalities, currentBodypartsExamTypes]);
 
   const getPeriodLabel = (period: TimePeriod) => {
     switch (period) {
@@ -320,7 +561,10 @@ export default function Dashboard() {
           <Button 
             variant="outline" 
             size="sm" 
-            onClick={fetchDashboardData}
+            onClick={() => {
+              console.log('Manual refresh clicked');
+              fetchDashboardData();
+            }}
             className="ml-2"
           >
             <TrendingUp className="h-4 w-4 mr-2" />
@@ -389,107 +633,25 @@ export default function Dashboard() {
       {/* Charts and Analytics Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Modality Distribution */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Modality Distribution</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {currentModalities && currentModalities.length > 0 ? (
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={currentModalities}
-                      dataKey="count"
-                      nameKey="modality"
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={40}
-                      outerRadius={80}
-                      label={({modality, count, percentage}) => `${modality}: ${count} (${percentage}%)`}
-                    >
-                      {currentModalities.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={`hsl(${index * 137.5 % 360}, 70%, 50%)`} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value, name) => [value, `${name} examinations`]} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <div className="text-center text-muted-foreground py-8">
-                No data available for {getPeriodLabel(selectedPeriod).toLowerCase()}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <ModalityChart 
+          data={memoizedChartData.modalities} 
+          period={getPeriodLabel(selectedPeriod)}
+        />
 
         {/* Age Demographics */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Age Demographics</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {currentDemographics && currentDemographics.age_groups && currentDemographics.age_groups.length > 0 ? (
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={currentDemographics.age_groups} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="range" />
-                    <YAxis />
-                    <Tooltip formatter={(value, name) => [value, name === 'count' ? 'Patients' : name]} />
-                    <Bar dataKey="count" fill="#3b82f6">
-                      <LabelList dataKey="count" position="top" />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <div className="text-center text-muted-foreground py-8">
-                No data available for {getPeriodLabel(selectedPeriod).toLowerCase()}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <AgeChart 
+          data={memoizedChartData.demographics?.age_groups || []} 
+          period={getPeriodLabel(selectedPeriod)}
+        />
       </div>
 
       {/* Bottom Row - Gender Distribution and Storage */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Gender Distribution */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Gender Distribution</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {currentDemographics && currentDemographics.gender && currentDemographics.gender.length > 0 ? (
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={currentDemographics.gender}
-                      dataKey="count"
-                      nameKey="gender"
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={40}
-                      outerRadius={80}
-                      label={({gender, count, percentage}) => `${gender === 'M' ? 'Male' : 'Female'}: ${count} (${percentage}%)`}
-                    >
-                      {currentDemographics.gender.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.gender === 'M' ? '#3b82f6' : '#ec4899'} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value, name) => [value, `${name === 'M' ? 'Male' : 'Female'} patients`]} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <div className="text-center text-muted-foreground py-8">
-                No data available for {getPeriodLabel(selectedPeriod).toLowerCase()}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <GenderChart 
+          data={memoizedChartData.demographics?.gender || []} 
+          period={getPeriodLabel(selectedPeriod)}
+        />
 
         {/* Storage Management */}
         <Card>
@@ -596,77 +758,15 @@ export default function Dashboard() {
 
       {/* Body Parts and Exam Types Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Body Parts Distribution */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Body Parts Distribution</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {currentBodypartsExamTypes && currentBodypartsExamTypes.bodyparts && currentBodypartsExamTypes.bodyparts.length > 0 ? (
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={currentBodypartsExamTypes.bodyparts}
-                      dataKey="count"
-                      nameKey="bodypart"
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={40}
-                      outerRadius={80}
-                      label={({bodypart, count, percentage}) => `${bodypart}: ${count} (${percentage}%)`}
-                    >
-                      {currentBodypartsExamTypes.bodyparts.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={`hsl(${200 + index * 45}, 70%, 50%)`} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value, name) => [value, `${name} examinations`]} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <div className="text-center text-muted-foreground py-8">
-                No data available for {getPeriodLabel(selectedPeriod).toLowerCase()}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Exam Types Distribution */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Exam Types Distribution</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {currentBodypartsExamTypes && currentBodypartsExamTypes.exam_types && currentBodypartsExamTypes.exam_types.length > 0 ? (
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={currentBodypartsExamTypes.exam_types}
-                      dataKey="count"
-                      nameKey="exam_type"
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={40}
-                      outerRadius={80}
-                      label={({exam_type, count, percentage}) => `${exam_type}: ${count} (${percentage}%)`}
-                    >
-                      {currentBodypartsExamTypes.exam_types.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={`hsl(${280 + index * 50}, 70%, 50%)`} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value, name) => [value, `${name} examinations`]} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <div className="text-center text-muted-foreground py-8">
-                No data available for {getPeriodLabel(selectedPeriod).toLowerCase()}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <BodypartsChart 
+          data={memoizedChartData.bodypartsExamTypes?.bodyparts || []} 
+          period={getPeriodLabel(selectedPeriod)}
+        />
+        
+        <ExamTypesChart 
+          data={memoizedChartData.bodypartsExamTypes?.exam_types || []} 
+          period={getPeriodLabel(selectedPeriod)}
+        />
       </div>
     </div>
   );

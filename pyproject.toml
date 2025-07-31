@@ -25,6 +25,12 @@ djangorestframework-simplejwt = "^5.5.1"
 django-cors-headers = "^4.7.0"
 pydicom = "^3.0.1"
 pynetdicom = "^3.0.3"
+channels = "^4.3.0"
+channels-redis = "^4.3.0"
+psutil = "^7.0.0"
+daphne = "^4.2.1"
+cryptography = "<42"
+pyopenssl = ">=23.0.0"
 
 [tool.poetry.dev-dependencies]
 
