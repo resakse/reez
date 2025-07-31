@@ -490,6 +490,7 @@ def import_legacy_study(request):
                 'referring_physician': referring_physician,
                 'accession_number': accession_number,
                 'requesting_service': '',  # Not available in PACS import
+                'institution_name': institution_name,  # Add institution name for accession generation
                 'modality': modality
             }
             

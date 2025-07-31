@@ -32,6 +32,29 @@ import flatpickr from 'flatpickr';
 import 'flatpickr/dist/flatpickr.min.css';
 import 'flatpickr/dist/themes/dark.css';
 
+// SweetAlert2 theme support styles
+const swalStyles = `
+  .dark-swal-popup .swal2-html-container {
+    color: #f9fafb !important;
+  }
+  .light-swal-popup .swal2-html-container {
+    color: #1f2937 !important;
+  }
+  .dark-swal-title {
+    color: #f9fafb !important;
+  }
+  .light-swal-title {
+    color: #1f2937 !important;
+  }
+`;
+
+// Inject styles
+if (typeof window !== 'undefined') {
+  const styleElement = document.createElement('style');
+  styleElement.textContent = swalStyles;
+  document.head.appendChild(styleElement);
+}
+
 interface LegacyStudy {
   ID: string;
   StudyInstanceUID: string;
@@ -94,6 +117,20 @@ export default function PacsBrowserPage() {
   // Debounced text filters
   const [debouncedPatientName, setDebouncedPatientName] = useState('');
   const [debouncedPatientId, setDebouncedPatientId] = useState('');
+
+  // Theme-aware SweetAlert2 configuration
+  const getSwalConfig = () => {
+    const isDark = document.documentElement.classList.contains('dark');
+    return {
+      background: isDark ? '#1f2937' : '#ffffff',
+      color: isDark ? '#f9fafb' : '#1f2937',
+      customClass: {
+        popup: isDark ? 'dark-swal-popup' : 'light-swal-popup',
+        title: isDark ? 'dark-swal-title' : 'light-swal-title',
+        htmlContainer: isDark ? 'dark-swal-content' : 'light-swal-content'
+      }
+    };
+  };
 
   // Initialize flatpickr for date range
   useEffect(() => {
@@ -360,28 +397,11 @@ export default function PacsBrowserPage() {
           InstitutionName: study.institutionName,
           Ward: study.ward,
           Klinik: study.institutionName || 'Unknown',
-          // DICOM fields - may not be available from backend yet
-          BodyPartExamined: study.bodyPartExamined || study.BodyPartExamined || 
-            // Fallback: generate based on modality for testing
-            (study.modality === 'XR' ? 'CHEST' : 
-             study.modality === 'CT' ? 'ABDOMEN' : 
-             study.modality === 'MR' ? 'BRAIN' : undefined),
-          ProtocolName: study.protocolName || study.ProtocolName ||
-            // Fallback: generate based on modality for testing  
-            (study.modality === 'XR' ? 'Chest PA/AP-REALISM' :
-             study.modality === 'CT' ? 'Abdomen/Pelvis with Contrast' :
-             study.modality === 'MR' ? 'Brain MRI T1/T2' : undefined),
-          AcquisitionDeviceProcessingDescription: study.acquisitionDeviceProcessingDescription || 
-            study.AcquisitionDeviceProcessingDescription ||
-            // Fallback: generate based on modality for testing
-            (study.modality === 'XR' ? 'CHEST,FRN P->A' :
-             study.modality === 'CT' ? 'ABDOMEN,PORTAL VENOUS' :
-             study.modality === 'MR' ? 'BRAIN,T1 WEIGHTED' : undefined),
-          Manufacturer: study.manufacturer || study.Manufacturer || 
-            // Fallback: assign based on some pattern for testing
-            (['FUJIFILM Corporation', 'Siemens Healthcare', 'GE Healthcare', 'Philips Medical'][
-              Math.floor(Math.random() * 4)
-            ])
+          // DICOM fields from backend
+          BodyPartExamined: study.bodyPartExamined || study.BodyPartExamined,
+          ProtocolName: study.protocolName || study.ProtocolName,
+          AcquisitionDeviceProcessingDescription: study.acquisitionDeviceProcessingDescription || study.AcquisitionDeviceProcessingDescription,
+          Manufacturer: study.manufacturer || study.Manufacturer
         };
       });
 
@@ -466,6 +486,10 @@ export default function PacsBrowserPage() {
   };
 
   const importStudy = async (study: LegacyStudy) => {
+    const isDark = document.documentElement.classList.contains('dark');
+    const noteBackgroundColor = isDark ? '#374151' : '#f8f9fa';
+    const noteTextColor = isDark ? '#e5e7eb' : '#6b7280';
+    
     // Show SweetAlert2 confirmation dialog
     const result = await Swal.fire({
       title: 'Import Study to RIS?',
@@ -477,7 +501,7 @@ export default function PacsBrowserPage() {
           <p><strong>Modality:</strong> ${study.Modality || 'Unknown'}</p>
           <p><strong>Description:</strong> ${study.StudyDescription || 'N/A'}</p>
         </div>
-        <div style="background: #f8f9fa; padding: 10px; border-radius: 6px; margin-top: 15px;">
+        <div style="background: ${noteBackgroundColor}; color: ${noteTextColor}; padding: 10px; border-radius: 6px; margin-top: 15px;">
           <small><strong>Note:</strong> This will create a new patient registration and examination record in the RIS database.</small>
         </div>
       `,
@@ -487,7 +511,8 @@ export default function PacsBrowserPage() {
       cancelButtonText: 'Cancel',
       confirmButtonColor: '#3085d6',
       cancelButtonColor: '#d33',
-      width: 500
+      width: 500,
+      ...getSwalConfig()
     });
 
     if (!result.isConfirmed) {
@@ -546,7 +571,8 @@ export default function PacsBrowserPage() {
           `,
           icon: 'success',
           confirmButtonText: 'OK',
-          confirmButtonColor: '#28a745'
+          confirmButtonColor: '#28a745',
+          ...getSwalConfig()
         });
 
       } else {
@@ -557,7 +583,8 @@ export default function PacsBrowserPage() {
             title: 'Permission Denied',
             text: 'Only superusers can import studies to RIS',
             icon: 'error',
-            confirmButtonColor: '#d33'
+            confirmButtonColor: '#d33',
+            ...getSwalConfig()
           });
         } else if (response.status === 400 && data.error?.includes('already imported')) {
           // Update the study status locally
@@ -574,7 +601,8 @@ export default function PacsBrowserPage() {
             title: 'Already Imported',
             text: `This study was already imported as registration ${data.registrationId}`,
             icon: 'warning',
-            confirmButtonColor: '#ffc107'
+            confirmButtonColor: '#ffc107',
+            ...getSwalConfig()
           });
         } else {
           toast.error(data.error || 'Failed to import study');
@@ -582,7 +610,8 @@ export default function PacsBrowserPage() {
             title: 'Import Failed',
             text: data.error || 'Failed to import study',
             icon: 'error',
-            confirmButtonColor: '#d33'
+            confirmButtonColor: '#d33',
+            ...getSwalConfig()
           });
         }
       }
@@ -592,7 +621,8 @@ export default function PacsBrowserPage() {
         title: 'Network Error',
         text: 'Failed to connect to the server. Please try again.',
         icon: 'error',
-        confirmButtonColor: '#d33'
+        confirmButtonColor: '#d33',
+        ...getSwalConfig()
       });
     } finally {
       // Remove from importing set
@@ -718,28 +748,11 @@ export default function PacsBrowserPage() {
           InstitutionName: study.institutionName,
           Ward: study.ward,
           Klinik: study.institutionName || 'Unknown',
-          // DICOM fields - may not be available from backend yet
-          BodyPartExamined: study.bodyPartExamined || study.BodyPartExamined || 
-            // Fallback: generate based on modality for testing
-            (study.modality === 'XR' ? 'CHEST' : 
-             study.modality === 'CT' ? 'ABDOMEN' : 
-             study.modality === 'MR' ? 'BRAIN' : undefined),
-          ProtocolName: study.protocolName || study.ProtocolName ||
-            // Fallback: generate based on modality for testing  
-            (study.modality === 'XR' ? 'Chest PA/AP-REALISM' :
-             study.modality === 'CT' ? 'Abdomen/Pelvis with Contrast' :
-             study.modality === 'MR' ? 'Brain MRI T1/T2' : undefined),
-          AcquisitionDeviceProcessingDescription: study.acquisitionDeviceProcessingDescription || 
-            study.AcquisitionDeviceProcessingDescription ||
-            // Fallback: generate based on modality for testing
-            (study.modality === 'XR' ? 'CHEST,FRN P->A' :
-             study.modality === 'CT' ? 'ABDOMEN,PORTAL VENOUS' :
-             study.modality === 'MR' ? 'BRAIN,T1 WEIGHTED' : undefined),
-          Manufacturer: study.manufacturer || study.Manufacturer || 
-            // Fallback: assign based on some pattern for testing
-            (['FUJIFILM Corporation', 'Siemens Healthcare', 'GE Healthcare', 'Philips Medical'][
-              Math.floor(Math.random() * 4)
-            ])
+          // DICOM fields from backend
+          BodyPartExamined: study.bodyPartExamined || study.BodyPartExamined,
+          ProtocolName: study.protocolName || study.ProtocolName,
+          AcquisitionDeviceProcessingDescription: study.acquisitionDeviceProcessingDescription || study.AcquisitionDeviceProcessingDescription,
+          Manufacturer: study.manufacturer || study.Manufacturer
         }));
 
         // Check import status for all studies

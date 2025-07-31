@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Badge } from '@/components/ui/badge';
 import { Search, Filter, Calendar, User, Building2, Stethoscope, Eye } from 'lucide-react';
 import AuthService from '@/lib/auth';
@@ -76,7 +77,7 @@ interface FilterParams {
   exam_type: string;
   pemohon: string;
   ward: string;
-  klinik: string;
+  modality: string;
 }
 
 export default function ExaminationsPage() {
@@ -84,6 +85,8 @@ export default function ExaminationsPage() {
   const [examinations, setExaminations] = useState<Examination[]>([]);
   const [examTypes, setExamTypes] = useState<ExamType[]>([]);
   const [wards, setWards] = useState<Ward[]>([]);
+  const [modalities, setModalities] = useState<any[]>([]);
+  const [uniquePemohon, setUniquePemohon] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<FilterParams>({
@@ -92,28 +95,52 @@ export default function ExaminationsPage() {
     exam_type: '',
     pemohon: '',
     ward: '',
-    klinik: '',
+    modality: '',
   });
+  
+  // Debounced search effect for search field
+  useEffect(() => {
+    if (filters.search === '') {
+      // If search is empty, trigger immediately
+      fetchExaminationsWithFilters(filters);
+      return;
+    }
+    
+    // Debounce search input
+    const timeoutId = setTimeout(() => {
+      fetchExaminationsWithFilters(filters);
+    }, 800);
+
+    return () => clearTimeout(timeoutId);
+  }, [filters.search]);
   const [dateRange, setDateRange] = useState<string[]>([]);
   const dateRangeRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        // Fetch exam types and wards for filter dropdowns
-        const [examTypesRes, wardsRes] = await Promise.all([
+        // Fetch exam types, wards, and modalities for filter dropdowns
+        const [examTypesRes, wardsRes, modalitiesRes] = await Promise.all([
           AuthService.authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/exams/`),
-          AuthService.authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/wards/`)
+          AuthService.authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/wards/`),
+          AuthService.authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/modalities/`)
         ]);
 
         if (examTypesRes.ok) {
           const examTypesData = await examTypesRes.json();
+          console.log('Exam Types Data:', examTypesData);
+          console.log('Exam Names:', examTypesData.map(exam => exam.exam));
           setExamTypes(examTypesData);
         }
 
         if (wardsRes.ok) {
           const wardsData = await wardsRes.json();
           setWards(wardsData);
+        }
+
+        if (modalitiesRes.ok) {
+          const modalitiesData = await modalitiesRes.json();
+          setModalities(modalitiesData);
         }
 
         // Fetch examinations
@@ -177,19 +204,19 @@ export default function ExaminationsPage() {
     }
   }, [loading]); // Add loading dependency to retry after data loads
 
-  const fetchExaminations = async () => {
+  const fetchExaminationsWithFilters = async (filtersToUse: FilterParams = filters) => {
     try {
-      console.log('fetchExaminations called with filters:', filters);
+      console.log('fetchExaminations called with filters:', filtersToUse);
       setLoading(true);
       
       // Build query parameters
       const params = new URLSearchParams();
       params.append('ordering', '-no_xray'); // Sort by x-ray number descending
-      if (filters.search) params.append('search', filters.search);
+      if (filtersToUse.search) params.append('search', filtersToUse.search);
       
       // Handle date range
-      if (filters.date_range && filters.date_range.length === 2) {
-        const [startDateStr, endDateStr] = filters.date_range;
+      if (filtersToUse.date_range && filtersToUse.date_range.length === 2) {
+        const [startDateStr, endDateStr] = filtersToUse.date_range;
         // Convert from dd/mm/yyyy to yyyy-mm-dd
         const startParts = startDateStr.split('/');
         const endParts = endDateStr.split('/');
@@ -201,10 +228,10 @@ export default function ExaminationsPage() {
         }
       }
       
-      if (filters.exam_type) params.append('exam_type', filters.exam_type);
-      if (filters.pemohon) params.append('pemohon', filters.pemohon);
-      if (filters.ward) params.append('ward', filters.ward);
-      if (filters.klinik) params.append('klinik', filters.klinik);
+      if (filtersToUse.exam_type) params.append('exam_type', filtersToUse.exam_type);
+      if (filtersToUse.pemohon) params.append('pemohon', filtersToUse.pemohon);
+      if (filtersToUse.ward) params.append('ward', filtersToUse.ward);
+      if (filtersToUse.modality) params.append('modality', filtersToUse.modality);
 
       const url = `${process.env.NEXT_PUBLIC_API_URL}/api/examinations/?${params.toString()}`;
       const res = await AuthService.authenticatedFetch(url);
@@ -214,7 +241,19 @@ export default function ExaminationsPage() {
       }
 
       const data = await res.json();
-      setExaminations(data.results || data);
+      const results = data.results || data;
+      setExaminations(results);
+      
+      // Extract unique pemohon values
+      const pemohonSet = new Set<string>();
+      
+      results.forEach((exam: Examination) => {
+        if (exam.daftar_info.pemohon && exam.daftar_info.pemohon.trim()) {
+          pemohonSet.add(exam.daftar_info.pemohon.trim());
+        }
+      });
+      
+      setUniquePemohon(Array.from(pemohonSet).sort());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load examinations');
     } finally {
@@ -222,11 +261,20 @@ export default function ExaminationsPage() {
     }
   };
 
+  const fetchExaminations = () => fetchExaminationsWithFilters();
+
   const handleFilterChange = (field: keyof FilterParams, value: string) => {
-    setFilters(prev => ({
-      ...prev,
+    const newFilters = {
+      ...filters,
       [field]: value
-    }));
+    };
+    
+    setFilters(newFilters);
+    
+    // Auto-trigger search for non-search fields with updated filters
+    if (field !== 'search') {
+      fetchExaminationsWithFilters(newFilters);
+    }
   };
 
   const handleSearch = (e?: React.MouseEvent) => {
@@ -238,19 +286,25 @@ export default function ExaminationsPage() {
   const clearFilters = (e?: React.MouseEvent) => {
     e?.preventDefault();
     console.log('Clear Filters clicked');
-    setFilters({
+    const clearedFilters = {
       search: '',
       date_range: [],
       exam_type: '',
       pemohon: '',
       ward: '',
-      klinik: '',
-    });
+      modality: '',
+    };
+    
+    setFilters(clearedFilters);
     setDateRange([]);
+    
     // Clear flatpickr instance (same method as pacs-browser)
     if (dateRangeRef.current && (dateRangeRef.current as any)._flatpickr) {
       (dateRangeRef.current as any)._flatpickr.clear();
     }
+    
+    // Immediately fetch results with cleared filters
+    fetchExaminationsWithFilters(clearedFilters);
   };
 
   const formatDate = (dateString: string): string => {
@@ -333,55 +387,69 @@ export default function ExaminationsPage() {
 
             <div>
               <Label htmlFor="exam_type">Exam Type</Label>
-              <Select value={filters.exam_type || 'all'} onValueChange={(value) => handleFilterChange('exam_type', value === 'all' ? '' : value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select exam type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  {examTypes.filter(exam => exam.id && exam.id.toString() !== '').map((exam) => (
-                    <SelectItem key={exam.id} value={exam.id.toString()}>
-                      {exam.exam}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                options={[
+                  { value: 'all', label: 'All Types' },
+                  ...examTypes.filter(exam => exam.id && exam.id.toString() !== '').map((exam) => ({
+                    value: exam.id.toString(),
+                    label: exam.exam
+                  }))
+                ]}
+                value={filters.exam_type || 'all'}
+                onValueChange={(value) => handleFilterChange('exam_type', value === 'all' ? '' : value)}
+                placeholder="Select exam type"
+                searchPlaceholder="Search exam types..."
+              />
             </div>
 
             <div>
               <Label htmlFor="pemohon">Requesting Doctor</Label>
-              <Input
-                id="pemohon"
-                placeholder="Doctor name..."
-                value={filters.pemohon}
-                onChange={(e) => handleFilterChange('pemohon', e.target.value)}
+              <SearchableSelect
+                options={[
+                  { value: 'all', label: 'All Doctors' },
+                  ...uniquePemohon.map((doctor) => ({
+                    value: doctor,
+                    label: doctor
+                  }))
+                ]}
+                value={filters.pemohon || 'all'}
+                onValueChange={(value) => handleFilterChange('pemohon', value === 'all' ? '' : value)}
+                placeholder="Select requesting doctor"
+                searchPlaceholder="Search doctors..."
               />
             </div>
 
             <div>
               <Label htmlFor="ward">Ward</Label>
-              <Select value={filters.ward || 'all'} onValueChange={(value) => handleFilterChange('ward', value === 'all' ? '' : value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select ward" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Wards</SelectItem>
-                  {wards.filter(ward => ward.id && ward.id.toString() !== '').map((ward) => (
-                    <SelectItem key={ward.id} value={ward.id.toString()}>
-                      {ward.wad}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                options={[
+                  { value: 'all', label: 'All Wards' },
+                  ...wards.filter(ward => ward.id && ward.id.toString() !== '').map((ward) => ({
+                    value: ward.id.toString(),
+                    label: ward.wad
+                  }))
+                ]}
+                value={filters.ward || 'all'}
+                onValueChange={(value) => handleFilterChange('ward', value === 'all' ? '' : value)}
+                placeholder="Select ward"
+                searchPlaceholder="Search wards..."
+              />
             </div>
 
             <div>
-              <Label htmlFor="klinik">Clinic</Label>
-              <Input
-                id="klinik"
-                placeholder="Clinic name..."
-                value={filters.klinik}
-                onChange={(e) => handleFilterChange('klinik', e.target.value)}
+              <Label htmlFor="modality">Modality</Label>
+              <SearchableSelect
+                options={[
+                  { value: 'all', label: 'All Modalities' },
+                  ...modalities.filter(modality => modality.id && modality.id.toString() !== '').map((modality) => ({
+                    value: modality.id.toString(),
+                    label: modality.nama
+                  }))
+                ]}
+                value={filters.modality || 'all'}
+                onValueChange={(value) => handleFilterChange('modality', value === 'all' ? '' : value)}
+                placeholder="Select modality"
+                searchPlaceholder="Search modalities..."
               />
             </div>
 
