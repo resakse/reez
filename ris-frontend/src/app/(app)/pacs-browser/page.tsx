@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { getOrthancUrl } from '@/lib/pacs';
 import { toast } from '@/lib/toast';
 import AuthService from '@/lib/auth';
+import Swal from 'sweetalert2';
 import { 
   Search, 
   Calendar, 
@@ -43,6 +44,8 @@ interface LegacyStudy {
   InstitutionName?: string;
   Ward?: string;
   Klinik?: string;
+  isImported?: boolean;
+  registrationId?: number;
 }
 
 interface ModalityOption {
@@ -64,6 +67,7 @@ export default function PacsBrowserPage() {
   ]);
   const [allKlinikOptions, setAllKlinikOptions] = useState<string[]>([]);
   const [allStudies, setAllStudies] = useState<LegacyStudy[]>([]);
+  const [importingStudies, setImportingStudies] = useState<Set<string>>(new Set());
 
   // Search filters
   const [patientName, setPatientName] = useState('');
@@ -126,6 +130,43 @@ export default function PacsBrowserPage() {
     
     return '';
   };
+
+  const checkImportStatus = useCallback(async (studies: LegacyStudy[]): Promise<LegacyStudy[]> => {
+    try {
+      // Get all study UIDs to check
+      const studyUids = studies.map(s => s.StudyInstanceUID);
+      
+      // Batch check import status
+      const response = await AuthService.authenticatedFetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/registrations/batch-check/`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ study_instance_uids: studyUids })
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        const importedStudies = data.imported_studies || {};
+        
+        // Update studies with import status
+        return studies.map(study => ({
+          ...study,
+          isImported: !!importedStudies[study.StudyInstanceUID],
+          registrationId: importedStudies[study.StudyInstanceUID] || undefined
+        }));
+      }
+    } catch (err) {
+      // If batch check fails, assume none are imported
+      console.warn('Failed to check import status:', err);
+    }
+    
+    // Return studies with default not imported status
+    return studies.map(study => ({ ...study, isImported: false }));
+  }, []);
 
   // Debounce text inputs to prevent excessive filtering
   useEffect(() => {
@@ -272,6 +313,9 @@ export default function PacsBrowserPage() {
         Klinik: extractKlinikFromDescription(study.institutionName || study.studyDescription)
       }));
 
+      // Check import status for all studies
+      formattedStudies = await checkImportStatus(formattedStudies);
+
       // Store all studies for client-side filtering
       setAllStudies(formattedStudies);
 
@@ -318,8 +362,142 @@ export default function PacsBrowserPage() {
   };
 
   const importStudy = async (study: LegacyStudy) => {
-    // TODO: Implement import functionality
-    toast.info('Import functionality coming soon');
+    // Show SweetAlert2 confirmation dialog
+    const result = await Swal.fire({
+      title: 'Import Study to RIS?',
+      html: `
+        <div style="text-align: left; margin: 20px 0;">
+          <p><strong>Patient:</strong> ${study.PatientName || 'Unknown'}</p>
+          <p><strong>Patient ID:</strong> ${study.PatientID || 'Unknown'}</p>
+          <p><strong>Study Date:</strong> ${formatDate(study.StudyDate || '')}</p>
+          <p><strong>Modality:</strong> ${study.Modality || 'Unknown'}</p>
+          <p><strong>Description:</strong> ${study.StudyDescription || 'N/A'}</p>
+        </div>
+        <div style="background: #f8f9fa; padding: 10px; border-radius: 6px; margin-top: 15px;">
+          <small><strong>Note:</strong> This will create a new patient registration and examination record in the RIS database.</small>
+        </div>
+      `,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, Import',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#3085d6',
+      cancelButtonColor: '#d33',
+      width: 500
+    });
+
+    if (!result.isConfirmed) {
+      return;
+    }
+
+    // Add to importing set
+    setImportingStudies(prev => new Set(prev).add(study.StudyInstanceUID));
+
+    try {
+      const response = await AuthService.authenticatedFetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/pacs/import/`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            studyInstanceUid: study.StudyInstanceUID,
+            createPatient: true
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        // Update the study in our local state to mark as imported
+        setAllStudies(prevStudies => 
+          prevStudies.map(s => 
+            s.StudyInstanceUID === study.StudyInstanceUID 
+              ? { ...s, isImported: true, registrationId: data.registrationId }
+              : s
+          )
+        );
+
+        const examCount = data.examinationCount || 1;
+        const examDetails = data.examinations || [];
+        
+        // Show success message
+        if (examCount > 1) {
+          toast.success(`Study imported successfully! Created ${examCount} examinations: ${examDetails.map((e: any) => e.exam_type).join(', ')}`);
+        } else {
+          toast.success(`Study imported successfully! Registration ID: ${data.registrationId}`);
+        }
+
+        // Show success SweetAlert
+        await Swal.fire({
+          title: 'Import Successful!',
+          html: `
+            <div style="text-align: left; margin: 20px 0;">
+              <p><strong>Registration ID:</strong> ${data.registrationId}</p>
+              <p><strong>Examinations Created:</strong> ${examCount}</p>
+              ${examDetails.length > 0 ? `<p><strong>Exam Types:</strong> ${examDetails.map((e: any) => e.exam_type).join(', ')}</p>` : ''}
+            </div>
+          `,
+          icon: 'success',
+          confirmButtonText: 'OK',
+          confirmButtonColor: '#28a745'
+        });
+
+      } else {
+        // Handle specific error cases
+        if (response.status === 403) {
+          toast.error('Only superusers can import studies');
+          await Swal.fire({
+            title: 'Permission Denied',
+            text: 'Only superusers can import studies to RIS',
+            icon: 'error',
+            confirmButtonColor: '#d33'
+          });
+        } else if (response.status === 400 && data.error?.includes('already imported')) {
+          // Update the study status locally
+          setAllStudies(prevStudies => 
+            prevStudies.map(s => 
+              s.StudyInstanceUID === study.StudyInstanceUID 
+                ? { ...s, isImported: true, registrationId: data.registrationId }
+                : s
+            )
+          );
+          
+          toast.warning(`Study already imported as registration ${data.registrationId}`);
+          await Swal.fire({
+            title: 'Already Imported',
+            text: `This study was already imported as registration ${data.registrationId}`,
+            icon: 'warning',
+            confirmButtonColor: '#ffc107'
+          });
+        } else {
+          toast.error(data.error || 'Failed to import study');
+          await Swal.fire({
+            title: 'Import Failed',
+            text: data.error || 'Failed to import study',
+            icon: 'error',
+            confirmButtonColor: '#d33'
+          });
+        }
+      }
+    } catch (err) {
+      toast.error('Network error: Failed to import study');
+      await Swal.fire({
+        title: 'Network Error',
+        text: 'Failed to connect to the server. Please try again.',
+        icon: 'error',
+        confirmButtonColor: '#d33'
+      });
+    } finally {
+      // Remove from importing set
+      setImportingStudies(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(study.StudyInstanceUID);
+        return newSet;
+      });
+    }
   };
 
   // Fetch modality options from database
@@ -420,7 +598,7 @@ export default function PacsBrowserPage() {
         }
 
         // Map backend response to frontend format
-        const formattedStudies: LegacyStudy[] = data.studies.map((study: any) => ({
+        let formattedStudies: LegacyStudy[] = data.studies.map((study: any) => ({
           ID: study.id,
           StudyInstanceUID: study.studyInstanceUid,
           PatientName: study.patientName,
@@ -437,6 +615,9 @@ export default function PacsBrowserPage() {
           Ward: study.ward,
           Klinik: extractKlinikFromDescription(study.institutionName || study.studyDescription)
         }));
+
+        // Check import status for all studies
+        formattedStudies = await checkImportStatus(formattedStudies);
 
         // Store all studies for client-side filtering
         setAllStudies(formattedStudies);
@@ -689,15 +870,41 @@ export default function PacsBrowserPage() {
                             <Eye className="w-3 h-3 mr-1" />
                             View
                           </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => importStudy(study)}
-                            className="text-xs"
-                          >
-                            <Download className="w-3 h-3 mr-1" />
-                            Import
-                          </Button>
+                          {(user?.is_staff || user?.is_superuser) && (
+                            study.isImported ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => router.push(`/studies/${study.registrationId}`)}
+                                className="text-xs"
+                                title="Study already imported - View in RIS"
+                              >
+                                <Archive className="w-3 h-3 mr-1" />
+                                In RIS
+                              </Button>
+                            ) : user?.is_superuser ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => importStudy(study)}
+                                disabled={importingStudies.has(study.StudyInstanceUID)}
+                                className="text-xs"
+                                title="Import this study to RIS (Superuser only)"
+                              >
+                                {importingStudies.has(study.StudyInstanceUID) ? (
+                                  <>
+                                    <div className="w-3 h-3 mr-1 animate-spin rounded-full border border-current border-t-transparent" />
+                                    Importing...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Download className="w-3 h-3 mr-1" />
+                                    Import
+                                  </>
+                                )}
+                              </Button>
+                            ) : null
+                          )}
                         </div>
                       </td>
                     </tr>

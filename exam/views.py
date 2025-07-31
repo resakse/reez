@@ -1,13 +1,13 @@
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
-from django.db.models import Q
+from django.db.models import Q, Count
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.shortcuts import render
@@ -135,6 +135,33 @@ class DaftarViewSet(viewsets.ModelViewSet):
             serializer.is_valid(raise_exception=True)
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=['post'], url_path='batch-check')
+    def batch_check_import_status(self, request):
+        """
+        Batch check import status for multiple study instance UIDs
+        """
+        study_instance_uids = request.data.get('study_instance_uids', [])
+        
+        if not study_instance_uids:
+            return Response({'error': 'study_instance_uids is required'}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+        
+        # Query registrations that match any of the study instance UIDs
+        imported_registrations = Daftar.objects.filter(
+            study_instance_uid__in=study_instance_uids
+        ).values('study_instance_uid', 'id')
+        
+        # Create mapping of study_instance_uid -> registration_id
+        imported_studies = {}
+        for reg in imported_registrations:
+            if reg['study_instance_uid']:
+                imported_studies[reg['study_instance_uid']] = reg['id']
+        
+        return Response({
+            'success': True,
+            'imported_studies': imported_studies
+        })
 
 
 class PemeriksaanViewSet(viewsets.ModelViewSet):
@@ -1465,3 +1492,433 @@ def upload_dicom_files(request):
             'error': 'Upload failed',
             'message': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# Dashboard API Views
+class DashboardStatsAPIView(APIView):
+    """
+    API endpoint for dashboard statistics
+    Provides aggregate statistics by time periods (today/week/month/year/all)
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        from django.db.models import Count
+        from datetime import datetime, timedelta
+        
+        # Get current time
+        now = timezone.now()
+        today = now.date()
+        
+        # Define time periods
+        periods = {
+            'today': {
+                'start': timezone.make_aware(datetime.combine(today, datetime.min.time())),
+                'end': timezone.make_aware(datetime.combine(today, datetime.max.time()))
+            },
+            'week': {
+                'start': now - timedelta(days=7),
+                'end': now
+            },
+            'month': {
+                'start': now - timedelta(days=30),
+                'end': now
+            },
+            'year': {
+                'start': now - timedelta(days=365),
+                'end': now
+            }
+        }
+        
+        stats = {}
+        
+        for period_name, period_range in periods.items():
+            # Patient count
+            patients_count = Pesakit.objects.filter(
+                created__range=[period_range['start'], period_range['end']]
+            ).count()
+            
+            # Registration count
+            registrations_count = Daftar.objects.filter(
+                created__range=[period_range['start'], period_range['end']]
+            ).count()
+            
+            # Examination count
+            examinations_count = Pemeriksaan.objects.filter(
+                created__range=[period_range['start'], period_range['end']]
+            ).count()
+            
+            # Completed studies count
+            completed_studies = Daftar.objects.filter(
+                created__range=[period_range['start'], period_range['end']],
+                study_status='COMPLETED'
+            ).count()
+            
+            stats[period_name] = {
+                'patients': patients_count,
+                'registrations': registrations_count,
+                'examinations': examinations_count,
+                'studies_completed': completed_studies
+            }
+        
+        # All time stats
+        stats['all_time'] = {
+            'patients': Pesakit.objects.count(),
+            'registrations': Daftar.objects.count(),
+            'examinations': Pemeriksaan.objects.count(),
+            'studies_completed': Daftar.objects.filter(study_status='COMPLETED').count()
+        }
+        
+        return Response(stats)
+
+
+class DashboardDemographicsAPIView(APIView):
+    """
+    API endpoint for patient demographics
+    Provides age, gender, and race distribution by time periods
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        from datetime import datetime, timedelta
+        
+        # Get current time
+        now = timezone.now()
+        today = now.date()
+        
+        # Define time periods
+        periods = {
+            'today': {
+                'start': timezone.make_aware(datetime.combine(today, datetime.min.time())),
+                'end': timezone.make_aware(datetime.combine(today, datetime.max.time()))
+            },
+            'week': {
+                'start': now - timedelta(days=7),
+                'end': now
+            },
+            'month': {
+                'start': now - timedelta(days=30),
+                'end': now
+            },
+            'year': {
+                'start': now - timedelta(days=365),
+                'end': now
+            }
+        }
+        
+        demographics = {'by_period': {}}
+        
+        for period_name, period_range in periods.items():
+            # Get patients in this period
+            patients = Pesakit.objects.filter(
+                created__range=[period_range['start'], period_range['end']]
+            )
+            
+            total_patients = patients.count()
+            
+            if total_patients == 0:
+                demographics['by_period'][period_name] = {
+                    'age_groups': [],
+                    'gender': [],
+                    'race': []
+                }
+                continue
+            
+            # Age groups calculation
+            age_groups = {'0-17': 0, '18-65': 0, '65+': 0}
+            
+            for patient in patients:
+                if patient.t_lahir:  # If we can calculate age from NRIC
+                    age = patient.kira_umur
+                    if age < 18:
+                        age_groups['0-17'] += 1
+                    elif age <= 65:
+                        age_groups['18-65'] += 1
+                    else:
+                        age_groups['65+'] += 1
+                else:
+                    # If no birth date, try to parse umur field
+                    if patient.umur:
+                        try:
+                            age_str = patient.umur.replace('Y', '').replace('y', '').strip()
+                            age = int(age_str)
+                            if age < 18:
+                                age_groups['0-17'] += 1
+                            elif age <= 65:
+                                age_groups['18-65'] += 1
+                            else:
+                                age_groups['65+'] += 1
+                        except (ValueError, AttributeError):
+                            # Default to adult if we can't determine age
+                            age_groups['18-65'] += 1
+            
+            age_groups_list = [
+                {
+                    'range': age_range,
+                    'count': count,
+                    'percentage': round((count / total_patients) * 100, 1) if total_patients > 0 else 0
+                }
+                for age_range, count in age_groups.items()
+            ]
+            
+            # Gender distribution
+            gender_stats = patients.values('jantina').annotate(count=Count('jantina'))
+            gender_list = []
+            for gender_stat in gender_stats:
+                gender_display = 'M' if gender_stat['jantina'] == 'L' else 'F'
+                gender_list.append({
+                    'gender': gender_display,
+                    'count': gender_stat['count'],
+                    'percentage': round((gender_stat['count'] / total_patients) * 100, 1)
+                })
+            
+            # Race distribution
+            race_stats = patients.values('bangsa').annotate(count=Count('bangsa'))
+            race_list = [
+                {
+                    'race': race_stat['bangsa'],
+                    'count': race_stat['count'],
+                    'percentage': round((race_stat['count'] / total_patients) * 100, 1)
+                }
+                for race_stat in race_stats
+            ]
+            
+            demographics['by_period'][period_name] = {
+                'age_groups': age_groups_list,
+                'gender': gender_list,
+                'race': race_list
+            }
+        
+        return Response(demographics)
+
+
+class DashboardModalityStatsAPIView(APIView):
+    """
+    API endpoint for modality distribution statistics
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        from datetime import datetime, timedelta
+        
+        # Get current time
+        now = timezone.now()
+        today = now.date()
+        
+        # Define time periods
+        periods = {
+            'today': {
+                'start': timezone.make_aware(datetime.combine(today, datetime.min.time())),
+                'end': timezone.make_aware(datetime.combine(today, datetime.max.time()))
+            },
+            'week': {
+                'start': now - timedelta(days=7),
+                'end': now
+            },
+            'month': {
+                'start': now - timedelta(days=30),
+                'end': now
+            },
+            'year': {
+                'start': now - timedelta(days=365),
+                'end': now
+            }
+        }
+        
+        modality_stats = {'by_period': {}}
+        
+        for period_name, period_range in periods.items():
+            # Get examinations in this period with modality info
+            examinations = Pemeriksaan.objects.filter(
+                created__range=[period_range['start'], period_range['end']]
+            ).select_related('exam__modaliti')
+            
+            total_exams = examinations.count()
+            
+            if total_exams == 0:
+                modality_stats['by_period'][period_name] = []
+                continue
+            
+            # Group by modality
+            modality_counts = examinations.values('exam__modaliti__nama').annotate(
+                count=Count('exam__modaliti__nama')
+            ).order_by('-count')
+            
+            modality_list = [
+                {
+                    'modality': modality['exam__modaliti__nama'],
+                    'count': modality['count'],
+                    'percentage': round((modality['count'] / total_exams) * 100, 1)
+                }
+                for modality in modality_counts
+            ]
+            
+            modality_stats['by_period'][period_name] = modality_list
+        
+        return Response(modality_stats)
+
+
+class DashboardStorageAPIView(APIView):
+    """
+    API endpoint for storage management and capacity planning
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        import os
+        import shutil
+        from django.conf import settings
+        
+        try:
+            # Get PACS configuration for storage paths
+            pacs_config = PacsConfig.objects.first()
+            
+            # Default storage paths - you can make this configurable
+            storage_paths = []
+            
+            # Try to get Orthanc storage path from PACS config
+            if pacs_config and pacs_config.orthancurl:
+                # This is a placeholder - in real implementation, you'd need to
+                # either store storage paths in PacsConfig or have a separate model
+                # For now, let's use some common paths
+                possible_paths = [
+                    '/var/lib/orthanc/db',
+                    '/data/orthanc',
+                    '/opt/orthanc/data',
+                    settings.MEDIA_ROOT,  # Django media folder as fallback
+                ]
+                
+                for path in possible_paths:
+                    if os.path.exists(path):
+                        storage_paths.append(path)
+                        break
+            
+            # If no paths found, use current directory as fallback
+            if not storage_paths:
+                storage_paths = [os.getcwd()]
+            
+            storage_info = []
+            total_used = 0
+            total_capacity = 0
+            
+            for path in storage_paths:
+                try:
+                    # Get disk usage for this path
+                    total, used, free = shutil.disk_usage(path)
+                    
+                    # Convert bytes to GB
+                    total_gb = total / (1024**3)
+                    used_gb = used / (1024**3)
+                    free_gb = free / (1024**3)
+                    usage_percentage = (used / total) * 100 if total > 0 else 0
+                    
+                    storage_info.append({
+                        'path': path,
+                        'total_gb': round(total_gb, 2),
+                        'used_gb': round(used_gb, 2),
+                        'free_gb': round(free_gb, 2),
+                        'usage_percentage': round(usage_percentage, 1)
+                    })
+                    
+                    total_used += used_gb
+                    total_capacity += total_gb
+                    
+                except (OSError, PermissionError):
+                    # Skip paths we can't access
+                    continue
+            
+            # Calculate growth analysis
+            # Get examination count for last 30 days to estimate daily growth
+            thirty_days_ago = timezone.now() - timedelta(days=30)
+            recent_exams = Pemeriksaan.objects.filter(
+                created__gte=thirty_days_ago
+            ).count()
+            
+            # Estimate average size per exam (you might want to make this configurable)
+            # Typical X-ray: 10-50MB, CT: 100-500MB, MRI: 200-1000MB
+            # Let's use 50MB as average
+            avg_exam_size_gb = 0.05  # 50MB in GB
+            
+            daily_exam_count = recent_exams / 30 if recent_exams > 0 else 1
+            daily_growth_gb = daily_exam_count * avg_exam_size_gb
+            monthly_growth_gb = daily_growth_gb * 30
+            
+            # Calculate time until full
+            if total_capacity > total_used and daily_growth_gb > 0:
+                free_space_gb = total_capacity - total_used
+                days_until_full = free_space_gb / daily_growth_gb
+                months_until_full = days_until_full / 30
+            else:
+                days_until_full = 0
+                months_until_full = 0
+            
+            # Modality storage breakdown (estimated)
+            modality_breakdown = []
+            total_examinations = Pemeriksaan.objects.count()
+            
+            if total_examinations > 0:
+                modality_counts = Pemeriksaan.objects.values('exam__modaliti__nama').annotate(
+                    count=Count('exam__modaliti__nama')
+                ).order_by('-count')
+                
+                # Estimate storage size by modality
+                modality_size_estimates = {
+                    'X-RAY': 0.03,  # 30MB average
+                    'CR': 0.03,     # 30MB average
+                    'DX': 0.03,     # 30MB average
+                    'CT': 0.3,      # 300MB average
+                    'MRI': 0.5,     # 500MB average
+                    'US': 0.1,      # 100MB average
+                }
+                
+                for modality in modality_counts:
+                    modality_name = modality['exam__modaliti__nama']
+                    exam_count = modality['count']
+                    
+                    # Get estimated size per exam for this modality
+                    size_per_exam = modality_size_estimates.get(modality_name.upper(), 0.05)  # Default 50MB
+                    estimated_size_gb = exam_count * size_per_exam
+                    
+                    modality_breakdown.append({
+                        'modality': modality_name,
+                        'size_gb': round(estimated_size_gb, 2),
+                        'percentage': round((estimated_size_gb / total_used) * 100, 1) if total_used > 0 else 0
+                    })
+            
+            return Response({
+                'storage_paths': storage_info,
+                'primary_storage': {
+                    'total_gb': round(total_capacity, 2),
+                    'used_gb': round(total_used, 2),
+                    'free_gb': round(total_capacity - total_used, 2),
+                    'usage_percentage': round((total_used / total_capacity) * 100, 1) if total_capacity > 0 else 0
+                },
+                'growth_analysis': {
+                    'daily_growth_gb': round(daily_growth_gb, 2),
+                    'monthly_growth_gb': round(monthly_growth_gb, 2),
+                    'days_until_full': int(days_until_full),
+                    'months_until_full': round(months_until_full, 1),
+                    'daily_exam_count': round(daily_exam_count, 1)
+                },
+                'by_modality': modality_breakdown
+            })
+            
+        except Exception as e:
+            return Response({
+                'error': f'Storage analysis failed: {str(e)}',
+                'storage_paths': [],
+                'primary_storage': {
+                    'total_gb': 0,
+                    'used_gb': 0,
+                    'free_gb': 0,
+                    'usage_percentage': 0
+                },
+                'growth_analysis': {
+                    'daily_growth_gb': 0,
+                    'monthly_growth_gb': 0,
+                    'days_until_full': 0,
+                    'months_until_full': 0,
+                    'daily_exam_count': 0
+                },
+                'by_modality': []
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
