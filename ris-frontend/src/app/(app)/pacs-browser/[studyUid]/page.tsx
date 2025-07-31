@@ -36,6 +36,23 @@ const SimpleDicomViewer = dynamic(() => import('@/components/SimpleDicomViewer')
   ),
 });
 
+const ProjectionDicomViewer = dynamic(() => import('@/components/ProjectionDicomViewer'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-96">
+      <Card className="w-96">
+        <CardHeader>
+          <CardTitle>Loading X-ray Viewer...</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="text-center mt-2">Initializing X-ray viewer...</p>
+        </CardContent>
+      </Card>
+    </div>
+  ),
+});
+
 import { getStudyMetadata, getStudyImageIds } from '@/lib/orthanc';
 import { toast } from '@/lib/toast';
 import AuthService from '@/lib/auth';
@@ -450,20 +467,39 @@ export default function LegacyStudyViewerPage() {
       <div className="fixed inset-0 bg-black z-50">
         {/* Full Window DICOM Viewer */}
         <div className="relative h-full">
-          {imageIds.length > 0 ? (
-            <SimpleDicomViewer 
-              imageIds={imageIds}
-              seriesInfo={seriesInfo}
-              studyMetadata={{
-                patientName: metadata.PatientName || 'Unknown',
-                patientId: metadata.PatientID || 'Unknown',
-                studyDate: metadata.StudyDate || '',
-                studyDescription: metadata.StudyDescription || '',
-                modality: metadata.Modality || 'Unknown',
-                studyInstanceUID: studyUid
-              }}
-            />
-          ) : (
+          {imageIds.length > 0 ? (() => {
+            // Determine which viewer to use based on modality
+            const modality = metadata.Modality || 'Unknown';
+            const isProjectionModality = ['CR', 'DR', 'XR', 'DX', 'RG', 'RF'].includes(modality);
+            
+            const studyMetadata = {
+              patientName: metadata.PatientName || 'Unknown',
+              patientId: metadata.PatientID || 'Unknown',
+              studyDate: metadata.StudyDate || '',
+              studyDescription: metadata.StudyDescription || '',
+              modality: metadata.Modality || 'Unknown',
+              studyInstanceUID: studyUid
+            };
+
+            if (isProjectionModality) {
+              // Use ProjectionDicomViewer for X-ray studies (CR/DR/XR/etc)
+              return (
+                <ProjectionDicomViewer 
+                  imageIds={imageIds}
+                  studyMetadata={studyMetadata}
+                />
+              );
+            } else {
+              // Use SimpleDicomViewer for stack-based studies (CT/MRI/USG/etc)
+              return (
+                <SimpleDicomViewer 
+                  imageIds={imageIds}
+                  seriesInfo={seriesInfo}
+                  studyMetadata={studyMetadata}
+                />
+              );
+            }
+          })() : (
             <div className="h-full flex items-center justify-center">
               <div className="text-center text-white">
                 <Eye className="mx-auto h-12 w-12 mb-4" />
@@ -528,20 +564,39 @@ export default function LegacyStudyViewerPage() {
     <div className="h-full flex">
       {/* DICOM Viewer - Full Height */}
       <div className="flex-1 relative">
-        {imageIds.length > 0 ? (
-          <SimpleDicomViewer 
-            imageIds={imageIds}
-            seriesInfo={seriesInfo}
-            studyMetadata={{
-              patientName: metadata.PatientName || 'Unknown',
-              patientId: metadata.PatientID || 'Unknown',
-              studyDate: metadata.StudyDate || '',
-              studyDescription: metadata.StudyDescription || '',
-              modality: metadata.Modality || 'Unknown',
-              studyInstanceUID: studyUid
-            }}
-          />
-        ) : (
+        {imageIds.length > 0 ? (() => {
+          // Determine which viewer to use based on modality
+          const modality = metadata.Modality || 'Unknown';
+          const isProjectionModality = ['CR', 'DR', 'XR', 'DX', 'RG', 'RF'].includes(modality);
+          
+          const studyMetadata = {
+            patientName: metadata.PatientName || 'Unknown',
+            patientId: metadata.PatientID || 'Unknown',
+            studyDate: metadata.StudyDate || '',
+            studyDescription: metadata.StudyDescription || '',
+            modality: metadata.Modality || 'Unknown',
+            studyInstanceUID: studyUid
+          };
+
+          if (isProjectionModality) {
+            // Use ProjectionDicomViewer for X-ray studies (CR/DR/XR/etc)
+            return (
+              <ProjectionDicomViewer 
+                imageIds={imageIds}
+                studyMetadata={studyMetadata}
+              />
+            );
+          } else {
+            // Use SimpleDicomViewer for stack-based studies (CT/MRI/USG/etc)
+            return (
+              <SimpleDicomViewer 
+                imageIds={imageIds}
+                seriesInfo={seriesInfo}
+                studyMetadata={studyMetadata}
+              />
+            );
+          }
+        })() : (
           <div className="h-full flex items-center justify-center bg-background">
             <div className="text-center max-w-md">
               <Eye className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
