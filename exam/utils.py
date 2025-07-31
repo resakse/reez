@@ -341,7 +341,21 @@ def create_daftar_for_study(patient, file_metadata, registration_data=None, user
     study_description = (registration_data.get('study_description') or 
                         file_metadata.get('study_description') or 'Imported Study')
     
-    print(f"DEBUG: Creating daftar with pesakit={patient.id}, modality='{modality_name}', study_uid='{study_instance_uid}', accession='{accession_number}'")
+    # Parse study date from DICOM or use current time as fallback
+    study_date_str = file_metadata.get('study_date', '')
+    tarikh = timezone.now()  # Default fallback
+    
+    if study_date_str and len(study_date_str) == 8:
+        try:
+            # Convert DICOM date format (YYYYMMDD) to Django datetime
+            from datetime import datetime
+            study_date = datetime.strptime(study_date_str, '%Y%m%d').date()
+            tarikh = timezone.make_aware(datetime.combine(study_date, datetime.min.time()))
+        except ValueError:
+            # Invalid date format, use current time
+            pass
+    
+    print(f"DEBUG: Creating daftar with pesakit={patient.id}, modality='{modality_name}', study_uid='{study_instance_uid}', accession='{accession_number}', study_date='{study_date_str}'")
     
     daftar = Daftar.objects.create(
         pesakit=patient,
@@ -353,7 +367,7 @@ def create_daftar_for_study(patient, file_metadata, registration_data=None, user
         accession_number=accession_number or None,
         jxr=user,
         study_status='COMPLETED',
-        tarikh=timezone.now()
+        tarikh=tarikh
     )
     
     print(f"DEBUG: Created daftar ID {daftar.id} for patient {patient.id} with accession '{daftar.parent_accession_number}'")

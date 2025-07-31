@@ -1544,32 +1544,32 @@ class DashboardStatsAPIView(APIView):
                 'end': now
             },
             'year': {
-                'start': now - timedelta(days=365),
-                'end': now
+                'start': timezone.make_aware(datetime(now.year, 1, 1)),
+                'end': timezone.make_aware(datetime(now.year, 12, 31, 23, 59, 59))
             }
         }
         
         stats = {}
         
         for period_name, period_range in periods.items():
-            # Patient count
+            # Patient count (use created date for patients as they don't have exam dates)
             patients_count = Pesakit.objects.filter(
                 created__range=[period_range['start'], period_range['end']]
             ).count()
             
-            # Registration count
+            # Registration count (use tarikh/exam date instead of created date)
             registrations_count = Daftar.objects.filter(
-                created__range=[period_range['start'], period_range['end']]
+                tarikh__range=[period_range['start'], period_range['end']]
             ).count()
             
-            # Examination count
+            # Examination count (use daftar's tarikh/exam date via foreign key)
             examinations_count = Pemeriksaan.objects.filter(
-                created__range=[period_range['start'], period_range['end']]
+                daftar__tarikh__range=[period_range['start'], period_range['end']]
             ).count()
             
-            # Completed studies count
+            # Completed studies count (use tarikh/exam date instead of created date)
             completed_studies = Daftar.objects.filter(
-                created__range=[period_range['start'], period_range['end']],
+                tarikh__range=[period_range['start'], period_range['end']],
                 study_status='COMPLETED'
             ).count()
             
@@ -1644,8 +1644,8 @@ class DashboardDemographicsAPIView(APIView):
                 'end': now
             },
             'year': {
-                'start': now - timedelta(days=365),
-                'end': now
+                'start': timezone.make_aware(datetime(now.year, 1, 1)),
+                'end': timezone.make_aware(datetime(now.year, 12, 31, 23, 59, 59))
             }
         }
         
@@ -1840,8 +1840,8 @@ class DashboardModalityStatsAPIView(APIView):
                 'end': now
             },
             'year': {
-                'start': now - timedelta(days=365),
-                'end': now
+                'start': timezone.make_aware(datetime(now.year, 1, 1)),
+                'end': timezone.make_aware(datetime(now.year, 12, 31, 23, 59, 59))
             }
         }
         
@@ -2231,8 +2231,8 @@ class DashboardBodypartsExamTypesAPIView(APIView):
                 'end': now
             },
             'year': {
-                'start': now - timedelta(days=365),
-                'end': now
+                'start': timezone.make_aware(datetime(now.year, 1, 1)),
+                'end': timezone.make_aware(datetime(now.year, 12, 31, 23, 59, 59))
             }
         }
         

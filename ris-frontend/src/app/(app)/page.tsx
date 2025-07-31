@@ -164,6 +164,43 @@ const GenderChart = memo(({ data, period }: { data: any[], period: string }) => 
   </Card>
 ));
 
+const RaceChart = memo(({ data, period }: { data: any[], period: string }) => (
+  <Card>
+    <CardHeader>
+      <CardTitle>Race Distribution</CardTitle>
+    </CardHeader>
+    <CardContent>
+      {data && data.length > 0 ? (
+        <div className="h-64">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={data}
+                dataKey="count"
+                nameKey="race"
+                cx="50%"
+                cy="50%"
+                innerRadius={40}
+                outerRadius={80}
+                label={({race, count, percentage}) => `${race || 'Unknown'}: ${count} (${percentage}%)`}
+              >
+                {data.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={`hsl(${160 + index * 60}, 70%, 50%)`} />
+                ))}
+              </Pie>
+              <Tooltip formatter={(value, name) => [value, `${name} patients`]} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      ) : (
+        <div className="text-center text-muted-foreground py-8">
+          No data available for {period.toLowerCase()}
+        </div>
+      )}
+    </CardContent>
+  </Card>
+));
+
 const BodypartsChart = memo(({ data, period }: { data: any[], period: string }) => (
   <Card>
     <CardHeader>
@@ -644,7 +681,7 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Bottom Row - Gender Distribution and Storage */}
+      {/* Demographics Row - Gender and Race Distribution */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Gender Distribution */}
         <GenderChart 
@@ -652,7 +689,28 @@ export default function Dashboard() {
           period={getPeriodLabel(selectedPeriod)}
         />
 
-        {/* Storage Management */}
+        {/* Race Distribution */}
+        <RaceChart 
+          data={memoizedChartData.demographics?.race || []} 
+          period={getPeriodLabel(selectedPeriod)}
+        />
+      </div>
+
+      {/* Body Parts and Exam Types Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <BodypartsChart 
+          data={memoizedChartData.bodypartsExamTypes?.bodyparts || []} 
+          period={getPeriodLabel(selectedPeriod)}
+        />
+        
+        <ExamTypesChart 
+          data={memoizedChartData.bodypartsExamTypes?.exam_types || []} 
+          period={getPeriodLabel(selectedPeriod)}
+        />
+      </div>
+
+      {/* Storage Management Row - Bottom */}
+      <div className="grid grid-cols-1 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle>Storage Management</CardTitle>
@@ -753,19 +811,6 @@ export default function Dashboard() {
             </div>
           </CardContent>
         </Card>
-      </div>
-
-      {/* Body Parts and Exam Types Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <BodypartsChart 
-          data={memoizedChartData.bodypartsExamTypes?.bodyparts || []} 
-          period={getPeriodLabel(selectedPeriod)}
-        />
-        
-        <ExamTypesChart 
-          data={memoizedChartData.bodypartsExamTypes?.exam_types || []} 
-          period={getPeriodLabel(selectedPeriod)}
-        />
       </div>
     </div>
   );
