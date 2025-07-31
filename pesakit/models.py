@@ -57,11 +57,14 @@ class Pesakit(models.Model):
 
     def save(self, *args, **kwargs):
         if self.nama:
-            self.nama = titlecase(self.nama)
+            self.nama = self.nama.upper()
         if self.mrn:
             self.mrn = self.mrn.upper()
         if self.nric:
             self.nric = self.nric.upper()
+            # Auto-populate MRN with NRIC if MRN is empty
+            if not self.mrn:
+                self.mrn = self.nric
 
         super(Pesakit, self).save(*args, **kwargs)
 
