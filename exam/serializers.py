@@ -66,9 +66,11 @@ class PemeriksaanSerializer(serializers.ModelSerializer):
             'id', 'accession_number', 'no_xray', 'scheduled_step_id', 'exam', 'exam_id', 
             'laterality', 'patient_position', 'body_position', 'kv', 'mas', 'mgy',
             'catatan', 'exam_status', 'sequence_number', 'jxr', 'jxr_id', 'jxr_info', 
-            'created', 'modified', 'daftar_id', 'daftar_info'
+            'created', 'modified', 'daftar_id', 'daftar_info',
+            # DICOM Content Date/Time fields
+            'content_date', 'content_time', 'content_datetime', 'content_datetime_source'
         ]
-        read_only_fields = ['accession_number', 'no_xray', 'scheduled_step_id', 'created', 'modified', 'jxr_info']
+        read_only_fields = ['accession_number', 'no_xray', 'scheduled_step_id', 'created', 'modified', 'jxr_info', 'content_date', 'content_time', 'content_datetime', 'content_datetime_source']
 
     def get_daftar_info(self, obj):
         from staff.serializers import UserSerializer

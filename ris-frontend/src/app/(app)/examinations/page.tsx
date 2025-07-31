@@ -39,6 +39,11 @@ interface Examination {
   created: string;
   modified: string;
   study_instance_uid?: string;
+  // DICOM Content Date/Time fields
+  content_date?: string;
+  content_time?: string;
+  content_datetime?: string;
+  content_datetime_source?: string;
   daftar_info: {
     id: number;
     tarikh: string;
@@ -110,7 +115,7 @@ export default function ExaminationsPage() {
   const [totalPages, setTotalPages] = useState(0);
   
   // Sorting state
-  const [sortField, setSortField] = useState<string>('-daftar__tarikh'); // Default sort by date descending
+  const [sortField, setSortField] = useState<string>('-content_datetime'); // Default sort by DICOM content datetime descending
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   
   // Debounced search effect for search field
@@ -423,6 +428,14 @@ export default function ExaminationsPage() {
     }
   };
 
+  const getExaminationDateTime = (exam: Examination): string => {
+    // Prefer DICOM content_datetime if available, otherwise fall back to registration date
+    if (exam.content_datetime) {
+      return exam.content_datetime;
+    }
+    return exam.daftar_info.tarikh;
+  };
+
   if (loading && examinations.length === 0) {
     return (
       <Card>
@@ -571,10 +584,10 @@ export default function ExaminationsPage() {
                       variant="ghost" 
                       size="sm" 
                       className="font-medium hover:bg-transparent p-0 h-auto justify-start"
-                      onClick={() => handleSort('daftar__tarikh')}
+                      onClick={() => handleSort('content_datetime')}
                     >
                       Date & Time
-                      {getSortIcon('daftar__tarikh')}
+                      {getSortIcon('content_datetime')}
                     </Button>
                   </TableHead>
                   <TableHead>
@@ -667,7 +680,14 @@ export default function ExaminationsPage() {
                 ) : (
                   examinations.map((exam) => (
                     <TableRow key={exam.id}>
-                      <TableCell>{formatDate(exam.daftar_info.tarikh)}</TableCell>
+                      <TableCell>
+                        {formatDate(getExaminationDateTime(exam))}
+                        {exam.content_datetime && (
+                          <div className="text-xs text-muted-foreground">
+                            {exam.content_datetime_source || 'DICOM'}
+                          </div>
+                        )}
+                      </TableCell>
                       <TableCell className="font-medium">
                         <Badge variant="outline">{exam.no_xray}</Badge>
                       </TableCell>

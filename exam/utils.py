@@ -7,6 +7,7 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 from django.conf import settings
 from custom.katanama import titlecase
+from datetime import datetime
 import re
 
 
@@ -453,6 +454,40 @@ def create_pemeriksaan_from_dicom(daftar, file_metadata, user=None):
     if exam_details['radiographer_name']:
         notes_parts.append(f"Operator: {exam_details['radiographer_name']}")
     
+    # Parse DICOM Content Date/Time
+    content_date = None
+    content_time = None
+    content_datetime = None
+    
+    # Parse ContentDate (YYYYMMDD format)
+    if file_metadata.get('content_date') and len(file_metadata['content_date']) == 8:
+        try:
+            content_date = datetime.strptime(file_metadata['content_date'], '%Y%m%d').date()
+        except ValueError:
+            print(f"DEBUG: Failed to parse ContentDate: {file_metadata['content_date']}")
+    
+    # Parse ContentTime (HHMMSS.FFFFFF format)
+    if file_metadata.get('content_time'):
+        try:
+            # Handle various time formats (HHMMSS, HHMMSS.F, HHMMSS.FFFFFF)
+            time_str = file_metadata['content_time']
+            if '.' in time_str:
+                # Handle fractional seconds
+                time_parts = time_str.split('.')
+                base_time = time_parts[0]
+                fractional = time_parts[1][:6].ljust(6, '0')  # Pad or truncate to 6 digits
+                content_time = datetime.strptime(base_time + fractional, '%H%M%S%f').time()
+            else:
+                # Handle without fractional seconds
+                content_time = datetime.strptime(time_str, '%H%M%S').time()
+        except ValueError:
+            print(f"DEBUG: Failed to parse ContentTime: {file_metadata['content_time']}")
+    
+    # Combine ContentDate and ContentTime into content_datetime
+    if content_date and content_time:
+        content_datetime = datetime.combine(content_date, content_time)
+        print(f"DEBUG: Parsed DICOM Content DateTime: {content_datetime}")
+    
     # Generate accession number for this examination
     accession_number = generate_custom_accession(file_metadata)
     
@@ -467,7 +502,12 @@ def create_pemeriksaan_from_dicom(daftar, file_metadata, user=None):
         laterality=exam_details['laterality'] if exam_details['laterality'] else None,
         catatan=", ".join(notes_parts) if notes_parts else None,
         jxr=radiographer,
-        exam_status='COMPLETED'
+        exam_status='COMPLETED',
+        # DICOM Content Date/Time fields
+        content_date=content_date,
+        content_time=content_time,
+        content_datetime=content_datetime,
+        content_datetime_source=file_metadata.get('datetime_source', ''),
     )
     
     print(f"DEBUG: Created Pemeriksaan ID {pemeriksaan.id} with accession '{pemeriksaan.accession_number}'")

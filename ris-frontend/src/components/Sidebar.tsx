@@ -11,11 +11,37 @@ interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 export default function Sidebar({ className, isCollapsed }: SidebarProps) {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
   const pathname = usePathname();
   const isSupervisor = user?.is_superuser || false;
   const isStaff = user?.is_staff || false;
   const isNormalUser = user && !isStaff;
+  
+  // Don't render menu items while loading authentication state
+  if (isLoading) {
+    return (
+      <aside className={cn("hidden md:block text-white bg-sidebar", isCollapsed ? "w-20" : "w-64", "transition-all duration-300", className)}>
+        <nav className="p-4">
+          <div className="flex items-center justify-center h-32">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+          </div>
+        </nav>
+      </aside>
+    );
+  }
+  
+  // Don't render menu items if user is not authenticated
+  if (!user) {
+    return (
+      <aside className={cn("hidden md:block text-white bg-sidebar", isCollapsed ? "w-20" : "w-64", "transition-all duration-300", className)}>
+        <nav className="p-4">
+          <div className="flex items-center justify-center h-32 text-white/60 text-sm">
+            {!isCollapsed && "Please log in"}
+          </div>
+        </nav>
+      </aside>
+    );
+  }
 
   // Helper function to determine if a link is active
   const isActive = (href: string) => {

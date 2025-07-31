@@ -511,6 +511,25 @@ class Pemeriksaan(auto_prefetch.Model):
     jxr = auto_prefetch.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True, related_name="exam_jxr"
     )
+    
+    # DICOM Content Date/Time (actual examination date/time from DICOM tags)
+    content_date = models.DateField(
+        blank=True, null=True,
+        help_text="DICOM ContentDate (0008,0023) - actual examination date"
+    )
+    content_time = models.TimeField(
+        blank=True, null=True,
+        help_text="DICOM ContentTime (0008,0033) - actual examination time"
+    )
+    content_datetime = models.DateTimeField(
+        blank=True, null=True,
+        help_text="Combined DICOM ContentDate and ContentTime for sorting and display"
+    )
+    content_datetime_source = models.CharField(
+        max_length=50, blank=True, null=True,
+        help_text="Source of the datetime (e.g., 'ContentDate/ContentTime', 'StudyDate/StudyTime')"
+    )
+    
     created = models.DateTimeField(auto_now_add=True)
     modified = models.DateTimeField(auto_now=True)
 

@@ -201,10 +201,10 @@ const DicomUpload: React.FC<DicomUploadProps> = ({
 
   const wardOptions: SelectOption[] = [
     { value: '', label: 'Select ward (optional)' },
-    ...wards.map(ward => ({
+    ...(Array.isArray(wards) ? wards.map(ward => ({
       value: ward.id,
       label: ward.wad
-    }))
+    })) : [])
   ];
   
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -262,7 +262,8 @@ const DicomUpload: React.FC<DicomUploadProps> = ({
       );
       if (response.ok) {
         const data = await response.json();
-        setWards(data);
+        // Handle DRF pagination - extract results array
+        setWards(data.results || data);
       }
     } catch (error) {
       toast.error('Failed to load wards');

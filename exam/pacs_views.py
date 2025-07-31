@@ -5,6 +5,7 @@ Provides REST API endpoints for browsing legacy DICOM studies in Orthanc PACS
 
 import requests
 import json
+from datetime import datetime
 from django.http import HttpResponse, StreamingHttpResponse
 from django.db import IntegrityError
 from rest_framework.views import APIView
@@ -478,6 +479,19 @@ def import_legacy_study(request):
             }
 
         with transaction.atomic():
+            # Enhanced DICOM date/time extraction for PACS import
+            # Since we only have StudyDate/StudyTime from PACS, use those as ContentDate/ContentTime
+            datetime_source = ""
+            if study_date and study_time:
+                datetime_source = "StudyDate/StudyTime"
+            elif study_date:
+                datetime_source = "StudyDate (no time)"
+            
+            print(f"DEBUG: PACS Import Date/Time extraction:")
+            print(f"  StudyDate: {study_date}")
+            print(f"  StudyTime: {study_time}")
+            print(f"  DateTime source: {datetime_source}")
+            
             # Prepare DICOM metadata for shared functions
             file_metadata = {
                 'patient_name': patient_name,
@@ -491,7 +505,11 @@ def import_legacy_study(request):
                 'accession_number': accession_number,
                 'requesting_service': '',  # Not available in PACS import
                 'institution_name': institution_name,  # Add institution name for accession generation
-                'modality': modality
+                'modality': modality,
+                # Add DICOM Content Date/Time fields for consistency with DICOM upload
+                'content_date': study_date,  # Use StudyDate as ContentDate
+                'content_time': study_time,  # Use StudyTime as ContentTime
+                'datetime_source': datetime_source,
             }
             
             # Find or create patient using shared function

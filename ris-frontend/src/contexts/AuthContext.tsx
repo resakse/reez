@@ -75,8 +75,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
+    setIsLoading(true); // Prevent menu flash during logout
     AuthService.logout();
     setUser(null);
+    setIsLoading(false);
   };
 
   return (

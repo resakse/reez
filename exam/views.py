@@ -185,7 +185,7 @@ class PemeriksaanViewSet(viewsets.ModelViewSet):
     ordering_fields = [
         'no_xray', 'created', 'daftar__tarikh', 'daftar__pesakit__nama', 
         'exam__exam', 'exam__modaliti__nama', 'daftar__pemohon', 
-        'daftar__rujukan__wad', 'daftar__jxr__first_name'
+        'daftar__rujukan__wad', 'daftar__jxr__first_name', 'content_datetime'
     ]
     ordering = ['-no_xray']  # Default ordering by X-ray number descending
     pagination_class = CustomPagination
@@ -1069,6 +1069,61 @@ def upload_dicom_files(request):
                 series_description = getattr(dcm, 'SeriesDescription', '')
                 laterality = getattr(dcm, 'Laterality', '')  # L/R
                 
+                # Extract DICOM Date/Time with multiple fallback options and track source
+                date_source = ""
+                time_source = ""
+                
+                # Find best available date
+                if getattr(dcm, 'ContentDate', ''):
+                    content_date = dcm.ContentDate
+                    date_source = "ContentDate"
+                elif getattr(dcm, 'StudyDate', ''):
+                    content_date = dcm.StudyDate
+                    date_source = "StudyDate"
+                elif getattr(dcm, 'SeriesDate', ''):
+                    content_date = dcm.SeriesDate
+                    date_source = "SeriesDate"
+                elif getattr(dcm, 'AcquisitionDate', ''):
+                    content_date = dcm.AcquisitionDate
+                    date_source = "AcquisitionDate"
+                elif getattr(dcm, 'InstanceCreationDate', ''):
+                    content_date = dcm.InstanceCreationDate
+                    date_source = "InstanceCreationDate"
+                else:
+                    content_date = ""
+                
+                # Find best available time
+                if getattr(dcm, 'ContentTime', ''):
+                    content_time = dcm.ContentTime
+                    time_source = "ContentTime"
+                elif getattr(dcm, 'StudyTime', ''):
+                    content_time = dcm.StudyTime
+                    time_source = "StudyTime"
+                elif getattr(dcm, 'SeriesTime', ''):
+                    content_time = dcm.SeriesTime
+                    time_source = "SeriesTime"
+                elif getattr(dcm, 'AcquisitionTime', ''):
+                    content_time = dcm.AcquisitionTime
+                    time_source = "AcquisitionTime"
+                elif getattr(dcm, 'InstanceCreationTime', ''):
+                    content_time = dcm.InstanceCreationTime
+                    time_source = "InstanceCreationTime"
+                else:
+                    content_time = ""
+                
+                # Create datetime source description
+                if date_source and time_source:
+                    datetime_source = f"{date_source}/{time_source}"
+                elif date_source:
+                    datetime_source = f"{date_source} (no time)"
+                else:
+                    datetime_source = ""
+                
+                print(f"DEBUG: DICOM Date/Time extraction for {uploaded_file.name}:")
+                print(f"  Final content_date: {content_date} (from {date_source})")
+                print(f"  Final content_time: {content_time} (from {time_source})")
+                print(f"  DateTime source: {datetime_source}")
+                
                 # Store metadata for processing
                 file_metadata = {
                     'filename': uploaded_file.name,
@@ -1099,6 +1154,10 @@ def upload_dicom_files(request):
                     'patient_position': patient_position,
                     'view_position': view_position,
                     'laterality': laterality,
+                    # DICOM Content Date/Time
+                    'content_date': content_date,
+                    'content_time': content_time,
+                    'datetime_source': datetime_source,
                 }
                 processed_files.append(file_metadata)
                 
