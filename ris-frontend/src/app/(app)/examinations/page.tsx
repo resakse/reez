@@ -130,11 +130,7 @@ export default function ExaminationsPage() {
 
   // Initialize flatpickr for date range (copied from pacs-browser)
   useEffect(() => {
-    console.log('Flatpickr useEffect running, dateRangeRef.current:', dateRangeRef.current);
-    
     if (dateRangeRef.current) {
-      console.log('Initializing flatpickr on element:', dateRangeRef.current);
-      
       // Check if dark mode is enabled
       const isDarkMode = document.documentElement.classList.contains('dark');
       
@@ -145,7 +141,6 @@ export default function ExaminationsPage() {
         allowInput: true,
         theme: isDarkMode ? 'dark' : 'light',
         onChange: (selectedDates) => {
-          console.log('Flatpickr onChange:', selectedDates);
           const dates = selectedDates.map(date => {
             const year = date.getFullYear();
             const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -159,8 +154,6 @@ export default function ExaminationsPage() {
           }));
         }
       });
-
-      console.log('Flatpickr instance created:', fp);
 
       // Listen for theme changes and update flatpickr theme
       const observer = new MutationObserver((mutations) => {
@@ -181,13 +174,12 @@ export default function ExaminationsPage() {
         fp.destroy();
         observer.disconnect();
       };
-    } else {
-      console.log('dateRangeRef.current is null, will retry');
     }
   }, [loading]); // Add loading dependency to retry after data loads
 
   const fetchExaminations = async () => {
     try {
+      console.log('fetchExaminations called with filters:', filters);
       setLoading(true);
       
       // Build query parameters
@@ -237,11 +229,15 @@ export default function ExaminationsPage() {
     }));
   };
 
-  const handleSearch = () => {
+  const handleSearch = (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    console.log('Apply Filters clicked, current filters:', filters);
     fetchExaminations();
   };
 
-  const clearFilters = () => {
+  const clearFilters = (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    console.log('Clear Filters clicked');
     setFilters({
       search: '',
       date_range: [],

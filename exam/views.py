@@ -19,6 +19,7 @@ from exam.models import Pemeriksaan, Daftar, Exam, Modaliti, Part, Region, gener
 from pesakit.models import Pesakit
 from exam.models import PacsConfig, DashboardConfig
 from .filters import DaftarFilter
+from .examination_views import PemeriksaanFilter
 from .forms import BcsForm, DaftarForm, RegionForm, ExamForm, PacsConfigForm
 
 from rest_framework import viewsets, status
@@ -173,6 +174,7 @@ class PemeriksaanViewSet(viewsets.ModelViewSet):
     serializer_class = PemeriksaanSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_class = PemeriksaanFilter
     search_fields = ['no_xray', 'daftar__pesakit__nama', 'daftar__pemohon', 'exam__exam']
     ordering_fields = ['no_xray', 'created', 'daftar__tarikh']
     ordering = ['-no_xray']  # Default ordering by X-ray number descending
