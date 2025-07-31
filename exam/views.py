@@ -1556,19 +1556,42 @@ class DashboardStatsAPIView(APIView):
                 study_status='COMPLETED'
             ).count()
             
+            # Calculate cases per day - use actual days in period
+            if period_name == 'today':
+                days_in_period = 1
+            elif period_name == 'week':
+                days_in_period = 7
+            elif period_name == 'month':
+                days_in_period = 30
+            elif period_name == 'year':
+                days_in_period = 365
+            
+            cases_per_day = round(examinations_count / days_in_period, 1) if days_in_period > 0 else 0
+            
             stats[period_name] = {
                 'patients': patients_count,
                 'registrations': registrations_count,
                 'examinations': examinations_count,
-                'studies_completed': completed_studies
+                'studies_completed': completed_studies,
+                'cases_per_day': cases_per_day
             }
         
         # All time stats
+        all_examinations = Pemeriksaan.objects.count()
+        # Calculate all-time cases per day based on data span
+        first_exam = Pemeriksaan.objects.order_by('created').first()
+        if first_exam:
+            total_days = (now - first_exam.created).days or 1
+            all_time_cases_per_day = round(all_examinations / total_days, 1)
+        else:
+            all_time_cases_per_day = 0
+        
         stats['all_time'] = {
             'patients': Pesakit.objects.count(),
             'registrations': Daftar.objects.count(),
-            'examinations': Pemeriksaan.objects.count(),
-            'studies_completed': Daftar.objects.filter(study_status='COMPLETED').count()
+            'examinations': all_examinations,
+            'studies_completed': Daftar.objects.filter(study_status='COMPLETED').count(),
+            'cases_per_day': all_time_cases_per_day
         }
         
         return Response(stats)
@@ -1692,6 +1715,82 @@ class DashboardDemographicsAPIView(APIView):
                 'race': race_list
             }
         
+        # Add all_time demographics
+        all_patients = Pesakit.objects.all()
+        total_all_patients = all_patients.count()
+        
+        if total_all_patients > 0:
+            # Age groups calculation for all time
+            age_groups_all = {'0-17': 0, '18-65': 0, '65+': 0}
+            
+            for patient in all_patients:
+                if patient.t_lahir:  # If we can calculate age from NRIC
+                    age = patient.kira_umur
+                    if age < 18:
+                        age_groups_all['0-17'] += 1
+                    elif age <= 65:
+                        age_groups_all['18-65'] += 1
+                    else:
+                        age_groups_all['65+'] += 1
+                else:
+                    # If no birth date, try to parse umur field
+                    if patient.umur:
+                        try:
+                            age_str = patient.umur.replace('Y', '').replace('y', '').strip()
+                            age = int(age_str)
+                            if age < 18:
+                                age_groups_all['0-17'] += 1
+                            elif age <= 65:
+                                age_groups_all['18-65'] += 1
+                            else:
+                                age_groups_all['65+'] += 1
+                        except (ValueError, AttributeError):
+                            # Default to adult if we can't determine age
+                            age_groups_all['18-65'] += 1
+            
+            age_groups_all_list = [
+                {
+                    'range': age_range,
+                    'count': count,
+                    'percentage': round((count / total_all_patients) * 100, 1) if total_all_patients > 0 else 0
+                }
+                for age_range, count in age_groups_all.items()
+            ]
+            
+            # Gender distribution for all time
+            gender_stats_all = all_patients.values('jantina').annotate(count=Count('jantina'))
+            gender_all_list = []
+            for gender_stat in gender_stats_all:
+                gender_display = 'M' if gender_stat['jantina'] == 'L' else 'F'
+                gender_all_list.append({
+                    'gender': gender_display,
+                    'count': gender_stat['count'],
+                    'percentage': round((gender_stat['count'] / total_all_patients) * 100, 1)
+                })
+            
+            # Race distribution for all time
+            race_stats_all = all_patients.values('bangsa').annotate(count=Count('bangsa'))
+            race_all_list = [
+                {
+                    'race': race_stat['bangsa'],
+                    'count': race_stat['count'],
+                    'percentage': round((race_stat['count'] / total_all_patients) * 100, 1)
+                }
+                for race_stat in race_stats_all
+            ]
+            
+            demographics['by_period']['all_time'] = {
+                'age_groups': age_groups_all_list,
+                'gender': gender_all_list,
+                'race': race_all_list
+            }
+        else:
+            demographics['by_period']['all_time'] = {
+                'age_groups': [],
+                'gender': [],
+                'race': []
+            }
+        
         return Response(demographics)
 
 
@@ -1759,6 +1858,29 @@ class DashboardModalityStatsAPIView(APIView):
             
             modality_stats['by_period'][period_name] = modality_list
         
+        # Add all_time modality stats
+        all_examinations = Pemeriksaan.objects.all().select_related('exam__modaliti')
+        total_all_exams = all_examinations.count()
+        
+        if total_all_exams > 0:
+            # Group by modality for all time
+            all_modality_counts = all_examinations.values('exam__modaliti__nama').annotate(
+                count=Count('exam__modaliti__nama')
+            ).order_by('-count')
+            
+            all_modality_list = [
+                {
+                    'modality': modality['exam__modaliti__nama'],
+                    'count': modality['count'],
+                    'percentage': round((modality['count'] / total_all_exams) * 100, 1)
+                }
+                for modality in all_modality_counts
+            ]
+            
+            modality_stats['by_period']['all_time'] = all_modality_list
+        else:
+            modality_stats['by_period']['all_time'] = []
+        
         return Response(modality_stats)
 
 
@@ -1772,6 +1894,7 @@ class DashboardStorageAPIView(APIView):
     def get(self, request):
         import os
         import shutil
+        import psutil
         from django.conf import settings
         
         try:
@@ -1908,6 +2031,33 @@ class DashboardStorageAPIView(APIView):
                         'percentage': round((estimated_size_gb / total_used) * 100, 1) if total_used > 0 else 0
                     })
             
+            # Get system resources (CPU and RAM)
+            try:
+                cpu_percent = psutil.cpu_percent(interval=1)
+                memory = psutil.virtual_memory()
+                disk_io = psutil.disk_io_counters()
+                
+                system_resources = {
+                    'cpu_usage_percent': round(cpu_percent, 1),
+                    'ram_total_gb': round(memory.total / (1024**3), 2),
+                    'ram_used_gb': round(memory.used / (1024**3), 2),
+                    'ram_available_gb': round(memory.available / (1024**3), 2),
+                    'ram_usage_percent': round(memory.percent, 1),
+                    'disk_read_mb': round(disk_io.read_bytes / (1024**2), 2) if disk_io else 0,
+                    'disk_write_mb': round(disk_io.write_bytes / (1024**2), 2) if disk_io else 0
+                }
+            except (ImportError, AttributeError):
+                # psutil might not be available or some functions might not work
+                system_resources = {
+                    'cpu_usage_percent': 0,
+                    'ram_total_gb': 0,
+                    'ram_used_gb': 0,
+                    'ram_available_gb': 0,
+                    'ram_usage_percent': 0,
+                    'disk_read_mb': 0,
+                    'disk_write_mb': 0
+                }
+            
             return Response({
                 'storage_paths': storage_info,
                 'primary_storage': {
@@ -1923,7 +2073,8 @@ class DashboardStorageAPIView(APIView):
                     'months_until_full': round(months_until_full, 1),
                     'daily_exam_count': round(daily_exam_count, 1)
                 },
-                'by_modality': modality_breakdown
+                'by_modality': modality_breakdown,
+                'system_resources': system_resources
             })
             
         except Exception as e:
@@ -1945,3 +2096,232 @@ class DashboardStorageAPIView(APIView):
                 },
                 'by_modality': []
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class DashboardConfigAPIView(APIView):
+    """
+    API endpoint for dashboard configuration management
+    """
+    permission_classes = []  # Temporarily allow unauthenticated access for testing
+    renderer_classes = [JSONRenderer]
+    
+    def get(self, request):
+        """Get current dashboard configuration"""
+        try:
+            config = DashboardConfig.objects.first()
+            if not config:
+                # Create default config if none exists
+                config = DashboardConfig.objects.create()
+            
+            return Response({
+                'id': config.id,
+                'storage_root_paths': config.storage_root_paths,
+                'storage_warning_threshold': config.storage_warning_threshold,
+                'storage_critical_threshold': config.storage_critical_threshold,
+                'target_turnaround_time': config.target_turnaround_time,
+                'target_daily_throughput': config.target_daily_throughput,
+                'target_equipment_utilization': config.target_equipment_utilization,
+                'modality_size_estimates': config.modality_size_estimates,
+                'auto_refresh_interval': config.auto_refresh_interval,
+                'email_notifications': config.email_notifications,
+                'notification_emails': config.notification_emails,
+                'modified': config.modified
+            })
+            
+        except Exception as e:
+            return Response({
+                'error': f'Failed to fetch configuration: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    def post(self, request):
+        """Update dashboard configuration"""
+        try:
+            config = DashboardConfig.objects.first()
+            if not config:
+                config = DashboardConfig.objects.create()
+            
+            # Update configuration fields
+            if 'storage_root_paths' in request.data:
+                config.storage_root_paths = request.data['storage_root_paths']
+            if 'storage_warning_threshold' in request.data:
+                config.storage_warning_threshold = request.data['storage_warning_threshold']
+            if 'storage_critical_threshold' in request.data:
+                config.storage_critical_threshold = request.data['storage_critical_threshold']
+            if 'target_turnaround_time' in request.data:
+                config.target_turnaround_time = request.data['target_turnaround_time']
+            if 'target_daily_throughput' in request.data:
+                config.target_daily_throughput = request.data['target_daily_throughput']
+            if 'target_equipment_utilization' in request.data:
+                config.target_equipment_utilization = request.data['target_equipment_utilization']
+            if 'modality_size_estimates' in request.data:
+                config.modality_size_estimates = request.data['modality_size_estimates']
+            if 'auto_refresh_interval' in request.data:
+                config.auto_refresh_interval = request.data['auto_refresh_interval']
+            if 'email_notifications' in request.data:
+                config.email_notifications = request.data['email_notifications']
+            if 'notification_emails' in request.data:
+                config.notification_emails = request.data['notification_emails']
+            
+            config.save()
+            
+            return Response({
+                'success': True,
+                'message': 'Configuration updated successfully',
+                'config': {
+                    'id': config.id,
+                    'storage_root_paths': config.storage_root_paths,
+                    'storage_warning_threshold': config.storage_warning_threshold,
+                    'storage_critical_threshold': config.storage_critical_threshold,
+                    'modality_size_estimates': config.modality_size_estimates,
+                    'modified': config.modified
+                }
+            })
+            
+        except Exception as e:
+            return Response({
+                'error': f'Failed to update configuration: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class DashboardBodypartsExamTypesAPIView(APIView):
+    """
+    API endpoint for bodyparts and exam types distribution
+    Provides breakdown of examinations by body parts and exam types by time periods
+    """
+    permission_classes = []  # Temporarily allow unauthenticated access for testing
+    renderer_classes = [JSONRenderer]
+    
+    def get(self, request):
+        from datetime import datetime, timedelta
+        from django.db.models import Count
+        
+        # Get current time
+        now = timezone.now()
+        today = now.date()
+        
+        # Define time periods
+        periods = {
+            'today': {
+                'start': timezone.make_aware(datetime.combine(today, datetime.min.time())),
+                'end': timezone.make_aware(datetime.combine(today, datetime.max.time()))
+            },
+            'week': {
+                'start': now - timedelta(days=7),
+                'end': now
+            },
+            'month': {
+                'start': now - timedelta(days=30),
+                'end': now
+            },
+            'year': {
+                'start': now - timedelta(days=365),
+                'end': now
+            }
+        }
+        
+        bodyparts_exam_stats = {'by_period': {}}
+        
+        for period_name, period_range in periods.items():
+            # Get examinations in this period
+            examinations = Pemeriksaan.objects.filter(
+                created__range=[period_range['start'], period_range['end']]
+            )
+            
+            total_examinations = examinations.count()
+            
+            if total_examinations == 0:
+                bodyparts_exam_stats['by_period'][period_name] = {
+                    'bodyparts': [],
+                    'exam_types': []
+                }
+                continue
+            
+            # Body parts distribution (using Part model through Exam)
+            bodyparts_stats = examinations.values('exam__part__part').annotate(
+                count=Count('exam__part__part')
+            ).order_by('-count')
+            
+            bodyparts_list = []
+            for bodypart_stat in bodyparts_stats:
+                bodypart_name = bodypart_stat['exam__part__part'] or 'Unknown'
+                count = bodypart_stat['count']
+                percentage = round((count / total_examinations) * 100, 1)
+                
+                bodyparts_list.append({
+                    'bodypart': bodypart_name,
+                    'count': count,
+                    'percentage': percentage
+                })
+            
+            # Exam types distribution (using Exam model)
+            exam_types_stats = examinations.values('exam__exam').annotate(
+                count=Count('exam__exam')
+            ).order_by('-count')
+            
+            exam_types_list = []
+            for exam_type_stat in exam_types_stats:
+                exam_name = exam_type_stat['exam__exam'] or 'Unknown'
+                count = exam_type_stat['count']
+                percentage = round((count / total_examinations) * 100, 1)
+                
+                exam_types_list.append({
+                    'exam_type': exam_name,
+                    'count': count,
+                    'percentage': percentage
+                })
+            
+            bodyparts_exam_stats['by_period'][period_name] = {
+                'bodyparts': bodyparts_list,
+                'exam_types': exam_types_list
+            }
+        
+        # Add all_time stats
+        all_examinations = Pemeriksaan.objects.all()
+        total_all_examinations = all_examinations.count()
+        
+        if total_all_examinations > 0:
+            # All time body parts
+            all_bodyparts_stats = all_examinations.values('exam__part__part').annotate(
+                count=Count('exam__part__part')
+            ).order_by('-count')
+            
+            all_bodyparts_list = []
+            for bodypart_stat in all_bodyparts_stats:
+                bodypart_name = bodypart_stat['exam__part__part'] or 'Unknown'
+                count = bodypart_stat['count']
+                percentage = round((count / total_all_examinations) * 100, 1)
+                
+                all_bodyparts_list.append({
+                    'bodypart': bodypart_name,
+                    'count': count,
+                    'percentage': percentage
+                })
+            
+            # All time exam types
+            all_exam_types_stats = all_examinations.values('exam__exam').annotate(
+                count=Count('exam__exam')
+            ).order_by('-count')
+            
+            all_exam_types_list = []
+            for exam_type_stat in all_exam_types_stats:
+                exam_name = exam_type_stat['exam__exam'] or 'Unknown'
+                count = exam_type_stat['count']
+                percentage = round((count / total_all_examinations) * 100, 1)
+                
+                all_exam_types_list.append({
+                    'exam_type': exam_name,
+                    'count': count,
+                    'percentage': percentage
+                })
+            
+            bodyparts_exam_stats['by_period']['all_time'] = {
+                'bodyparts': all_bodyparts_list,
+                'exam_types': all_exam_types_list
+            }
+        else:
+            bodyparts_exam_stats['by_period']['all_time'] = {
+                'bodyparts': [],
+                'exam_types': []
+            }
+        
+        return Response(bodyparts_exam_stats)

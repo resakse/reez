@@ -8,7 +8,8 @@ from .views import (
     GroupedExaminationView, GroupedMWLView, PositionChoicesView,
     DicomWorklistExportView, upload_dicom_files,
     DashboardStatsAPIView, DashboardDemographicsAPIView, 
-    DashboardModalityStatsAPIView, DashboardStorageAPIView
+    DashboardModalityStatsAPIView, DashboardStorageAPIView,
+    DashboardConfigAPIView, DashboardBodypartsExamTypesAPIView
 )
 from .settings_views import PacsConfigListCreateAPIView, PacsConfigDetailAPIView, get_current_pacs_config, get_pacs_orthanc_url
 from .examination_views import ExaminationListAPIView, ExaminationDetailAPIView
@@ -117,4 +118,6 @@ urlpatterns = [
     path('dashboard/demographics/', DashboardDemographicsAPIView.as_view(), name='dashboard-demographics'),
     path('dashboard/modality-stats/', DashboardModalityStatsAPIView.as_view(), name='dashboard-modality-stats'),
     path('dashboard/storage/', DashboardStorageAPIView.as_view(), name='dashboard-storage'),
+    path('dashboard/config/', DashboardConfigAPIView.as_view(), name='dashboard-config'),
+    path('dashboard/bodyparts-examtypes/', DashboardBodypartsExamTypesAPIView.as_view(), name='dashboard-bodyparts-examtypes'),
 ]
