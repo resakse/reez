@@ -271,7 +271,7 @@ export default function ExaminationsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
-                  {examTypes.map((exam) => (
+                  {examTypes.filter(exam => exam.id && exam.id.toString() !== '').map((exam) => (
                     <SelectItem key={exam.id} value={exam.id.toString()}>
                       {exam.exam}
                     </SelectItem>
@@ -298,7 +298,7 @@ export default function ExaminationsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Wards</SelectItem>
-                  {wards.map((ward) => (
+                  {wards.filter(ward => ward.id && ward.id.toString() !== '').map((ward) => (
                     <SelectItem key={ward.id} value={ward.id.toString()}>
                       {ward.wad}
                     </SelectItem>

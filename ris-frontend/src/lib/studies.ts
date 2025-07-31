@@ -14,6 +14,8 @@ export interface Study {
   institution?: string;
   examinationId?: number;
   registrationId?: number;
+  ward?: string;
+  klinik?: string;
 }
 
 /**
@@ -50,7 +52,9 @@ export async function fetchStudies(): Promise<Study[]> {
         imageCount: 1, // Estimate - actual count would need PACS integration
         institution: 'Hospital Kuala Lumpur', // Could be made configurable
         examinationId: exam.id,
-        registrationId: daftar.id
+        registrationId: daftar.id,
+        ward: daftar.rujukan?.wad || 'Unknown Ward',
+        klinik: daftar.jxr?.klinik || 'Unknown Clinic'
       };
     }) || [];
     

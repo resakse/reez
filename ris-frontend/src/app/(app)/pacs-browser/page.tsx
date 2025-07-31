@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -41,19 +41,14 @@ interface LegacyStudy {
   SeriesCount?: number;
   ImageCount?: number;
   InstitutionName?: string;
+  Ward?: string;
+  Klinik?: string;
 }
 
-const modalityOptions = [
-  { value: 'ALL', label: 'All Modalities' },
-  { value: 'CT', label: 'CT Scan' },
-  { value: 'MR', label: 'MRI' },
-  { value: 'CR', label: 'X-Ray (CR)' },
-  { value: 'DR', label: 'X-Ray (DR)' },
-  { value: 'US', label: 'Ultrasound' },
-  { value: 'MG', label: 'Mammography' },
-  { value: 'RF', label: 'Fluoroscopy' },
-  { value: 'NM', label: 'Nuclear Medicine' }
-];
+interface ModalityOption {
+  value: string;
+  label: string;
+}
 
 export default function PacsBrowserPage() {
   const router = useRouter();
@@ -64,6 +59,11 @@ export default function PacsBrowserPage() {
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [totalStudies, setTotalStudies] = useState(0);
+  const [modalityOptions, setModalityOptions] = useState<ModalityOption[]>([
+    { value: 'ALL', label: 'All Modalities' }
+  ]);
+  const [allKlinikOptions, setAllKlinikOptions] = useState<string[]>([]);
+  const [allStudies, setAllStudies] = useState<LegacyStudy[]>([]);
 
   // Search filters
   const [patientName, setPatientName] = useState('');
@@ -72,6 +72,7 @@ export default function PacsBrowserPage() {
   const [dateTo, setDateTo] = useState('');
   const [modality, setModality] = useState('ALL');
   const [studyDescription, setStudyDescription] = useState('');
+  const [klinik, setKlinik] = useState('all');
 
   const formatDate = (dateString: string): string => {
     if (!dateString || dateString.length !== 8) return dateString;
@@ -83,18 +84,109 @@ export default function PacsBrowserPage() {
     return `${timeString.substring(0, 2)}:${timeString.substring(2, 4)}:${timeString.substring(4, 6)}`;
   };
 
+  const extractKlinikFromDescription = (text: string): string => {
+    if (!text) return '';
+    
+    // Multiple patterns to match different klinik formats
+    const patterns = [
+      // "KLINIK KESIHATAN BUKIT KUDA" - standard format
+      /KLINIK\s+[A-Z][A-Z\s]*/i,
+      // "RUJUKAN: KLINIK MATA" - with rujukan prefix
+      /RUJUKAN[:\s]*KLINIK\s+[A-Z][A-Z\s]*/i,
+      // "Klinik Ortopedik" - mixed case
+      /Klinik\s+[A-Za-z][A-Za-z\s]*/,
+      // "WARD 3A" or "WAD 5B" - ward references
+      /W[A-Z]*D\s+[A-Z0-9][A-Z0-9\s]*/i,
+      // "Unit Rawatan Rapi" - unit references
+      /UNIT\s+[A-Z][A-Z\s]*/i,
+      // "Jabatan Emergency" - department references
+      /JABATAN\s+[A-Z][A-Z\s]*/i
+    ];
+    
+    for (const pattern of patterns) {
+      const match = text.match(pattern);
+      if (match) {
+        let result = match[0].trim();
+        // Clean up common prefixes
+        result = result.replace(/^RUJUKAN[:\s]*/i, '');
+        return result;
+      }
+    }
+    
+    // If no specific pattern matches, look for any capitalized department-like words
+    const fallbackMatch = text.match(/\b[A-Z]{2,}(?:\s+[A-Z]{2,})*\b/);
+    if (fallbackMatch && fallbackMatch[0].length > 3) {
+      return fallbackMatch[0];
+    }
+    
+    return '';
+  };
+
+  // Auto-filter studies based on current filter values
+  const filteredStudies = useMemo(() => {
+    let filtered = [...allStudies];
+
+    // Apply text filters only if they meet minimum length requirement
+    if (patientName.length >= 3) {
+      filtered = filtered.filter(study => 
+        study.PatientName?.toLowerCase().includes(patientName.toLowerCase())
+      );
+    }
+
+    if (patientId.length >= 3) {
+      filtered = filtered.filter(study => 
+        study.PatientID?.includes(patientId)
+      );
+    }
+
+    if (studyDescription.length >= 3) {
+      filtered = filtered.filter(study => 
+        study.StudyDescription?.toLowerCase().includes(studyDescription.toLowerCase())
+      );
+    }
+
+    // Apply dropdown filters immediately
+    if (modality && modality !== 'ALL') {
+      filtered = filtered.filter(study => study.Modality === modality);
+    }
+
+    if (klinik && klinik !== 'all') {
+      filtered = filtered.filter(study => 
+        study.Klinik && study.Klinik.toLowerCase().includes(klinik.toLowerCase())
+      );
+    }
+
+    // Apply date filters
+    if (dateFrom) {
+      const fromDate = dateFrom.replace(/-/g, '');
+      filtered = filtered.filter(study => study.StudyDate >= fromDate);
+    }
+
+    if (dateTo) {
+      const toDate = dateTo.replace(/-/g, '');
+      filtered = filtered.filter(study => study.StudyDate <= toDate);
+    }
+
+    return filtered;
+  }, [allStudies, patientName, patientId, studyDescription, modality, klinik, dateFrom, dateTo]);
+
+  // Update displayed studies when filtered studies change
+  useEffect(() => {
+    setStudies(filteredStudies);
+    setTotalStudies(filteredStudies.length);
+  }, [filteredStudies]);
+
   const searchLegacyStudies = useCallback(async () => {
     try {
       setSearching(true);
       setError(null);
       
-      // Build search parameters
+      // Build search parameters (klinik and modality filtering done client-side)
       const searchParams = {
         patientName: patientName.trim() || undefined,
         patientId: patientId.trim() || undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
-        modality: (modality && modality !== 'ALL') ? modality : undefined,
         studyDescription: studyDescription.trim() || undefined,
         limit: 100
       };
@@ -130,7 +222,7 @@ export default function PacsBrowserPage() {
       }
 
       // Map backend response to frontend format
-      const formattedStudies: LegacyStudy[] = data.studies.map((study: any) => ({
+      let formattedStudies: LegacyStudy[] = data.studies.map((study: any) => ({
         ID: study.id,
         StudyInstanceUID: study.studyInstanceUid,
         PatientName: study.patientName,
@@ -143,13 +235,21 @@ export default function PacsBrowserPage() {
         Modality: study.modality,
         SeriesCount: study.seriesCount,
         ImageCount: study.imageCount,
-        InstitutionName: study.institutionName
+        InstitutionName: study.institutionName,
+        Ward: study.ward,
+        Klinik: extractKlinikFromDescription(study.institutionName || study.studyDescription)
       }));
 
-      // Successfully formatted studies
+      // Store all studies for client-side filtering
+      setAllStudies(formattedStudies);
 
-      setStudies(formattedStudies);
-      setTotalStudies(formattedStudies.length);
+      // Update klinik options from search results (preserve existing options)
+      const extractedKliniks = formattedStudies.map(study => study.Klinik).filter(Boolean);
+      const newKlinikOptions = Array.from(new Set([
+        ...allKlinikOptions,
+        ...extractedKliniks
+      ])).sort();
+      setAllKlinikOptions(newKlinikOptions);
       
       if (formattedStudies.length === 0) {
         toast.success('Search completed - no studies found matching criteria');
@@ -163,7 +263,7 @@ export default function PacsBrowserPage() {
     } finally {
       setSearching(false);
     }
-  }, [patientName, patientId, dateFrom, dateTo, modality, studyDescription]);
+  }, [patientName, patientId, dateFrom, dateTo, modality, studyDescription, klinik]);
 
   const clearFilters = () => {
     setPatientName('');
@@ -172,9 +272,9 @@ export default function PacsBrowserPage() {
     setDateTo('');
     setModality('ALL');
     setStudyDescription('');
-    setStudies([]);
-    setTotalStudies(0);
+    setKlinik('all');
     setError(null);
+    // Studies will be automatically filtered by the useMemo
   };
 
   const viewStudy = (study: LegacyStudy) => {
@@ -186,6 +286,143 @@ export default function PacsBrowserPage() {
     // TODO: Implement import functionality
     toast.info('Import functionality coming soon');
   };
+
+  // Fetch modality options from database
+  useEffect(() => {
+    const fetchModalities = async () => {
+      try {
+        const response = await AuthService.authenticatedFetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/modalities/`
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          const options: ModalityOption[] = [
+            { value: 'ALL', label: 'All Modalities' }
+          ];
+          
+          // Handle both paginated (data.results) and direct array responses
+          const modalities = data.results || data;
+          
+          if (!Array.isArray(modalities)) {
+            console.error('Invalid modalities response:', data);
+            toast.error('Invalid modality data format');
+            return;
+          }
+          
+          // Process modalities and ensure proper DICOM codes
+          modalities.forEach((modality: any) => {
+            let dicomCode = modality.singkatan;
+            
+            // If singkatan is empty/null, try to map from nama
+            if (!dicomCode || dicomCode.trim() === '') {
+              // Map common Malaysian names to DICOM codes
+              const nama = modality.nama.toLowerCase();
+              if (nama.includes('x-ray') || nama.includes('xray')) {
+                dicomCode = 'XR';
+              } else if (nama.includes('ct') || nama.includes('computed tomography')) {
+                dicomCode = 'CT';
+              } else if (nama.includes('mri') || nama.includes('magnetic resonance')) {
+                dicomCode = 'MR';
+              } else if (nama.includes('ultrasound') || nama.includes('ultrasonografi')) {
+                dicomCode = 'US';
+              } else if (nama.includes('mammography') || nama.includes('mamografi')) {
+                dicomCode = 'MG';
+              } else {
+                // Default to first 2-3 characters if no mapping found
+                dicomCode = modality.nama.substring(0, 3).toUpperCase();
+              }
+            }
+            
+            options.push({
+              value: dicomCode,
+              label: modality.nama
+            });
+          });
+          
+          setModalityOptions(options);
+        } else {
+          console.error('Failed to fetch modalities:', response.status, response.statusText);
+          toast.error('Failed to load modality options');
+        }
+      } catch (err) {
+        console.error('Failed to fetch modalities:', err);
+        toast.error('Failed to load modality options');
+      }
+    };
+
+    fetchModalities();
+  }, []);
+
+  // Auto-load studies on component mount  
+  useEffect(() => {
+    const autoLoadStudies = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Search with empty parameters to get all recent studies
+        const response = await AuthService.authenticatedFetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/pacs/search/`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ limit: 100 })
+          }
+        );
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `Failed to load studies: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to load studies');
+        }
+
+        // Map backend response to frontend format
+        const formattedStudies: LegacyStudy[] = data.studies.map((study: any) => ({
+          ID: study.id,
+          StudyInstanceUID: study.studyInstanceUid,
+          PatientName: study.patientName,
+          PatientID: study.patientId,
+          PatientBirthDate: study.patientBirthDate,
+          PatientSex: study.patientSex,
+          StudyDate: study.studyDate,
+          StudyTime: study.studyTime,
+          StudyDescription: study.studyDescription,
+          Modality: study.modality,
+          SeriesCount: study.seriesCount,
+          ImageCount: study.imageCount,
+          InstitutionName: study.institutionName,
+          Ward: study.ward,
+          Klinik: extractKlinikFromDescription(study.institutionName || study.studyDescription)
+        }));
+
+        // Store all studies for client-side filtering
+        setAllStudies(formattedStudies);
+        
+        // Update klinik options from all studies (preserve existing options)
+        const extractedKliniks = formattedStudies.map(study => study.Klinik).filter(Boolean);
+        const newKlinikOptions = Array.from(new Set([
+          ...allKlinikOptions,
+          ...extractedKliniks
+        ])).sort();
+        setAllKlinikOptions(newKlinikOptions);
+        
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load studies');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    autoLoadStudies();
+  }, []);
 
   return (
     <div className="container-fluid px-4 py-8">
@@ -218,15 +455,14 @@ export default function PacsBrowserPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             <div>
               <Label htmlFor="patientName">Patient Name</Label>
               <Input
                 id="patientName"
-                placeholder="Enter patient name..."
+                placeholder="Enter patient name (min 3 chars)..."
                 value={patientName}
                 onChange={(e) => setPatientName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && searchLegacyStudies()}
               />
             </div>
 
@@ -234,10 +470,9 @@ export default function PacsBrowserPage() {
               <Label htmlFor="patientId">Patient ID</Label>
               <Input
                 id="patientId"
-                placeholder="Enter patient ID..."
+                placeholder="Enter patient ID (min 3 chars)..."
                 value={patientId}
                 onChange={(e) => setPatientId(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && searchLegacyStudies()}
               />
             </div>
 
@@ -281,32 +516,51 @@ export default function PacsBrowserPage() {
               <Label htmlFor="studyDescription">Study Description</Label>
               <Input
                 id="studyDescription"
-                placeholder="Enter study description..."
+                placeholder="Enter study description (min 3 chars)..."
                 value={studyDescription}
                 onChange={(e) => setStudyDescription(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && searchLegacyStudies()}
               />
+            </div>
+            
+            <div>
+              <Label htmlFor="klinik">Klinik</Label>
+              <Select value={klinik} onValueChange={setKlinik}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select clinic" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Clinics</SelectItem>
+                  {allKlinikOptions.map(clinic => (
+                    <SelectItem key={clinic} value={clinic}>{clinic}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
-          <div className="flex space-x-4 mt-6">
-            <Button onClick={searchLegacyStudies} disabled={searching}>
-              {searching ? (
-                <>
-                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                  Searching...
-                </>
-              ) : (
-                <>
-                  <Search className="w-4 h-4 mr-2" />
-                  Search Studies
-                </>
-              )}
-            </Button>
-            <Button variant="outline" onClick={clearFilters}>
-              <Filter className="w-4 h-4 mr-2" />
-              Clear Filters
-            </Button>
+          <div className="flex justify-between items-center mt-6">
+            <div className="text-sm text-muted-foreground">
+              Filters apply automatically • Text search requires minimum 3 characters
+            </div>
+            <div className="flex space-x-4">
+              <Button onClick={searchLegacyStudies} disabled={searching}>
+                {searching ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Refreshing...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Refresh Studies
+                  </>
+                )}
+              </Button>
+              <Button variant="outline" onClick={clearFilters}>
+                <Filter className="w-4 h-4 mr-2" />
+                Clear Filters
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

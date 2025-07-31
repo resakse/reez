@@ -262,12 +262,12 @@ export default function GroupedRegistrationPage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label>Select Patient</Label>
-              <Select value={formData.pesakit_id.toString()} onValueChange={(value) => handlePatientSelect(parseInt(value))}>
+              <Select value={formData.pesakit_id > 0 ? formData.pesakit_id.toString() : ''} onValueChange={(value) => handlePatientSelect(parseInt(value))}>
                 <SelectTrigger>
                   <SelectValue placeholder="Search and select patient..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {patients.map(patient => (
+                  {patients.filter(patient => patient.id && patient.id > 0).map(patient => (
                     <SelectItem key={patient.id} value={patient.id.toString()}>
                       {patient.nama} - {patient.nric} {patient.mrn && `(${patient.mrn})`}
                     </SelectItem>
@@ -346,7 +346,7 @@ export default function GroupedRegistrationPage() {
                     <SelectValue placeholder="Select ward" />
                   </SelectTrigger>
                   <SelectContent>
-                    {wards.map(ward => (
+                    {wards.filter(ward => ward.id && ward.id.toString() !== '').map(ward => (
                       <SelectItem key={ward.id} value={ward.id.toString()}>
                         {ward.wad}
                       </SelectItem>

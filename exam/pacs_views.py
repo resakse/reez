@@ -6,12 +6,21 @@ Provides REST API endpoints for browsing legacy DICOM studies in Orthanc PACS
 import requests
 import json
 from django.http import HttpResponse, StreamingHttpResponse
+from django.db import IntegrityError
 from rest_framework.views import APIView
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from .models import PacsConfig
+from custom.katanama import titlecase
+from .utils import (
+    find_or_create_patient, 
+    create_daftar_for_study, 
+    create_pemeriksaan_from_dicom,
+    parse_dicom_examination_details,
+    generate_custom_accession
+)
 
 
 class PacsSearchView(APIView):
@@ -74,10 +83,10 @@ class PacsSearchView(APIView):
                     to_date = date_to.replace('-', '')
                     query['StudyDate'] = f"-{to_date}"
             
-            # Modality search
-            modality = search_params.get('modality')
-            if modality and modality != 'ALL':
-                query['ModalitiesInStudy'] = modality
+            # Note: Modality filtering is now done client-side after series-level extraction
+            # modality = search_params.get('modality')
+            # if modality and modality != 'ALL':
+            #     query['ModalitiesInStudy'] = modality
             
             # Study description search (wildcard)
             if search_params.get('studyDescription'):
@@ -110,9 +119,39 @@ class PacsSearchView(APIView):
             
             orthanc_results = orthanc_response.json()
             
+            # Debug: Print first study structure to understand available fields
+            if orthanc_results:
+                print(f"Sample Orthanc study structure: {orthanc_results[0]}")
+            
             # Format results for frontend
             formatted_studies = []
             for study in orthanc_results:
+                # Extract modality from series (DICOM tag 0008,0060 is series-level)
+                modality = 'Unknown'
+                series_list = study.get('Series', [])
+                
+                # Try study-level ModalitiesInStudy first
+                study_modalities = study.get('MainDicomTags', {}).get('ModalitiesInStudy', '')
+                if study_modalities:
+                    modality = study_modalities.split(',')[0].strip()
+                elif series_list:
+                    # If no study-level modality, try to get from first series
+                    try:
+                        first_series_id = series_list[0]
+                        series_response = requests.get(
+                            f"{orthanc_url}/series/{first_series_id}",
+                            timeout=5
+                        )
+                        if series_response.ok:
+                            series_data = series_response.json()
+                            series_modality = series_data.get('MainDicomTags', {}).get('Modality', '')
+                            if series_modality:
+                                modality = series_modality
+                    except Exception as e:
+                        print(f"Failed to fetch series modality: {e}")
+                        # Keep modality as 'Unknown'
+                        pass
+                
                 formatted_study = {
                     'id': study.get('ID', ''),
                     'studyInstanceUid': study.get('MainDicomTags', {}).get('StudyInstanceUID', ''),
@@ -123,8 +162,8 @@ class PacsSearchView(APIView):
                     'studyDate': study.get('MainDicomTags', {}).get('StudyDate', ''),
                     'studyTime': study.get('MainDicomTags', {}).get('StudyTime', ''),
                     'studyDescription': study.get('MainDicomTags', {}).get('StudyDescription', ''),
-                    'modality': study.get('MainDicomTags', {}).get('ModalitiesInStudy', '').split(',')[0] if study.get('MainDicomTags', {}).get('ModalitiesInStudy') else 'Unknown',
-                    'seriesCount': len(study.get('Series', [])),
+                    'modality': modality,
+                    'seriesCount': len(series_list),
                     'imageCount': 0,  # Could be calculated if needed
                     'institutionName': study.get('MainDicomTags', {}).get('InstitutionName', ''),
                     'accessionNumber': study.get('MainDicomTags', {}).get('AccessionNumber', ''),
@@ -380,49 +419,35 @@ def import_legacy_study(request):
             }
 
         with transaction.atomic():
-            # Find or create patient
-            patient = None
-            if create_patient and patient_id:
-                # Try to find existing patient by ID or name
-                from django.db import models as django_models
-                patient = Pesakit.objects.filter(
-                    django_models.Q(mrn=patient_id) | django_models.Q(nric=patient_id)
-                ).first()
-                
-                if not patient:
-                    # Create new patient
-                    patient = Pesakit.objects.create(
-                        nama=patient_name,
-                        mrn=patient_id,
-                        nric=patient_id if len(patient_id) == 12 else '',  # Assume NRIC if 12 digits
-                        jantina='L' if patient_sex == 'M' else 'P' if patient_sex == 'F' else 'L',
-                        jxr=request.user  # Required field for the user who created the record
-                    )
+            # Prepare DICOM metadata for shared functions
+            file_metadata = {
+                'patient_name': patient_name,
+                'patient_id': patient_id,
+                'patient_sex': patient_sex,
+                'patient_birth_date': patient_birth_date,
+                'study_instance_uid': study_uid,
+                'study_date': study_date,
+                'study_description': study_description,
+                'referring_physician': referring_physician,
+                'accession_number': accession_number,
+                'requesting_service': '',  # Not available in PACS import
+                'modality': modality
+            }
             
-            if not patient:
+            # Find or create patient using shared function
+            if create_patient:
+                patient = find_or_create_patient(file_metadata)
+            else:
                 return Response({
-                    'error': 'Patient creation disabled or patient information insufficient'
+                    'error': 'Patient creation disabled'
                 }, status=status.HTTP_400_BAD_REQUEST)
             
-            # Find or create modality
-            modaliti, _ = Modaliti.objects.get_or_create(
-                nama=modality,
-                defaults={'singkatan': modality}
-            )
-            
-            # Create registration (Daftar)
-            daftar = Daftar.objects.create(
-                tarikh=study_datetime,
-                pesakit=patient,
-                study_instance_uid=study_uid,
-                parent_accession_number=accession_number or None,
-                accession_number=accession_number or None,
-                study_description=study_description,
-                modality=modality,
-                study_status='COMPLETED',  # Legacy studies are completed
-                pemohon=referring_physician or 'Legacy Import',
-                status='Completed',
-                jxr=request.user
+            # Create registration (Daftar) using shared function
+            daftar = create_daftar_for_study(
+                patient, 
+                file_metadata, 
+                registration_data={'referring_physician': referring_physician or 'PACS Import'},
+                user=request.user
             )
             
             # Create examinations for each series
@@ -431,70 +456,28 @@ def import_legacy_study(request):
             for series_detail in series_details:
                 exam_details = parse_examination_details(series_detail)
                 
-                # Find or create modality for this series
-                series_modaliti, _ = Modaliti.objects.get_or_create(
-                    nama=exam_details['modality'],
-                    defaults={'singkatan': exam_details['modality']}
+                # Prepare series-specific metadata for shared functions
+                series_metadata = {
+                    **file_metadata,  # Copy base metadata
+                    'modality': exam_details['modality'],
+                    'body_part_examined': exam_details['body_part'],
+                    'acquisition_device_processing_description': f"{exam_details['exam_type']},{exam_details['position']}" if exam_details['position'] else exam_details['exam_type'],
+                    'operators_name': exam_details['radiographer_name'],
+                    'patient_position': exam_details['position'],
+                    'laterality': '',  # Not available in PACS import
+                    'series_description': exam_details['exam_type']
+                }
+                
+                # Create examination using shared function
+                pemeriksaan = create_pemeriksaan_from_dicom(
+                    daftar, 
+                    series_metadata, 
+                    user=request.user
                 )
                 
-                # Find or create body part if specified
-                part = None
-                if exam_details['body_part']:
-                    from exam.models import Part
-                    part, _ = Part.objects.get_or_create(
-                        part=exam_details['body_part'].upper()
-                    )
-                
-                # Find or create examination type
-                exam, _ = Exam.objects.get_or_create(
-                    exam=exam_details['exam_type'],
-                    modaliti=series_modaliti,
-                    part=part,
-                    defaults={'catatan': 'Imported from legacy PACS'}
-                )
-                
-                # Map position to patient_position
-                patient_position = None
-                if exam_details['position']:
-                    position_map = {
-                        'AP': 'AP',
-                        'PA': 'PA', 
-                        'LAT': 'LAT',
-                        'LATERAL': 'LAT',
-                        'LEFT': 'LATERAL_LEFT',
-                        'RIGHT': 'LATERAL_RIGHT',
-                        'OBL': 'OBLIQUE',
-                        'OBLIQUE': 'OBLIQUE'
-                    }
-                    patient_position = position_map.get(exam_details['position'].upper(), exam_details['position'])
-                
-                # Find or create radiographer user
-                radiographer = request.user  # Default to importing user
-                if exam_details['radiographer_name']:
-                    try:
-                        from django.contrib.auth import get_user_model
-                        User = get_user_model()
-                        # Try to find user by name parts
-                        name_parts = exam_details['radiographer_name'].split()
-                        if len(name_parts) >= 2:
-                            radiographer = User.objects.filter(
-                                first_name__icontains=name_parts[0],
-                                last_name__icontains=name_parts[1]
-                            ).first() or request.user
-                    except:
-                        pass
-                
-                # Create examination record (Pemeriksaan)
-                pemeriksaan = Pemeriksaan.objects.create(
-                    daftar=daftar,
-                    exam=exam,
-                    accession_number=f"{accession_number}_{len(created_examinations)+1}" if accession_number else None,
-                    no_xray=f"{accession_number}_{len(created_examinations)+1}" if accession_number else None,
-                    patient_position=patient_position,
-                    catatan=f"Series: {series_detail['series_id']}, Images: {exam_details['instance_count']}",
-                    jxr=radiographer,
-                    exam_status='COMPLETED'
-                )
+                # Update examination with series-specific info
+                pemeriksaan.catatan = f"Series: {series_detail['series_id']}, Images: {exam_details['instance_count']}"
+                pemeriksaan.save()
                 
                 created_examinations.append(pemeriksaan)
             

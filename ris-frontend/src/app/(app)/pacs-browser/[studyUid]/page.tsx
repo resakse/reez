@@ -694,14 +694,14 @@ export default function LegacyStudyViewerPage() {
                         <div key={index} className="bg-muted/30 p-2 rounded text-xs">
                           <div className="flex items-center gap-2 mb-1">
                             <Badge variant="secondary" className="text-xs">
-                              {exam.exam.exam}
+                              {exam.exam?.exam || 'N/A'}
                             </Badge>
                             <Badge variant="outline" className="text-xs">
-                              {exam.exam.modaliti.nama}
+                              {exam.exam?.modaliti?.nama || 'N/A'}
                             </Badge>
                           </div>
                           <div className="flex gap-2 text-xs text-muted-foreground">
-                            {exam.exam.part && (
+                            {exam.exam?.part && (
                               <span>• {exam.exam.part.part}</span>
                             )}
                             {exam.patient_position && (

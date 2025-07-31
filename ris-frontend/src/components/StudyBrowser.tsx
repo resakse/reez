@@ -34,6 +34,7 @@ const StudyBrowser: React.FC<StudyBrowserProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState(patientFilter || '');
   const [modalityFilter, setModalityFilter] = useState<string>('');
+  const [klinikFilter, setKlinikFilter] = useState<string>('');
   const [sortBy, setSortBy] = useState<'date' | 'patient' | 'modality'>('date');
 
   // Fetch studies from backend database
@@ -65,8 +66,9 @@ const StudyBrowser: React.FC<StudyBrowserProps> = ({
         (study.accessionNumber?.toLowerCase?.() || '').includes(searchTerm.toLowerCase());
       
       const matchesModality = modalityFilter === '' || study.modality === modalityFilter;
+      const matchesKlinik = klinikFilter === '' || study.klinik === klinikFilter;
       
-      return matchesSearch && matchesModality;
+      return matchesSearch && matchesModality && matchesKlinik;
     })
     .sort((a, b) => {
       switch (sortBy) {
@@ -172,7 +174,7 @@ const StudyBrowser: React.FC<StudyBrowserProps> = ({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label htmlFor="search">Search</Label>
               <Input
@@ -197,6 +199,21 @@ const StudyBrowser: React.FC<StudyBrowserProps> = ({
                 <option value="CT">CT Scan</option>
                 <option value="MR">MRI</option>
                 <option value="US">Ultrasound</option>
+              </select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="klinik">Klinik</Label>
+              <select
+                id="klinik"
+                value={klinikFilter}
+                onChange={(e) => setKlinikFilter(e.target.value)}
+                className="w-full p-2 border border-input rounded-md bg-background"
+              >
+                <option value="">All Clinics</option>
+                {Array.from(new Set(studies.map(study => study.klinik).filter(Boolean))).sort().map(klinik => (
+                  <option key={klinik} value={klinik}>{klinik}</option>
+                ))}
               </select>
             </div>
             

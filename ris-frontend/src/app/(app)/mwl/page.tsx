@@ -22,9 +22,9 @@ export default function GroupedMwlPage() {
   const [expandedStudies, setExpandedStudies] = useState<Set<number>>(new Set());
   const [filters, setFilters] = useState({
     date: new Date().toISOString().split('T')[0],
-    modality: '',
-    priority: '',
-    status: ''
+    modality: 'all',
+    priority: 'all',
+    status: 'all'
   });
   const [refreshing, setRefreshing] = useState(false);
 
@@ -32,9 +32,9 @@ export default function GroupedMwlPage() {
     try {
       const params = new URLSearchParams();
       if (filters.date) params.append('date', filters.date);
-      if (filters.modality) params.append('modality', filters.modality);
-      if (filters.priority) params.append('priority', filters.priority);
-      if (filters.status) params.append('status', filters.status);
+      if (filters.modality && filters.modality !== 'all') params.append('modality', filters.modality);
+      if (filters.priority && filters.priority !== 'all') params.append('priority', filters.priority);
+      if (filters.status && filters.status !== 'all') params.append('status', filters.status);
 
       const res = await AuthService.authenticatedFetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/mwl/grouped/?${params}`
@@ -221,7 +221,7 @@ export default function GroupedMwlPage() {
                   <SelectValue placeholder="All modalities" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All</SelectItem>
+                  <SelectItem value="all">All</SelectItem>
                   <SelectItem value="XR">X-Ray</SelectItem>
                   <SelectItem value="CR">CR</SelectItem>
                   <SelectItem value="DR">DR</SelectItem>
@@ -239,7 +239,7 @@ export default function GroupedMwlPage() {
                   <SelectValue placeholder="All priorities" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All</SelectItem>
+                  <SelectItem value="all">All</SelectItem>
                   <SelectItem value="STAT">STAT</SelectItem>
                   <SelectItem value="HIGH">High</SelectItem>
                   <SelectItem value="MEDIUM">Medium</SelectItem>
@@ -255,7 +255,7 @@ export default function GroupedMwlPage() {
                   <SelectValue placeholder="All statuses" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All</SelectItem>
+                  <SelectItem value="all">All</SelectItem>
                   <SelectItem value="SCHEDULED">Scheduled</SelectItem>
                   <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
                   <SelectItem value="COMPLETED">Completed</SelectItem>

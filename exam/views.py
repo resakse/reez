@@ -1072,124 +1072,19 @@ def upload_dicom_files(request):
                     'message': str(e)
                 }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
-        # Helper functions
-        def generate_custom_accession(file_metadata):
-            requesting_service = file_metadata.get('requesting_service', '')
-            study_date = file_metadata.get('study_date', '')
-            original_accession = file_metadata.get('accession_number', '')
-            
-            if not requesting_service or not study_date or not original_accession:
-                return original_accession  # Fallback to original
-            
-            # Extract first letters of each word in RequestingService
-            service_parts = requesting_service.strip().split()
-            service_code = ''.join(part[0].upper() for part in service_parts if part)
-            
-            # Extract year from StudyDate (YYYYMMDD format)
-            if len(study_date) >= 4:
-                year = study_date[:4]
-            else:
-                year = str(timezone.now().year)
-            
-            # Calculate remaining space for accession number
-            remaining_chars = 16 - len(service_code) - len(year)
-            remaining_chars = max(1, remaining_chars)  # At least 1 digit
-            
-            # Zero-fill the original accession number to fit remaining space
-            try:
-                accession_num = int(original_accession)
-                formatted_accession = str(accession_num).zfill(remaining_chars)
-            except (ValueError, TypeError):
-                formatted_accession = original_accession[:remaining_chars].zfill(remaining_chars)
-            
-            # Combine and ensure total length <= 16
-            result = f"{service_code}{year}{formatted_accession}"
-            return result[:16]
-
-        def find_or_create_patient(file_metadata):
-            """Find or create patient for this specific file"""
-            from pesakit.utils import parse_identification_number
-            from datetime import datetime, date
-            
-            patient_name = file_metadata.get('patient_name', 'Unknown Patient')
-            patient_id = file_metadata.get('patient_id', '')
-            patient_sex = file_metadata.get('patient_sex', '')
-            patient_birth_date = file_metadata.get('patient_birth_date', '')
-            
-            print(f"DEBUG: Looking for patient with ID: '{patient_id}', Name: '{patient_name}'")
-            
-            # Manual override takes precedence
-            if registration_data.get('patient_id'):
-                try:
-                    patient = Pesakit.objects.get(id=registration_data['patient_id'])
-                    print(f"DEBUG: Found manual override patient: {patient.id}")
-                    return patient
-                except Pesakit.DoesNotExist:
-                    pass
-            
-            # Try to find existing patient by Patient ID
-            if patient_id:
-                # First try exact NRIC match (raw)
-                existing_patient = Pesakit.objects.filter(nric=patient_id).first()
-                if existing_patient:
-                    print(f"DEBUG: Found existing patient by NRIC: {existing_patient.id} - {existing_patient.nama}")
-                    return existing_patient
-                
-                # Then try formatted NRIC (with dashes)
-                nric_info = parse_identification_number(patient_id)
-                if nric_info and nric_info.get('is_valid'):
-                    formatted_nric = nric_info['formatted']
-                    existing_patient = Pesakit.objects.filter(nric=formatted_nric).first()
-                    if existing_patient:
-                        print(f"DEBUG: Found existing patient by formatted NRIC: {existing_patient.id} - {existing_patient.nama}")
-                        return existing_patient
-                
-                # Try MRN match
-                existing_patient = Pesakit.objects.filter(mrn=patient_id).first()
-                if existing_patient:
-                    print(f"DEBUG: Found existing patient by MRN: {existing_patient.id} - {existing_patient.nama}")
-                    return existing_patient
-                
-                print(f"DEBUG: No existing patient found for ID: {patient_id}")
-            
-            # Create new patient from DICOM metadata
-            print(f"DEBUG: Creating new patient with PatientID: '{patient_id}'")
-            print(f"DEBUG: Raw PatientID from DICOM: '{patient_id}' (type: {type(patient_id)}, len: {len(patient_id)})")
-            
-            # Parse NRIC info for patient creation
-            nric_info = None
-            if patient_id:
-                nric_info = parse_identification_number(patient_id)
-            print(f"DEBUG: NRIC parsing result: {nric_info}")
-            
-            # Determine patient details from NRIC or DICOM tags
-            if nric_info and nric_info.get('is_valid'):
-                gender = nric_info['gender']
-                formatted_nric = nric_info['formatted']
-                print(f"DEBUG: Using NRIC-derived data: NRIC={formatted_nric}, Gender={gender}")
-            else:
-                # Use DICOM tags as fallback
-                dicom_sex = patient_sex.upper()
-                if dicom_sex == 'M':
-                    gender = 'L'  # Male
-                elif dicom_sex == 'F':
-                    gender = 'P'  # Female
-                else:
-                    gender = 'U'  # Unknown
-                # Use the PatientID directly as NRIC if available
-                formatted_nric = patient_id if patient_id else f'DICOM_{timezone.now().strftime("%Y%m%d%H%M%S")}'
-                print(f"DEBUG: Using DICOM fallback: NRIC={formatted_nric}, Gender={gender}")
-            
-            print(f"DEBUG: About to create patient with nama='{patient_name}', nric='{patient_id}', mrn='{patient_id}', jantina='{gender}'")
-            new_patient = Pesakit.objects.create(
-                nama=patient_name,
-                nric=patient_id,  # Use raw PatientID for NRIC
-                mrn=patient_id,   # Use raw PatientID for MRN
-                jantina=gender,
-                jxr=request.user
-            )
-            print(f"DEBUG: Created patient ID {new_patient.id} with NRIC: '{new_patient.nric}', MRN: '{new_patient.mrn}', Name: '{new_patient.nama}', Gender: '{new_patient.jantina}'")
-            return new_patient
+        # Import shared utilities
+        from .utils import (
+            generate_custom_accession,
+            find_or_create_patient,
+            create_daftar_for_study,
+            create_pemeriksaan_from_dicom
+        )
+        
+        # Use shared patient creation function with manual override support
+        def find_or_create_patient_with_override(file_metadata):
+            """Wrapper for shared function with manual patient ID override"""
+            manual_patient_id = registration_data.get('patient_id')
+            return find_or_create_patient(file_metadata, manual_patient_id)
 
         # Process each file individually to ensure separate patients get separate daftars
         all_results = {
@@ -1201,7 +1096,7 @@ def upload_dicom_files(request):
         try:
             for file_metadata in processed_files:
                 # Get patient for this specific file  
-                patient = find_or_create_patient(file_metadata)
+                patient = find_or_create_patient_with_override(file_metadata)
                 patient_key = f"{patient.nric}_{patient.nama}"
                 all_results['patients'][patient_key] = patient
                 
