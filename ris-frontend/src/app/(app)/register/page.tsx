@@ -157,15 +157,33 @@ export default function RegistrationWorkflowPage() {
         AuthService.authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/parts/`)
       ]);
 
-      if (wardsRes.ok) setWards(await wardsRes.json());
-      if (disciplinesRes.ok) setDisciplines(await disciplinesRes.json());
+      if (wardsRes.ok) {
+        const wardsData = await wardsRes.json();
+        console.log('Wards data:', wardsData);
+        setWards(Array.isArray(wardsData) ? wardsData : wardsData.results || []);
+      }
+      if (disciplinesRes.ok) {
+        const disciplinesData = await disciplinesRes.json();
+        console.log('Disciplines data:', disciplinesData);
+        setDisciplines(Array.isArray(disciplinesData) ? disciplinesData : disciplinesData.results || []);
+      }
       if (examsRes.ok) {
         const examsData = await examsRes.json();
-        setExams(examsData);
-        setFilteredExams(examsData);
+        console.log('Exams data:', examsData);
+        const examsArray = Array.isArray(examsData) ? examsData : examsData.results || [];
+        setExams(examsArray);
+        setFilteredExams(examsArray);
       }
-      if (modalitiesRes.ok) setModalities(await modalitiesRes.json());
-      if (bodyPartsRes.ok) setBodyParts(await bodyPartsRes.json());
+      if (modalitiesRes.ok) {
+        const modalitiesData = await modalitiesRes.json();
+        console.log('Modalities data:', modalitiesData);
+        setModalities(Array.isArray(modalitiesData) ? modalitiesData : modalitiesData.results || []);
+      }
+      if (bodyPartsRes.ok) {
+        const bodyPartsData = await bodyPartsRes.json();
+        console.log('Body parts data:', bodyPartsData);
+        setBodyParts(Array.isArray(bodyPartsData) ? bodyPartsData : bodyPartsData.results || []);
+      }
     } catch (error) {
       // Error fetching configuration
       showToastNotification('Failed to load configuration data. Please refresh the page.', 'error');
@@ -331,8 +349,7 @@ export default function RegistrationWorkflowPage() {
     try {
       const payload = {
         nama: newPatientData.nama,
-        no_kp: newPatientData.no_kp.replace(/[-\s]/g, ''),
-        t_lahir: newPatientData.t_lahir,
+        nric: newPatientData.no_kp.replace(/[-\s]/g, ''),
         jantina: newPatientData.jantina,
         umur: parseInt(newPatientData.umur) || null,
         alamat: newPatientData.alamat,
@@ -342,6 +359,8 @@ export default function RegistrationWorkflowPage() {
         mrn: newPatientData.mrn || null,
         catatan: newPatientData.catatan
       };
+
+      console.log('Creating patient with payload:', payload);
 
       const res = await AuthService.authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/patients/`, {
         method: 'POST',
@@ -630,7 +649,7 @@ export default function RegistrationWorkflowPage() {
                     <div className="relative">
                       <Calendar className="absolute left-3 top-3 h-4 w-4 text-muted-foreground z-10" />
                       <Flatpickr
-                        value={newPatientData.t_lahir}
+                        value={newPatientData.t_lahir ? new Date(newPatientData.t_lahir) : null}
                         onChange={(date) => {
                           const dateStr = date[0] ? date[0].toISOString().split('T')[0] : '';
                           setNewPatientData({...newPatientData, t_lahir: dateStr});
@@ -782,7 +801,7 @@ export default function RegistrationWorkflowPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">OPD/No Ward</SelectItem>
-                      {wards.map((ward) => (
+                      {Array.isArray(wards) && wards.map((ward) => (
                         <SelectItem key={ward.id} value={ward.id.toString()}>{ward.wad}</SelectItem>
                       ))}
                     </SelectContent>
@@ -880,7 +899,7 @@ export default function RegistrationWorkflowPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Modalities</SelectItem>
-                      {modalities.map((modality) => (
+                      {Array.isArray(modalities) && modalities.map((modality) => (
                         <SelectItem key={modality.id} value={modality.id.toString()}>
                           {modality.nama}
                         </SelectItem>
@@ -893,7 +912,7 @@ export default function RegistrationWorkflowPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Body Parts</SelectItem>
-                      {bodyParts.map((part) => (
+                      {Array.isArray(bodyParts) && bodyParts.map((part) => (
                         <SelectItem key={part.id} value={part.id.toString()}>
                           {part.part}
                         </SelectItem>
@@ -905,7 +924,7 @@ export default function RegistrationWorkflowPage() {
               
               <ScrollArea className="h-96">
                 <div className="grid gap-4">
-                  {filteredExams.length === 0 ? (
+                  {!Array.isArray(filteredExams) || filteredExams.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                       No exams found matching your criteria
                     </div>
