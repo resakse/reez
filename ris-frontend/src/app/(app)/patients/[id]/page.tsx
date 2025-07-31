@@ -205,6 +205,27 @@ export default function PatientDetailPage() {
     return patient.jantina === 'P';
   };
 
+  const calculateAge = (dateString: string): string => {
+    if (!dateString) {
+      return 'N/A';
+    }
+    try {
+      const birthDate = new Date(dateString);
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      
+      return age.toString();
+    } catch (error) {
+      console.error("Failed to calculate age:", dateString, error);
+      return 'N/A';
+    }
+  };
+
   if (loading) {
     return (
       <div className="container-fluid px-4 py-8">
@@ -321,7 +342,7 @@ export default function PatientDetailPage() {
               
               <div>
                 <label className="text-sm font-medium text-gray-500">Age</label>
-                <p className="text-lg">{patient.umur} years</p>
+                <p className="text-lg">{calculateAge(patient.t_lahir)} years</p>
               </div>
               
               <div>

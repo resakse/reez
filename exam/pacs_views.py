@@ -96,6 +96,10 @@ class PacsSearchView(APIView):
             if search_params.get('studyInstanceUid'):
                 query['StudyInstanceUID'] = search_params['studyInstanceUid']
             
+            # Note: New DICOM field searches (bodyPart, protocol, exam, manufacturer)
+            # are handled client-side after data extraction since these are series/instance-level fields
+            # and Orthanc study-level queries don't support these tags directly
+            
             # Prepare Orthanc request
             orthanc_request = {
                 'Level': 'Study',
@@ -128,6 +132,11 @@ class PacsSearchView(APIView):
             for study in orthanc_results:
                 # Extract modality from series (DICOM tag 0008,0060 is series-level)
                 modality = 'Unknown'
+                body_part_examined = None
+                protocol_name = None
+                acquisition_device_processing_description = None
+                manufacturer = None
+                
                 series_list = study.get('Series', [])
                 
                 # Try study-level ModalitiesInStudy first
@@ -152,6 +161,51 @@ class PacsSearchView(APIView):
                         # Keep modality as 'Unknown'
                         pass
                 
+                # Extract new DICOM fields from series and instance data
+                if series_list:
+                    try:
+                        first_series_id = series_list[0]
+                        series_response = requests.get(
+                            f"{orthanc_url}/series/{first_series_id}",
+                            timeout=5
+                        )
+                        if series_response.ok:
+                            series_data = series_response.json()
+                            series_tags = series_data.get('MainDicomTags', {})
+                            
+                            # Try to get fields from series level first
+                            body_part_examined = series_tags.get('BodyPartExamined')
+                            protocol_name = series_tags.get('ProtocolName')
+                            acquisition_device_processing_description = series_tags.get('AcquisitionDeviceProcessingDescription')
+                            manufacturer = series_tags.get('Manufacturer')
+                            
+                            # If not found at series level, try instance level
+                            instances = series_data.get('Instances', [])
+                            if instances and (not body_part_examined or not protocol_name or not acquisition_device_processing_description or not manufacturer):
+                                try:
+                                    first_instance_id = instances[0]
+                                    instance_response = requests.get(
+                                        f"{orthanc_url}/instances/{first_instance_id}",
+                                        timeout=5
+                                    )
+                                    if instance_response.ok:
+                                        instance_data = instance_response.json()
+                                        instance_tags = instance_data.get('MainDicomTags', {})
+                                        
+                                        # Use instance-level tags as fallback
+                                        if not body_part_examined:
+                                            body_part_examined = instance_tags.get('BodyPartExamined')
+                                        if not protocol_name:
+                                            protocol_name = instance_tags.get('ProtocolName')
+                                        if not acquisition_device_processing_description:
+                                            acquisition_device_processing_description = instance_tags.get('AcquisitionDeviceProcessingDescription')
+                                        if not manufacturer:
+                                            manufacturer = instance_tags.get('Manufacturer')
+                                except Exception as e:
+                                    print(f"Failed to fetch instance tags for DICOM fields: {e}")
+                    except Exception as e:
+                        print(f"Failed to fetch series tags for DICOM fields: {e}")
+                
                 formatted_study = {
                     'id': study.get('ID', ''),
                     'studyInstanceUid': study.get('MainDicomTags', {}).get('StudyInstanceUID', ''),
@@ -168,7 +222,12 @@ class PacsSearchView(APIView):
                     'institutionName': study.get('MainDicomTags', {}).get('InstitutionName', ''),
                     'accessionNumber': study.get('MainDicomTags', {}).get('AccessionNumber', ''),
                     'referringPhysicianName': study.get('MainDicomTags', {}).get('ReferringPhysicianName', ''),
-                    'operatorsName': study.get('MainDicomTags', {}).get('OperatorsName', '')
+                    'operatorsName': study.get('MainDicomTags', {}).get('OperatorsName', ''),
+                    # New DICOM fields
+                    'bodyPartExamined': body_part_examined,
+                    'protocolName': protocol_name,
+                    'acquisitionDeviceProcessingDescription': acquisition_device_processing_description,
+                    'manufacturer': manufacturer
                 }
                 formatted_studies.append(formatted_study)
             

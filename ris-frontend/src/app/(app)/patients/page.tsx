@@ -36,6 +36,27 @@ function formatDate(dateString: string | null | undefined): string {
   }
 }
 
+function calculateAge(dateString: string | null | undefined): string {
+  if (!dateString) {
+    return 'N/A';
+  }
+  try {
+    const birthDate = new Date(dateString);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    
+    return `${age} years`;
+  } catch (error) {
+    console.error("Failed to calculate age:", dateString, error);
+    return 'N/A';
+  }
+}
+
 export default function PatientsPage() {
   const { user } = useAuth();
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -79,6 +100,7 @@ export default function PatientsPage() {
               <TableHead>Patient ID</TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Date of Birth</TableHead>
+              <TableHead>Age</TableHead>
               <TableHead>Gender</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
@@ -89,6 +111,7 @@ export default function PatientsPage() {
                 <TableCell>{patient.mrn}</TableCell>
                 <TableCell>{patient.nama}</TableCell>
                 <TableCell>{formatDate(patient.t_lahir)}</TableCell>
+                <TableCell>{calculateAge(patient.t_lahir)}</TableCell>
                 <TableCell>{patient.jantina === 'L' ? 'Male' : 'Female'}</TableCell>
                 <TableCell>
                   <div className="flex space-x-2">
