@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   Table,
@@ -82,7 +83,8 @@ export default function PatientsPage() {
   }, [user]);
 
   return (
-    <Card>
+    <ProtectedRoute requireStaff={true}>
+      <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <div>
             <CardTitle>Patients</CardTitle>
@@ -128,6 +130,7 @@ export default function PatientsPage() {
           </TableBody>
         </Table>
       </CardContent>
-    </Card>
+      </Card>
+    </ProtectedRoute>
   );
 } 

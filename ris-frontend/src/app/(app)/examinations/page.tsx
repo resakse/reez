@@ -109,6 +109,10 @@ export default function ExaminationsPage() {
   const [totalCount, setTotalCount] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   
+  // Sorting state
+  const [sortField, setSortField] = useState<string>('-no_xray'); // Default sort by X-ray number descending
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  
   // Debounced search effect for search field
   useEffect(() => {
     if (filters.search === '') {
@@ -125,17 +129,17 @@ export default function ExaminationsPage() {
     return () => clearTimeout(timeoutId);
   }, [filters.search]);
 
-  // Reset to page 1 when filters change
+  // Reset to page 1 when filters or sorting change
   useEffect(() => {
     setCurrentPage(1);
-  }, [filters, pageSize]);
+  }, [filters, pageSize, sortField]);
 
-  // Fetch data when filters change
+  // Fetch data when filters or sorting change
   useEffect(() => {
     if (user) {
       fetchExaminationsWithFilters(filters);
     }
-  }, [user, filters]);
+  }, [user, filters, sortField]);
 
   // Fetch data when page or pageSize changes
   useEffect(() => {
@@ -249,7 +253,7 @@ export default function ExaminationsPage() {
       
       // Build query parameters with proper pagination
       const params = new URLSearchParams();
-      params.append('ordering', '-no_xray'); // Sort by x-ray number descending
+      params.append('ordering', sortField); // Use current sort field
       
       // Add pagination parameters
       params.append('page', currentPage.toString());
@@ -368,6 +372,34 @@ export default function ExaminationsPage() {
     
     // Immediately fetch results with cleared filters
     fetchExaminationsWithFilters(clearedFilters);
+  };
+
+  const handleSort = (field: string) => {
+    let newSortField = field;
+    let newDirection: 'asc' | 'desc' = 'asc';
+    
+    // If clicking the same field, toggle direction
+    if (sortField === field || sortField === `-${field}`) {
+      newDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+    }
+    
+    // Add minus prefix for descending order (Django REST Framework convention)
+    if (newDirection === 'desc') {
+      newSortField = `-${field}`;
+    }
+    
+    setSortField(newSortField);
+    setSortDirection(newDirection);
+  };
+
+  const getSortIcon = (field: string) => {
+    const currentField = sortField.replace('-', '');
+    if (currentField !== field) {
+      return <ArrowUpDown className="h-4 w-4 opacity-50" />;
+    }
+    return sortDirection === 'asc' ? 
+      <ArrowUp className="h-4 w-4" /> : 
+      <ArrowDown className="h-4 w-4" />;
   };
 
   const formatDate = (dateString: string): string => {
@@ -534,14 +566,94 @@ export default function ExaminationsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>X-Ray No.</TableHead>
-                  <TableHead>Patient</TableHead>
-                  <TableHead>Exam Type</TableHead>
-                  <TableHead>Modality</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Requesting Doctor</TableHead>
-                  <TableHead>Ward</TableHead>
-                  <TableHead>Radiographer</TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="font-medium hover:bg-transparent p-0 h-auto justify-start"
+                      onClick={() => handleSort('no_xray')}
+                    >
+                      X-Ray No.
+                      {getSortIcon('no_xray')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="font-medium hover:bg-transparent p-0 h-auto justify-start"
+                      onClick={() => handleSort('daftar__pesakit__nama')}
+                    >
+                      Patient
+                      {getSortIcon('daftar__pesakit__nama')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="font-medium hover:bg-transparent p-0 h-auto justify-start"
+                      onClick={() => handleSort('exam__exam')}
+                    >
+                      Exam Type
+                      {getSortIcon('exam__exam')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="font-medium hover:bg-transparent p-0 h-auto justify-start"
+                      onClick={() => handleSort('exam__modaliti__nama')}
+                    >
+                      Modality
+                      {getSortIcon('exam__modaliti__nama')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="font-medium hover:bg-transparent p-0 h-auto justify-start"
+                      onClick={() => handleSort('daftar__tarikh')}
+                    >
+                      Date
+                      {getSortIcon('daftar__tarikh')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="font-medium hover:bg-transparent p-0 h-auto justify-start"
+                      onClick={() => handleSort('daftar__pemohon')}
+                    >
+                      Requesting Doctor
+                      {getSortIcon('daftar__pemohon')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="font-medium hover:bg-transparent p-0 h-auto justify-start"
+                      onClick={() => handleSort('daftar__rujukan__wad')}
+                    >
+                      Ward
+                      {getSortIcon('daftar__rujukan__wad')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="font-medium hover:bg-transparent p-0 h-auto justify-start"
+                      onClick={() => handleSort('daftar__jxr__first_name')}
+                    >
+                      Radiographer
+                      {getSortIcon('daftar__jxr__first_name')}
+                    </Button>
+                  </TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>

@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import { useRouter } from 'next/navigation';
 import DicomUpload from '@/components/DicomUpload';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,7 +25,8 @@ export default function UploadPage() {
   };
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <ProtectedRoute requireStaff={true}>
+      <div className="container mx-auto py-6 space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
         <Button
@@ -79,6 +81,7 @@ export default function UploadPage() {
         onUploadComplete={handleUploadComplete}
         onClose={handleClose}
       />
-    </div>
+      </div>
+    </ProtectedRoute>
   );
 }

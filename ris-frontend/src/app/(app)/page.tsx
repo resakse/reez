@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, memo } from 'react';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -570,7 +571,8 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <ProtectedRoute requireStaff={true}>
+      <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -812,6 +814,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
-    </div>
+      </div>
+    </ProtectedRoute>
   );
 }

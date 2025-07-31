@@ -14,6 +14,8 @@ export default function Sidebar({ className, isCollapsed }: SidebarProps) {
   const { user } = useAuth();
   const pathname = usePathname();
   const isSupervisor = user?.is_superuser || false;
+  const isStaff = user?.is_staff || false;
+  const isNormalUser = user && !isStaff;
 
   // Helper function to determine if a link is active
   const isActive = (href: string) => {
@@ -46,24 +48,30 @@ export default function Sidebar({ className, isCollapsed }: SidebarProps) {
     <aside className={cn("hidden md:block text-white bg-sidebar", isCollapsed ? "w-20" : "w-64", "transition-all duration-300", className)}>
       <nav className="p-4">
         <ul className="space-y-2">
-          <li>
-            <Link href="/" className={getLinkClasses("/")}>
-              <LayoutDashboard className={getIconClasses("/")} />
-              {!isCollapsed && "Dashboard"}
-            </Link>
-          </li>
-          <li>
-            <Link href="/patients" className={getLinkClasses("/patients")}>
-              <Users className={getIconClasses("/patients")} />
-              {!isCollapsed && "Patients"}
-            </Link>
-          </li>
-          <li>
-            <Link href="/register" className={getLinkClasses("/register")}>
-              <ClipboardList className={getIconClasses("/register")} />
-              {!isCollapsed && "Registration"}
-            </Link>
-          </li>
+          {!isNormalUser && (
+            <li>
+              <Link href="/" className={getLinkClasses("/")}>
+                <LayoutDashboard className={getIconClasses("/")} />
+                {!isCollapsed && "Dashboard"}
+              </Link>
+            </li>
+          )}
+          {!isNormalUser && (
+            <li>
+              <Link href="/patients" className={getLinkClasses("/patients")}>
+                <Users className={getIconClasses("/patients")} />
+                {!isCollapsed && "Patients"}
+              </Link>
+            </li>
+          )}
+          {!isNormalUser && (
+            <li>
+              <Link href="/register" className={getLinkClasses("/register")}>
+                <ClipboardList className={getIconClasses("/register")} />
+                {!isCollapsed && "Registration"}
+              </Link>
+            </li>
+          )}
           <li>
             <Link href="/examinations" className={getLinkClasses("/examinations")}>
               <Stethoscope className={getIconClasses("/examinations")} />
@@ -76,75 +84,81 @@ export default function Sidebar({ className, isCollapsed }: SidebarProps) {
               {!isCollapsed && "PACS Browser"}
             </Link>
           </li>
-          <li>
-            <Link href="/upload" className={getLinkClasses("/upload")}>
-              <Upload className={getIconClasses("/upload")} />
-              {!isCollapsed && "Upload DICOM"}
-            </Link>
-          </li>
-          
-          <li className="pt-4 pb-2">
-            <div className={cn("text-xs font-semibold text-gray-400 uppercase", isCollapsed && "text-center")}>
-              {!isCollapsed ? "Configuration" : "Config"}
-            </div>
-          </li>
-          
-          <li>
-            <Link href="/wards" className={getLinkClasses("/wards")}>
-              <Home className={getIconClasses("/wards")} />
-              {!isCollapsed && "Wards"}
-            </Link>
-          </li>
-          <li>
-            <Link href="/modalities" className={getLinkClasses("/modalities")}>
-              <X className={getIconClasses("/modalities")} />
-              {!isCollapsed && "Modalities"}
-            </Link>
-          </li>
-          <li>
-            <Link href="/body-parts" className={getLinkClasses("/body-parts")}>
-              <Bone className={getIconClasses("/body-parts")} />
-              {!isCollapsed && "Body Parts"}
-            </Link>
-          </li>
-          <li>
-            <Link href="/exams" className={getLinkClasses("/exams")}>
-              <FileText className={getIconClasses("/exams")} />
-              {!isCollapsed && "Exam Types"}
-            </Link>
-          </li>
-          <li>
-            <Link href="/mwl" className={getLinkClasses("/mwl")}>
-              <ListChecks className={getIconClasses("/mwl")} />
-              {!isCollapsed && "MWL Worklist"}
-            </Link>
-          </li>
-          
-          <li className="pt-4 pb-2">
-            <div className={cn("text-xs font-semibold text-gray-400 uppercase", isCollapsed && "text-center")}>
-              {!isCollapsed ? "System" : "Sys"}
-            </div>
-          </li>
-          <li>
-            <Link href="/staff" className={getLinkClasses("/staff")}>
-              <UserCog className={getIconClasses("/staff")} />
-              {!isCollapsed && "Staff Management"}
-            </Link>
-          </li>
-          {isSupervisor && (
+          {!isNormalUser && (
             <li>
-              <Link href="/settings" className={getLinkClasses("/settings")}>
-                <Settings className={getIconClasses("/settings")} />
-                {!isCollapsed && "Settings"}
+              <Link href="/upload" className={getLinkClasses("/upload")}>
+                <Upload className={getIconClasses("/upload")} />
+                {!isCollapsed && "Upload DICOM"}
               </Link>
             </li>
           )}
-          <li>
-            <div className="flex items-center p-2 text-gray-400 cursor-not-allowed">
-              <BarChart className="h-5 w-5 mr-2" />
-              {!isCollapsed && "Reports"}
-            </div>
-          </li>
+          
+          {!isNormalUser && (
+            <>
+              <li className="pt-4 pb-2">
+                <div className={cn("text-xs font-semibold text-gray-400 uppercase", isCollapsed && "text-center")}>
+                  {!isCollapsed ? "Configuration" : "Config"}
+                </div>
+              </li>
+              
+              <li>
+                <Link href="/wards" className={getLinkClasses("/wards")}>
+                  <Home className={getIconClasses("/wards")} />
+                  {!isCollapsed && "Wards"}
+                </Link>
+              </li>
+              <li>
+                <Link href="/modalities" className={getLinkClasses("/modalities")}>
+                  <X className={getIconClasses("/modalities")} />
+                  {!isCollapsed && "Modalities"}
+                </Link>
+              </li>
+              <li>
+                <Link href="/body-parts" className={getLinkClasses("/body-parts")}>
+                  <Bone className={getIconClasses("/body-parts")} />
+                  {!isCollapsed && "Body Parts"}
+                </Link>
+              </li>
+              <li>
+                <Link href="/exams" className={getLinkClasses("/exams")}>
+                  <FileText className={getIconClasses("/exams")} />
+                  {!isCollapsed && "Exam Types"}
+                </Link>
+              </li>
+              <li>
+                <Link href="/mwl" className={getLinkClasses("/mwl")}>
+                  <ListChecks className={getIconClasses("/mwl")} />
+                  {!isCollapsed && "MWL Worklist"}
+                </Link>
+              </li>
+              
+              <li className="pt-4 pb-2">
+                <div className={cn("text-xs font-semibold text-gray-400 uppercase", isCollapsed && "text-center")}>
+                  {!isCollapsed ? "System" : "Sys"}
+                </div>
+              </li>
+              <li>
+                <Link href="/staff" className={getLinkClasses("/staff")}>
+                  <UserCog className={getIconClasses("/staff")} />
+                  {!isCollapsed && "Staff Management"}
+                </Link>
+              </li>
+              {isSupervisor && (
+                <li>
+                  <Link href="/settings" className={getLinkClasses("/settings")}>
+                    <Settings className={getIconClasses("/settings")} />
+                    {!isCollapsed && "Settings"}
+                  </Link>
+                </li>
+              )}
+              <li>
+                <div className="flex items-center p-2 text-gray-400 cursor-not-allowed">
+                  <BarChart className="h-5 w-5 mr-2" />
+                  {!isCollapsed && "Reports"}
+                </div>
+              </li>
+            </>
+          )}
         </ul>
       </nav>
     </aside>

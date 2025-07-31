@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   Table,
@@ -56,13 +57,26 @@ export default function StaffPage() {
         const res = await AuthService.authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/staff/`);
 
         if (!res.ok) {
-          throw new Error('Failed to fetch staff');
+          throw new Error(`Failed to fetch staff: ${res.status} ${res.statusText}`);
         }
 
-        const data: Staff[] = await res.json();
-        setStaff(data);
+        const data = await res.json();
+        
+        // Handle paginated response
+        if (data && Array.isArray(data.results)) {
+          setStaff(data.results);
+        } else if (Array.isArray(data)) {
+          // Handle direct array response
+          setStaff(data);
+        } else {
+          console.error('Expected array or paginated response but got:', typeof data, data);
+          setError('Invalid data format received from server');
+          setStaff([]);
+        }
       } catch (err) {
+        console.error('Staff fetch error:', err);
         setError(err instanceof Error ? err.message : 'An unknown error occurred');
+        setStaff([]); // Ensure staff is always an array
       } finally {
         setLoading(false);
       }
@@ -89,9 +103,11 @@ export default function StaffPage() {
       }
 
       // Refresh the staff list
-      setStaff(staff.map(s => 
-        s.id === staffId ? { ...s, is_active: !currentStatus } : s
-      ));
+      setStaff(prevStaff => 
+        Array.isArray(prevStaff) 
+          ? prevStaff.map(s => s.id === staffId ? { ...s, is_active: !currentStatus } : s)
+          : []
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update staff status');
     }
@@ -109,7 +125,8 @@ export default function StaffPage() {
   }
 
   return (
-    <Card>
+    <ProtectedRoute requireStaff={true}>
+      <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <div>
           <CardTitle>Staff Management</CardTitle>
@@ -135,7 +152,7 @@ export default function StaffPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {staff.map((staffMember) => (
+            {Array.isArray(staff) && staff.map((staffMember) => (
               <TableRow key={staffMember.id}>
                 <TableCell className="font-medium">{staffMember.username}</TableCell>
                 <TableCell>{staffMember.nama}</TableCell>
@@ -166,12 +183,13 @@ export default function StaffPage() {
             ))}
           </TableBody>
         </Table>
-        {staff.length === 0 && !loading && (
+        {Array.isArray(staff) && staff.length === 0 && !loading && (
           <div className="text-center py-4 text-gray-500">
             No staff members found.
           </div>
         )}
       </CardContent>
-    </Card>
+      </Card>
+    </ProtectedRoute>
   );
 }
