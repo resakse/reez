@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   Table,
@@ -19,6 +19,9 @@ import { Badge } from '@/components/ui/badge';
 import { Search, Filter, Calendar, User, Building2, Stethoscope, Eye } from 'lucide-react';
 import AuthService from '@/lib/auth';
 import Link from 'next/link';
+import flatpickr from 'flatpickr';
+import 'flatpickr/dist/flatpickr.min.css';
+import 'flatpickr/dist/themes/dark.css';
 
 interface Examination {
   id: number;
@@ -69,8 +72,7 @@ interface Ward {
 
 interface FilterParams {
   search: string;
-  date_from: string;
-  date_to: string;
+  date_range: string[];
   exam_type: string;
   pemohon: string;
   ward: string;
@@ -86,13 +88,14 @@ export default function ExaminationsPage() {
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<FilterParams>({
     search: '',
-    date_from: '',
-    date_to: '',
+    date_range: [],
     exam_type: '',
     pemohon: '',
     ward: '',
     klinik: '',
   });
+  const [dateRange, setDateRange] = useState<string[]>([]);
+  const dateRangeRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -125,6 +128,64 @@ export default function ExaminationsPage() {
     fetchInitialData();
   }, []);
 
+  // Initialize flatpickr for date range (copied from pacs-browser)
+  useEffect(() => {
+    console.log('Flatpickr useEffect running, dateRangeRef.current:', dateRangeRef.current);
+    
+    if (dateRangeRef.current) {
+      console.log('Initializing flatpickr on element:', dateRangeRef.current);
+      
+      // Check if dark mode is enabled
+      const isDarkMode = document.documentElement.classList.contains('dark');
+      
+      const fp = flatpickr(dateRangeRef.current, {
+        mode: 'range',
+        dateFormat: 'd/m/Y',
+        placeholder: 'Select date range...',
+        allowInput: true,
+        theme: isDarkMode ? 'dark' : 'light',
+        onChange: (selectedDates) => {
+          console.log('Flatpickr onChange:', selectedDates);
+          const dates = selectedDates.map(date => {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${day}/${month}/${year}`;
+          });
+          setDateRange(dates);
+          setFilters(prev => ({
+            ...prev,
+            date_range: dates
+          }));
+        }
+      });
+
+      console.log('Flatpickr instance created:', fp);
+
+      // Listen for theme changes and update flatpickr theme
+      const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+            const isDark = document.documentElement.classList.contains('dark');
+            fp.set('theme', isDark ? 'dark' : 'light');
+          }
+        });
+      });
+
+      observer.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['class']
+      });
+
+      return () => {
+        fp.destroy();
+        observer.disconnect();
+      };
+    } else {
+      console.log('dateRangeRef.current is null, will retry');
+    }
+  }, [loading]); // Add loading dependency to retry after data loads
+
   const fetchExaminations = async () => {
     try {
       setLoading(true);
@@ -133,8 +194,21 @@ export default function ExaminationsPage() {
       const params = new URLSearchParams();
       params.append('ordering', '-no_xray'); // Sort by x-ray number descending
       if (filters.search) params.append('search', filters.search);
-      if (filters.date_from) params.append('date_from', filters.date_from);
-      if (filters.date_to) params.append('date_to', filters.date_to);
+      
+      // Handle date range
+      if (filters.date_range && filters.date_range.length === 2) {
+        const [startDateStr, endDateStr] = filters.date_range;
+        // Convert from dd/mm/yyyy to yyyy-mm-dd
+        const startParts = startDateStr.split('/');
+        const endParts = endDateStr.split('/');
+        if (startParts.length === 3 && endParts.length === 3) {
+          const startDate = `${startParts[2]}-${startParts[1]}-${startParts[0]}`;
+          const endDate = `${endParts[2]}-${endParts[1]}-${endParts[0]}`;
+          params.append('date_from', startDate);
+          params.append('date_to', endDate);
+        }
+      }
+      
       if (filters.exam_type) params.append('exam_type', filters.exam_type);
       if (filters.pemohon) params.append('pemohon', filters.pemohon);
       if (filters.ward) params.append('ward', filters.ward);
@@ -170,13 +244,17 @@ export default function ExaminationsPage() {
   const clearFilters = () => {
     setFilters({
       search: '',
-      date_from: '',
-      date_to: '',
+      date_range: [],
       exam_type: '',
       pemohon: '',
       ward: '',
       klinik: '',
     });
+    setDateRange([]);
+    // Clear flatpickr instance (same method as pacs-browser)
+    if (dateRangeRef.current && (dateRangeRef.current as any)._flatpickr) {
+      (dateRangeRef.current as any)._flatpickr.clear();
+    }
   };
 
   const formatDate = (dateString: string): string => {
@@ -244,23 +322,17 @@ export default function ExaminationsPage() {
             </div>
 
             <div>
-              <Label htmlFor="date_from">Date From</Label>
-              <Input
-                id="date_from"
-                type="datetime-local"
-                value={filters.date_from}
-                onChange={(e) => handleFilterChange('date_from', e.target.value)}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="date_to">Date To</Label>
-              <Input
-                id="date_to"
-                type="datetime-local"
-                value={filters.date_to}
-                onChange={(e) => handleFilterChange('date_to', e.target.value)}
-              />
+              <Label htmlFor="dateRange">Date Range</Label>
+              <div className="relative">
+                <Calendar className="absolute left-2 top-2.5 h-4 w-4 text-gray-400 pointer-events-none" />
+                <Input
+                  ref={dateRangeRef}
+                  id="dateRange"
+                  placeholder="Select date range..."
+                  className="pl-8 cursor-pointer"
+                  readOnly
+                />
+              </div>
             </div>
 
             <div>
