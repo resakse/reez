@@ -105,6 +105,11 @@ export default function PacsBrowserPage() {
   const [allStudies, setAllStudies] = useState<LegacyStudy[]>([]);
   const [importingStudies, setImportingStudies] = useState<Set<string>>(new Set());
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [totalPages, setTotalPages] = useState(1);
+
   // Search filters
   const [patientName, setPatientName] = useState('');
   const [patientId, setPatientId] = useState('');
@@ -115,6 +120,7 @@ export default function PacsBrowserPage() {
   const [bodyPart, setBodyPart] = useState('all');
   const [exam, setExam] = useState('all');
   const [manufacturer, setManufacturer] = useState('all');
+  const [searchLimit, setSearchLimit] = useState(500);
 
   // Debounced text filters
   const [debouncedPatientName, setDebouncedPatientName] = useState('');
@@ -320,9 +326,28 @@ export default function PacsBrowserPage() {
 
   // Update displayed studies when filtered studies change
   useEffect(() => {
-    setStudies(filteredStudies);
-    setTotalStudies(filteredStudies.length);
-  }, [filteredStudies]);
+    const totalItems = filteredStudies.length;
+    const pages = Math.ceil(totalItems / itemsPerPage);
+    setTotalPages(pages);
+    setTotalStudies(totalItems);
+    
+    // Reset to page 1 if current page is out of bounds
+    if (currentPage > pages && pages > 0) {
+      setCurrentPage(1);
+    }
+    
+    // Calculate paginated studies
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedStudies = filteredStudies.slice(startIndex, endIndex);
+    
+    setStudies(paginatedStudies);
+  }, [filteredStudies, currentPage, itemsPerPage]);
+  
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedPatientName, debouncedPatientId, modality, klinik, dateRange, bodyPart, exam, manufacturer]);
 
   const searchLegacyStudies = useCallback(async () => {
     try {
@@ -345,7 +370,7 @@ export default function PacsBrowserPage() {
         })() : undefined,
         exam: exam !== 'all' ? exam || undefined : undefined,
         manufacturer: manufacturer !== 'all' ? manufacturer || undefined : undefined,
-        limit: 100
+        limit: searchLimit
       };
 
       // Remove undefined values
@@ -751,7 +776,7 @@ export default function PacsBrowserPage() {
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ limit: 100 })
+            body: JSON.stringify({ limit: searchLimit })
           }
         );
 
@@ -859,7 +884,7 @@ export default function PacsBrowserPage() {
             </p>
           </div>
           <Badge variant="outline" className="text-sm">
-            Legacy Studies: {totalStudies}
+            Legacy Studies: {totalStudies} {totalStudies > itemsPerPage && `(Page ${currentPage} of ${totalPages})`}
           </Badge>
         </div>
       </div>
@@ -989,7 +1014,22 @@ export default function PacsBrowserPage() {
             <div className="text-sm text-muted-foreground">
               Filters apply automatically • Text search requires minimum 3 characters
             </div>
-            <div className="flex space-x-4">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="searchLimit" className="text-sm">Max Results:</Label>
+                <Select value={searchLimit.toString()} onValueChange={(value) => setSearchLimit(Number(value))}>
+                  <SelectTrigger className="w-24">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="100">100</SelectItem>
+                    <SelectItem value="300">300</SelectItem>
+                    <SelectItem value="500">500</SelectItem>
+                    <SelectItem value="1000">1000</SelectItem>
+                    <SelectItem value="2000">2000</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <Button onClick={searchLegacyStudies} disabled={searching}>
                 {searching ? (
                   <>
@@ -1197,6 +1237,97 @@ export default function PacsBrowserPage() {
                   <Skeleton className="h-8 w-24" />
                 </div>
               ))}
+            </div>
+          )}
+          
+          {/* Pagination Controls */}
+          {studies.length > 0 && filteredStudies.length > itemsPerPage && (
+            <div className="flex items-center justify-between mt-6 pt-4 border-t mx-6 pb-4">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">
+                  Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalStudies)} of {totalStudies} studies
+                </span>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="itemsPerPage" className="text-sm">Show:</Label>
+                  <Select value={itemsPerPage.toString()} onValueChange={(value) => setItemsPerPage(Number(value))}>
+                    <SelectTrigger className="w-20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                  >
+                    First
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNum;
+                      if (totalPages <= 5) {
+                        pageNum = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i;
+                      } else {
+                        pageNum = currentPage - 2 + i;
+                      }
+                      
+                      return (
+                        <Button
+                          key={pageNum}
+                          variant={currentPage === pageNum ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setCurrentPage(pageNum)}
+                          className="w-8 h-8 p-0"
+                        >
+                          {pageNum}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    Next
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={currentPage === totalPages}
+                  >
+                    Last
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
         </CardContent>
