@@ -133,6 +133,70 @@ class PacsConfig(models.Model):
         return f"PACS Config ({self.get_endpoint_style_display()}) - {self.modified}"
 
 
+class PacsServer(models.Model):
+    ENDPOINT_STYLE_CHOICES = [
+        ('dicomweb', 'DICOMweb (OHIF-style) - Standard WADO-RS'),
+        ('file', 'File endpoint - Direct Orthanc /file'),
+        ('attachment', 'Attachment - Raw DICOM data'),
+        ('auto', 'Auto-detect - Try best working endpoint'),
+    ]
+    
+    name = models.CharField(
+        max_length=100, 
+        unique=True, 
+        help_text="Friendly name for the PACS server (e.g., 'Unraid Orthanc', 'Main Hospital PACS')"
+    )
+    orthancurl = models.URLField(
+        verbose_name="Orthanc URL", 
+        max_length=200,
+        help_text="Orthanc server URL (e.g., http://10.0.1.0:8042)"
+    )
+    viewrurl = models.URLField(
+        verbose_name="DICOM Viewer URL", 
+        max_length=200,
+        help_text="DICOM viewer URL for this server"
+    )
+    endpoint_style = models.CharField(
+        max_length=20,
+        choices=ENDPOINT_STYLE_CHOICES,
+        default='dicomweb',
+        help_text="DICOM endpoint style for image retrieval"
+    )
+    comments = models.TextField(
+        blank=True, 
+        help_text="Purpose and usage notes (e.g., 'This is only for CT Scan images', 'Archive server for studies older than 1 year')"
+    )
+    is_active = models.BooleanField(default=True, help_text="Enable/disable this PACS server")
+    is_primary = models.BooleanField(default=False, help_text="Primary PACS server for new examinations")
+    is_deleted = models.BooleanField(default=False, help_text="Soft delete flag for servers with historical data")
+    created = models.DateTimeField(auto_now_add=True)
+    modified = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-is_primary', 'name']
+        verbose_name = "PACS Server"
+        verbose_name_plural = "PACS Servers"
+        constraints = [
+            models.UniqueConstraint(
+                fields=['is_primary'],
+                condition=models.Q(is_primary=True, is_deleted=False),
+                name='unique_primary_pacs'
+            )
+        ]
+    
+    def save(self, *args, **kwargs):
+        # Ensure only one primary PACS exists among non-deleted servers
+        if self.is_primary and not self.is_deleted:
+            PacsServer.objects.filter(is_primary=True, is_deleted=False).exclude(pk=self.pk).update(is_primary=False)
+        super().save(*args, **kwargs)
+    
+    def __str__(self):
+        primary_marker = " (Primary)" if self.is_primary else ""
+        active_marker = "" if self.is_active else " (Inactive)"
+        deleted_marker = " (Deleted)" if self.is_deleted else ""
+        return f"{self.name}{primary_marker}{active_marker}{deleted_marker}"
+
+
 class Modaliti(models.Model):
     nama = models.CharField(_("Modaliti"), max_length=150)
     singkatan = models.CharField(_("Singkatan"), max_length=50, blank=True, null=True)
@@ -558,6 +622,14 @@ class PacsExam(models.Model):
     orthanc_id = models.CharField(max_length=100, blank=True, null=True)
     study_id = models.CharField(max_length=100, blank=True, null=True)
     study_instance = models.CharField(max_length=100, blank=True, null=True)
+    pacs_server = models.ForeignKey(
+        PacsServer, 
+        on_delete=models.PROTECT,  # Prevent deletion of servers with examinations
+        help_text="PACS server where this examination's DICOM data is stored",
+        related_name='examinations',
+        null=True,  # Temporary for migration
+        blank=True
+    )
 
     created = models.DateTimeField(auto_now_add=True)
     modified = models.DateTimeField(auto_now=True)
@@ -566,4 +638,11 @@ class PacsExam(models.Model):
         verbose_name_plural = 'Pacs Item'
 
     def __str__(self):
-        return self.orthanc_id
+        return self.orthanc_id or f"PacsExam {self.id}"
+    
+    def get_image_proxy_url(self, orthanc_id: str, endpoint_type: str = 'configurable'):
+        """Get the correct proxy URL for this examination's images"""
+        if self.pacs_server:
+            return f"/api/pacs/instances/{self.pacs_server.id}/{orthanc_id}/{endpoint_type}"
+        # Fallback to legacy URL structure
+        return f"/api/pacs/instances/{orthanc_id}/{endpoint_type}"

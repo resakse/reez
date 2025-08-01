@@ -1,7 +1,20 @@
 import AuthService from './auth';
 
-interface PacsConfig {
+interface PacsServer {
+  id: number;
+  name: string;
   orthancurl: string;
+  viewrurl: string;
+  endpoint_style: string;
+  is_active: boolean;
+  is_primary: boolean;
+  comments?: string;
+}
+
+interface PacsConfig {
+  servers: PacsServer[];
+  primary_server: PacsServer | null;
+  active_servers: PacsServer[];
 }
 
 let cachedPacsConfig: PacsConfig | null = null;
@@ -15,45 +28,79 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 export async function getPacsConfig(): Promise<PacsConfig> {
   const now = Date.now();
   
-  // Return cached config if still valid
   if (cachedPacsConfig && now < cacheExpiry) {
     return cachedPacsConfig;
   }
   
   try {
-    const response = await AuthService.authenticatedFetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/pacs/orthanc-url/`
-    );
+    const [serversResponse, primaryResponse] = await Promise.all([
+      AuthService.authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/pacs-servers/active/`),
+      AuthService.authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/pacs-servers/primary/`)
+    ]);
     
-    if (!response.ok) {
-      throw new Error(`Failed to fetch PACS config: ${response.statusText}`);
-    }
+    const servers: PacsServer[] = serversResponse.ok ? await serversResponse.json() : [];
+    const primary_server: PacsServer | null = primaryResponse.ok ? await primaryResponse.json() : null;
     
-    const config: PacsConfig = await response.json();
+    const config: PacsConfig = {
+      servers,
+      primary_server,
+      active_servers: servers.filter(s => s.is_active)
+    };
     
-    // Cache the config
     cachedPacsConfig = config;
     cacheExpiry = now + CACHE_DURATION;
     
     return config;
   } catch (error) {
-    // Failed to fetch PACS config from database, using fallback
+    console.warn('Failed to fetch multiple PACS config, using fallback:', error);
     
-    // Fallback to environment variable or default
-    const fallbackConfig: PacsConfig = {
-      orthancurl: process.env.NEXT_PUBLIC_ORTHANC_URL || 'http://localhost:8043'
+    // Fallback to single server configuration for backward compatibility
+    return {
+      servers: [{
+        id: 1,
+        name: 'Default PACS',
+        orthancurl: process.env.NEXT_PUBLIC_ORTHANC_URL || 'http://localhost:8043',
+        viewrurl: 'http://localhost:3000/viewer',
+        endpoint_style: 'dicomweb',
+        is_active: true,
+        is_primary: true
+      }],
+      primary_server: null,
+      active_servers: []
     };
-    
-    return fallbackConfig;
   }
 }
 
 /**
- * Gets the Orthanc URL from PACS configuration
+ * Gets the primary PACS server
+ */
+export async function getPrimaryPacsServer(): Promise<PacsServer | null> {
+  const config = await getPacsConfig();
+  return config.primary_server || config.servers.find(s => s.is_primary) || null;
+}
+
+/**
+ * Gets all active PACS servers
+ */
+export async function getActivePacsServers(): Promise<PacsServer[]> {
+  const config = await getPacsConfig();
+  return config.active_servers;
+}
+
+/**
+ * Gets a specific PACS server by ID
+ */
+export async function getPacsServerById(id: number): Promise<PacsServer | null> {
+  const config = await getPacsConfig();
+  return config.servers.find(s => s.id === id) || null;
+}
+
+/**
+ * Gets the Orthanc URL from primary PACS server (backward compatibility)
  */
 export async function getOrthancUrl(): Promise<string> {
-  const config = await getPacsConfig();
-  return config.orthancurl;
+  const primaryServer = await getPrimaryPacsServer();
+  return primaryServer?.orthancurl || process.env.NEXT_PUBLIC_ORTHANC_URL || 'http://localhost:8043';
 }
 
 /**
@@ -64,3 +111,6 @@ export function clearPacsConfigCache(): void {
   cachedPacsConfig = null;
   cacheExpiry = 0;
 }
+
+// Export types for use in other components
+export type { PacsServer, PacsConfig };

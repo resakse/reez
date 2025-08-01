@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Modaliti, Part, Exam, Daftar, Pemeriksaan, PacsConfig
+from .models import Modaliti, Part, Exam, Daftar, Pemeriksaan, PacsConfig, PacsServer
 from pesakit.models import Pesakit
 from wad.models import Ward
 from pesakit.serializers import PesakitSerializer
@@ -420,3 +420,37 @@ class PacsConfigSerializer(serializers.ModelSerializer):
             {'value': choice[0], 'label': choice[1]} 
             for choice in PacsConfig.ENDPOINT_STYLE_CHOICES
         ]
+
+
+class PacsServerSerializer(serializers.ModelSerializer):
+    endpoint_style_choices = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = PacsServer
+        fields = ['id', 'name', 'orthancurl', 'viewrurl', 'endpoint_style', 
+                 'is_active', 'is_primary', 'comments', 'endpoint_style_choices',
+                 'created', 'modified']
+        read_only_fields = ['created', 'modified', 'endpoint_style_choices']
+    
+    def get_endpoint_style_choices(self, obj):
+        return [{'value': choice[0], 'label': choice[1]} 
+                for choice in PacsServer.ENDPOINT_STYLE_CHOICES]
+    
+    def validate(self, data):
+        """Ensure at least one PACS server remains active"""
+        if not data.get('is_active', True):
+            active_count = PacsServer.objects.filter(
+                is_active=True, 
+                is_deleted=False
+            ).exclude(pk=self.instance.pk if self.instance else None).count()
+            
+            if active_count == 0:
+                raise serializers.ValidationError("At least one PACS server must remain active.")
+        return data
+
+
+class PacsServerListSerializer(serializers.ModelSerializer):
+    """Simplified serializer for listing PACS servers"""
+    class Meta:
+        model = PacsServer
+        fields = ['id', 'name', 'orthancurl', 'is_active', 'is_primary', 'comments']

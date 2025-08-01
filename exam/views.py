@@ -155,9 +155,22 @@ class DaftarViewSet(viewsets.ModelViewSet):
             return Response({'error': 'study_instance_uids is required'}, 
                           status=status.HTTP_400_BAD_REQUEST)
         
+        if not isinstance(study_instance_uids, list):
+            return Response({'error': 'study_instance_uids must be an array'}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+        
+        # Filter out empty/null UIDs
+        valid_uids = [uid for uid in study_instance_uids if uid and isinstance(uid, str) and uid.strip()]
+        
+        if not valid_uids:
+            return Response({
+                'success': True,
+                'imported_studies': {}
+            })
+        
         # Query registrations that match any of the study instance UIDs
         imported_registrations = Daftar.objects.filter(
-            study_instance_uid__in=study_instance_uids
+            study_instance_uid__in=valid_uids
         ).values('study_instance_uid', 'id')
         
         # Create mapping of study_instance_uid -> registration_id

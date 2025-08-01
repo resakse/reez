@@ -12,6 +12,7 @@ from .views import (
     DashboardConfigAPIView, DashboardBodypartsExamTypesAPIView
 )
 from .settings_views import PacsConfigListCreateAPIView, PacsConfigDetailAPIView, get_current_pacs_config, get_pacs_orthanc_url
+from .pacs_management_views import PacsServerViewSet, MultiplePacsSearchView, PacsUploadDestinationsView
 from .examination_views import ExaminationListAPIView, ExaminationDetailAPIView
 from .pacs_views import PacsSearchView, pacs_stats, import_legacy_study, DicomImageProxyView, dicom_instance_proxy, get_study_image_ids, get_enhanced_study_metadata, pacs_health_check, dicom_instance_raw_proxy, dicom_instance_dicomweb_proxy, get_study_series_metadata, get_series_bulk_images
 from .configurable_pacs_views import configurable_dicom_instance_proxy, configurable_dicom_metadata, configurable_dicom_frames
@@ -27,6 +28,7 @@ router.register(r'parts', PartViewSet, basename='part')
 router.register(r'exams', ExamViewSet, basename='exam')
 router.register(r'registrations', DaftarViewSet, basename='registration')
 router.register(r'examinations', PemeriksaanViewSet, basename='examination')
+router.register(r'pacs-servers', PacsServerViewSet, basename='pacs-server')
 
 urlpatterns = [
     path("", views.orthanc_study, name="orthanc-study"),
@@ -90,6 +92,8 @@ urlpatterns = [
     
     # PACS Browser API endpoints (authenticated users)
     path('pacs/search/', PacsSearchView.as_view(), name='pacs-search'),
+    path('pacs/search-multiple/', MultiplePacsSearchView.as_view(), name='pacs-search-multiple'),
+    path('pacs/upload-destinations/', PacsUploadDestinationsView.as_view(), name='pacs-upload-destinations'),
     path('pacs/stats/', pacs_stats, name='pacs-stats'),
     path('pacs/import/', import_legacy_study, name='pacs-import'),
     path('pacs/health/', pacs_health_check, name='pacs-health'),

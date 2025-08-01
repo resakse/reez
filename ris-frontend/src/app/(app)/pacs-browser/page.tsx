@@ -77,6 +77,8 @@ interface LegacyStudy {
   ProtocolName?: string; // 0018,1030
   AcquisitionDeviceProcessingDescription?: string; // 0018,1400
   Manufacturer?: string; // 0008,0070
+  pacsServerId?: number; // Multiple PACS support
+  pacsServerName?: string; // Multiple PACS support
 }
 
 interface ModalityOption {
@@ -190,8 +192,15 @@ export default function PacsBrowserPage() {
 
   const checkImportStatus = useCallback(async (studies: LegacyStudy[]): Promise<LegacyStudy[]> => {
     try {
-      // Get all study UIDs to check
-      const studyUids = studies.map(s => s.StudyInstanceUID);
+      // Get all study UIDs to check (filter out empty/null values)
+      const studyUids = studies
+        .map(s => s.StudyInstanceUID)
+        .filter(uid => uid && uid.trim() !== '');
+      
+      // Skip batch check if no valid UIDs
+      if (studyUids.length === 0) {
+        return studies.map(study => ({ ...study, isImported: false }));
+      }
       
       // Batch check import status
       const response = await AuthService.authenticatedFetch(
@@ -346,9 +355,9 @@ export default function PacsBrowserPage() {
 
       // Searching with built parameters
 
-      // Use Django API endpoint instead of direct Orthanc connection
+      // Use Django API endpoint for multiple PACS search
       const response = await AuthService.authenticatedFetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/pacs/search/`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/pacs/search-multiple/`,
         {
           method: 'POST',
           headers: {
@@ -369,12 +378,13 @@ export default function PacsBrowserPage() {
         throw new Error(data.error || 'Search failed');
       }
 
-      // Map backend response to frontend format
+      // Map backend response to frontend format - multiple PACS support
       let formattedStudies: LegacyStudy[] = data.studies.map((study: any) => {
         // Debug: Log the first study to see what fields are available
         if (formattedStudies.length === 0) {
-          console.log('First study from backend:', study);
-          console.log('Note: Backend needs to be updated to return DICOM fields:');
+          console.log('First study from multiple PACS backend:', study);
+          console.log('PACS server info:', study.pacs_server_id, study.pacs_server_name);
+          console.log('Note: Backend provides DICOM fields:');
           console.log('- bodyPartExamined (0018,0015)');
           console.log('- protocolName (0018,1030)'); 
           console.log('- acquisitionDeviceProcessingDescription (0018,1400)');
@@ -396,12 +406,15 @@ export default function PacsBrowserPage() {
           ImageCount: study.imageCount,
           InstitutionName: study.institutionName,
           Ward: study.ward,
-          Klinik: study.institutionName || 'Unknown',
+          Klinik: study.institutionName || study.pacs_server_name || 'Unknown',
           // DICOM fields from backend
           BodyPartExamined: study.bodyPartExamined || study.BodyPartExamined,
           ProtocolName: study.protocolName || study.ProtocolName,
           AcquisitionDeviceProcessingDescription: study.acquisitionDeviceProcessingDescription || study.AcquisitionDeviceProcessingDescription,
-          Manufacturer: study.manufacturer || study.Manufacturer
+          Manufacturer: study.manufacturer || study.Manufacturer,
+          // Store PACS server information for potential future use
+          pacsServerId: study.pacs_server_id,
+          pacsServerName: study.pacs_server_name
         };
       });
 
@@ -447,10 +460,32 @@ export default function PacsBrowserPage() {
       ])).sort();
       setAllExamOptions(newExamOptions);
       
+      // Display pagination info if available
+      const paginationInfo = data.pagination_info;
+      const serversSearched = data.servers_searched?.length || 0;
+      const serverErrors = data.server_errors || {};
+      
       if (formattedStudies.length === 0) {
-        toast.success('Search completed - no studies found matching criteria');
+        if (serversSearched > 0) {
+          toast.success(`Search completed across ${serversSearched} PACS server(s) - no studies found matching criteria`);
+        } else {
+          toast.warning('No active PACS servers available for search');
+        }
       } else {
-        toast.success(`Found ${formattedStudies.length} legacy studies`);
+        let message = `Found ${formattedStudies.length} legacy studies`;
+        if (serversSearched > 1) {
+          message += ` from ${serversSearched} PACS server(s)`;
+        }
+        if (paginationInfo && paginationInfo.per_server_limit) {
+          message += ` (max ${paginationInfo.per_server_limit} per server)`;
+        }
+        toast.success(message);
+      }
+      
+      // Show server errors if any
+      if (Object.keys(serverErrors).length > 0) {
+        const errorServers = Object.keys(serverErrors).join(', ');
+        toast.warning(`Some PACS servers had errors: ${errorServers}`);
       }
     } catch (err) {
       // Error searching legacy studies
@@ -708,9 +743,9 @@ export default function PacsBrowserPage() {
         setLoading(true);
         setError(null);
         
-        // Search with empty parameters to get all recent studies
+        // Search with empty parameters to get all recent studies from multiple PACS
         const response = await AuthService.authenticatedFetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/pacs/search/`,
+          `${process.env.NEXT_PUBLIC_API_URL}/api/pacs/search-multiple/`,
           {
             method: 'POST',
             headers: {
@@ -731,7 +766,7 @@ export default function PacsBrowserPage() {
           throw new Error(data.error || 'Failed to load studies');
         }
 
-        // Map backend response to frontend format
+        // Map backend response to frontend format - multiple PACS support
         let formattedStudies: LegacyStudy[] = data.studies.map((study: any) => ({
           ID: study.id,
           StudyInstanceUID: study.studyInstanceUid,
@@ -747,12 +782,15 @@ export default function PacsBrowserPage() {
           ImageCount: study.imageCount,
           InstitutionName: study.institutionName,
           Ward: study.ward,
-          Klinik: study.institutionName || 'Unknown',
+          Klinik: study.institutionName || study.pacs_server_name || 'Unknown',
           // DICOM fields from backend
           BodyPartExamined: study.bodyPartExamined || study.BodyPartExamined,
           ProtocolName: study.protocolName || study.ProtocolName,
           AcquisitionDeviceProcessingDescription: study.acquisitionDeviceProcessingDescription || study.AcquisitionDeviceProcessingDescription,
-          Manufacturer: study.manufacturer || study.Manufacturer
+          Manufacturer: study.manufacturer || study.Manufacturer,
+          // Store PACS server information for potential future use
+          pacsServerId: study.pacs_server_id,
+          pacsServerName: study.pacs_server_name
         }));
 
         // Check import status for all studies
@@ -817,7 +855,7 @@ export default function PacsBrowserPage() {
               PACS Browser
             </h1>
             <p className="mt-2 text-muted-foreground">
-              Browse and view legacy DICOM studies from PACS archive
+              Browse and view legacy DICOM studies from multiple PACS servers
             </p>
           </div>
           <Badge variant="outline" className="text-sm">
@@ -834,7 +872,7 @@ export default function PacsBrowserPage() {
             Search Legacy Studies
           </CardTitle>
           <CardDescription>
-            Search through historical DICOM studies in the PACS archive
+            Search through historical DICOM studies from multiple PACS servers
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -991,7 +1029,7 @@ export default function PacsBrowserPage() {
             </span>
           </CardTitle>
           <CardDescription>
-            Historical DICOM studies from PACS archive
+            Historical DICOM studies from multiple PACS servers with pagination support
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -1006,6 +1044,7 @@ export default function PacsBrowserPage() {
                     <th className="text-left py-3 px-4 font-semibold text-sm">Exam</th>
                     <th className="text-left py-3 px-4 font-semibold text-sm">Body Part</th>
                     <th className="text-left py-3 px-4 font-semibold text-sm">Manufacturer</th>
+                    <th className="text-left py-3 px-4 font-semibold text-sm">PACS Server</th>
                     <th className="text-left py-3 px-4 font-semibold text-sm">Series</th>
                     <th className="text-left py-3 px-4 font-semibold text-sm">Actions</th>
                   </tr>
@@ -1017,11 +1056,6 @@ export default function PacsBrowserPage() {
                         <div>
                           <p className="font-medium">{study.PatientName?.replace(/\^/g, ' ') || 'Unknown'}</p>
                           <p className="text-xs text-muted-foreground">ID: {study.PatientID}</p>
-                          {study.PatientSex && (
-                            <Badge variant="outline" className="text-xs mt-1">
-                              {study.PatientSex === 'M' ? 'Male' : study.PatientSex === 'F' ? 'Female' : study.PatientSex}
-                            </Badge>
-                          )}
                         </div>
                       </td>
                       <td className="py-3 px-4 text-sm">
@@ -1075,6 +1109,11 @@ export default function PacsBrowserPage() {
                         <p className="max-w-xs truncate" title={study.Manufacturer}>
                           {study.Manufacturer || '-'}
                         </p>
+                      </td>
+                      <td className="py-3 px-4 text-sm">
+                        <Badge variant="secondary" className="text-xs" title={`Server ID: ${study.pacsServerId}`}>
+                          {study.pacsServerName || 'Unknown'}
+                        </Badge>
                       </td>
                       <td className="py-3 px-4 text-sm">
                         <Badge variant="outline" className="text-xs">
