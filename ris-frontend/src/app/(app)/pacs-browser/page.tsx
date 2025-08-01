@@ -11,6 +11,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuCheckboxItem, 
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger 
+} from '@/components/ui/dropdown-menu';
 import { getOrthancUrl } from '@/lib/pacs';
 import { toast } from '@/lib/toast';
 import AuthService from '@/lib/auth';
@@ -25,7 +33,9 @@ import {
   Stethoscope,
   User,
   Clock,
-  RefreshCw
+  RefreshCw,
+  Server,
+  ChevronDown
 } from 'lucide-react';
 
 import flatpickr from 'flatpickr';
@@ -104,6 +114,8 @@ export default function PacsBrowserPage() {
   const [allExamOptions, setAllExamOptions] = useState<string[]>([]);
   const [allStudies, setAllStudies] = useState<LegacyStudy[]>([]);
   const [importingStudies, setImportingStudies] = useState<Set<string>>(new Set());
+  const [allPacsServerOptions, setAllPacsServerOptions] = useState<{id: number, name: string}[]>([]);
+  const [selectedPacsServers, setSelectedPacsServers] = useState<number[]>([]);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -307,6 +319,13 @@ export default function PacsBrowserPage() {
       filtered = filtered.filter(study => study.Manufacturer === manufacturer);
     }
 
+    // Apply PACS server filter
+    if (selectedPacsServers.length > 0) {
+      filtered = filtered.filter(study => 
+        study.pacsServerId && selectedPacsServers.includes(study.pacsServerId)
+      );
+    }
+
     // Apply date range filter
     if (dateRange.length >= 1) {
       // Convert DD/MM/YYYY to YYYYMMDD for comparison
@@ -323,7 +342,7 @@ export default function PacsBrowserPage() {
     }
 
     return filtered;
-  }, [allStudies, debouncedPatientName, debouncedPatientId, modality, klinik, dateRange, bodyPart, exam, manufacturer]);
+  }, [allStudies, debouncedPatientName, debouncedPatientId, modality, klinik, dateRange, bodyPart, exam, manufacturer, selectedPacsServers]);
 
   // Update displayed studies when filtered studies change
   useEffect(() => {
@@ -348,7 +367,7 @@ export default function PacsBrowserPage() {
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedPatientName, debouncedPatientId, modality, klinik, dateRange, bodyPart, exam, manufacturer]);
+  }, [debouncedPatientName, debouncedPatientId, modality, klinik, dateRange, bodyPart, exam, manufacturer, selectedPacsServers]);
 
   const searchLegacyStudies = useCallback(async () => {
     try {
@@ -371,6 +390,7 @@ export default function PacsBrowserPage() {
         })() : undefined,
         exam: exam !== 'all' ? exam || undefined : undefined,
         manufacturer: manufacturer !== 'all' ? manufacturer || undefined : undefined,
+        server_ids: selectedPacsServers.length > 0 ? selectedPacsServers : undefined,
         limit: searchLimit
       };
 
@@ -450,6 +470,23 @@ export default function PacsBrowserPage() {
       // Store all studies for client-side filtering
       setAllStudies(formattedStudies);
 
+      // Update PACS server options from search results (preserve existing active servers)
+      const extractedPacsServers = formattedStudies
+        .filter(study => study.pacsServerId && study.pacsServerName)
+        .map(study => ({ id: study.pacsServerId!, name: study.pacsServerName! }));
+      
+      // Merge with existing servers, keeping existing ones and adding new ones
+      const existingServerIds = new Set(allPacsServerOptions.map(s => s.id));
+      const newServers = extractedPacsServers.filter(server => !existingServerIds.has(server.id));
+      
+      if (newServers.length > 0) {
+        const allServers = [...allPacsServerOptions, ...newServers];
+        const uniquePacsServers = Array.from(
+          new Map(allServers.map(server => [server.id, server])).values()
+        ).sort((a, b) => a.name.localeCompare(b.name));
+        setAllPacsServerOptions(uniquePacsServers);
+      }
+
       // Update klinik options from search results (preserve existing options)
       const extractedKliniks = formattedStudies.map(study => study.Klinik).filter(Boolean);
       const newKlinikOptions = Array.from(new Set([
@@ -520,7 +557,7 @@ export default function PacsBrowserPage() {
     } finally {
       setSearching(false);
     }
-  }, [patientName, patientId, dateRange, modality, klinik, bodyPart, exam, manufacturer]);
+  }, [patientName, patientId, dateRange, modality, klinik, bodyPart, exam, manufacturer, selectedPacsServers]);
 
   const clearFilters = () => {
     setPatientName('');
@@ -531,6 +568,7 @@ export default function PacsBrowserPage() {
     setBodyPart('all');
     setExam('all');
     setManufacturer('all');
+    setSelectedPacsServers([]);
     setError(null);
     // Clear debounced values immediately
     setDebouncedPatientName('');
@@ -695,6 +733,33 @@ export default function PacsBrowserPage() {
     }
   };
 
+  // Fetch PACS servers on component mount
+  useEffect(() => {
+    const fetchPacsServers = async () => {
+      try {
+        const response = await AuthService.authenticatedFetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/pacs-servers/active/`
+        );
+        
+        if (response.ok) {
+          const servers = await response.json();
+          const serverOptions = servers.map((server: any) => ({
+            id: server.id,
+            name: server.name
+          })).sort((a: any, b: any) => a.name.localeCompare(b.name));
+          
+          setAllPacsServerOptions(serverOptions);
+        } else {
+          console.error('Failed to fetch PACS servers:', response.status, response.statusText);
+        }
+      } catch (err) {
+        console.error('Failed to fetch PACS servers:', err);
+      }
+    };
+
+    fetchPacsServers();
+  }, []);
+
   // Fetch modality options from database
   useEffect(() => {
     const fetchModalities = async () => {
@@ -824,6 +889,23 @@ export default function PacsBrowserPage() {
 
         // Store all studies for client-side filtering
         setAllStudies(formattedStudies);
+        
+        // Update PACS server options from all studies (preserve existing active servers)
+        const extractedPacsServers = formattedStudies
+          .filter(study => study.pacsServerId && study.pacsServerName)
+          .map(study => ({ id: study.pacsServerId!, name: study.pacsServerName! }));
+        
+        // Merge with existing servers, keeping existing ones and adding new ones
+        const existingServerIds = new Set(allPacsServerOptions.map(s => s.id));
+        const newServers = extractedPacsServers.filter(server => !existingServerIds.has(server.id));
+        
+        if (newServers.length > 0) {
+          const allServers = [...allPacsServerOptions, ...newServers];
+          const uniquePacsServers = Array.from(
+            new Map(allServers.map(server => [server.id, server])).values()
+          ).sort((a, b) => a.name.localeCompare(b.name));
+          setAllPacsServerOptions(uniquePacsServers);
+        }
         
         // Update klinik options from all studies (preserve existing options)
         const extractedKliniks = formattedStudies.map(study => study.Klinik).filter(Boolean);
@@ -1008,6 +1090,54 @@ export default function PacsBrowserPage() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="pacsServers">PACS Servers</Label>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="w-full justify-between">
+                    <span className="flex items-center gap-2">
+                      <Server className="h-4 w-4" />
+                      {selectedPacsServers.length === 0 ? 'All PACS Servers' : 
+                       selectedPacsServers.length === 1 ? 
+                       allPacsServerOptions.find(s => s.id === selectedPacsServers[0])?.name || 'Selected' :
+                       `${selectedPacsServers.length} servers selected`}
+                    </span>
+                    <ChevronDown className="h-4 w-4 opacity-50" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56" align="start">
+                  <DropdownMenuLabel>Select PACS Servers</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuCheckboxItem
+                    checked={selectedPacsServers.length === 0}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setSelectedPacsServers([]);
+                      }
+                    }}
+                  >
+                    All Servers
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuSeparator />
+                  {allPacsServerOptions.map(server => (
+                    <DropdownMenuCheckboxItem
+                      key={server.id}
+                      checked={selectedPacsServers.includes(server.id)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedPacsServers(prev => [...prev, server.id]);
+                        } else {
+                          setSelectedPacsServers(prev => prev.filter(id => id !== server.id));
+                        }
+                      }}
+                    >
+                      {server.name}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
 
