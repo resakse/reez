@@ -28,22 +28,11 @@ export default function UploadPage() {
     <ProtectedRoute requireStaff={true}>
       <div className="container mx-auto py-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => router.back()}
-          className="gap-2"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold">Upload DICOM Images</h1>
-          <p className="text-muted-foreground">
-            Upload DICOM files and register them in the RIS system
-          </p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold">Upload DICOM Images</h1>
+        <p className="text-muted-foreground">
+          Upload DICOM files and register them in the RIS system
+        </p>
       </div>
 
       {/* Information Card */}

@@ -10,7 +10,7 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { 
   Upload, X, FileText, AlertCircle, CheckCircle, 
-  User, Stethoscope, Building, FileImage, Loader2
+  User, Stethoscope, Building, FileImage, Loader2, Server
 } from 'lucide-react';
 import Select, { SingleValue } from 'react-select';
 import AuthService from '@/lib/auth';
@@ -47,6 +47,12 @@ interface Patient {
 interface Ward {
   id: string;
   wad: string;
+}
+
+interface PacsServer {
+  id: number;
+  name: string;
+  is_primary?: boolean;
 }
 
 interface SelectOption {
@@ -168,8 +174,11 @@ const DicomUpload: React.FC<DicomUploadProps> = ({
   const [selectedPatient, setSelectedPatient] = useState<SelectOption | null>(null);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [wards, setWards] = useState<Ward[]>([]);
+  const [pacsServers, setPacsServers] = useState<PacsServer[]>([]);
+  const [selectedPacsServer, setSelectedPacsServer] = useState<SelectOption | null>(null);
   const [isLoadingPatients, setIsLoadingPatients] = useState(false);
   const [isLoadingWards, setIsLoadingWards] = useState(false);
+  const [isLoadingPacsServers, setIsLoadingPacsServers] = useState(false);
   
   // Form data
   const [formData, setFormData] = useState({
@@ -206,6 +215,11 @@ const DicomUpload: React.FC<DicomUploadProps> = ({
       label: ward.wad
     })) : [])
   ];
+
+  const pacsServerOptions: SelectOption[] = pacsServers.map(server => ({
+    value: server.id.toString(),
+    label: server.is_primary ? `${server.name} (Primary)` : server.name
+  }));
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragRef = useRef<HTMLDivElement>(null);
@@ -222,6 +236,7 @@ const DicomUpload: React.FC<DicomUploadProps> = ({
   React.useEffect(() => {
     loadPatients();
     loadWards();
+    loadPacsServers();
   }, []);
 
   // Set initial patient selection when patientId prop changes or patients load
@@ -269,6 +284,55 @@ const DicomUpload: React.FC<DicomUploadProps> = ({
       toast.error('Failed to load wards');
     } finally {
       setIsLoadingWards(false);
+    }
+  };
+
+  const loadPacsServers = async () => {
+    setIsLoadingPacsServers(true);
+    try {
+      const response = await AuthService.authenticatedFetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/pacs/upload-destinations/`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        console.log('PACS servers API response:', data); // Debug log
+        
+        const servers = data.servers || [];
+        setPacsServers(servers);
+        
+        if (servers.length === 0) {
+          console.warn('No PACS servers returned from API');
+          toast.warning('No PACS servers configured. Contact your administrator to set up PACS servers.');
+        } else {
+          console.log(`Found ${servers.length} PACS server(s):`, servers.map(s => s.name));
+        }
+        
+        // Auto-select primary server if available
+        const primaryServer = servers.find((server: PacsServer) => server.is_primary);
+        if (primaryServer) {
+          setSelectedPacsServer({
+            value: primaryServer.id.toString(),
+            label: `${primaryServer.name} (Primary)`
+          });
+          console.log('Auto-selected primary server:', primaryServer.name);
+        } else if (servers.length === 1) {
+          // Auto-select if only one server available
+          setSelectedPacsServer({
+            value: servers[0].id.toString(),
+            label: servers[0].name
+          });
+          console.log('Auto-selected only available server:', servers[0].name);
+        }
+      } else {
+        console.error('PACS servers API error:', response.status, response.statusText);
+        const errorData = await response.text();
+        console.error('Error response:', errorData);
+        toast.error(`Failed to load PACS servers: ${response.status} ${response.statusText}`);
+      }
+    } catch (error) {
+      toast.error('Failed to load PACS servers');
+    } finally {
+      setIsLoadingPacsServers(false);
     }
   };
 
@@ -376,7 +440,11 @@ const DicomUpload: React.FC<DicomUploadProps> = ({
       return;
     }
 
-    // No validation needed - all metadata extracted from DICOM files
+    if (!selectedPacsServer || !selectedPacsServer.value) {
+      toast.error('Please select a PACS server for upload');
+      return;
+    }
+
     // Patient will be created from DICOM metadata if not selected
 
     setIsUploading(true);
@@ -394,6 +462,9 @@ const DicomUpload: React.FC<DicomUploadProps> = ({
       // Add metadata
       if (selectedPatient && selectedPatient.value) {
         uploadFormData.append('patient_id', selectedPatient.value);
+      }
+      if (selectedPacsServer && selectedPacsServer.value) {
+        uploadFormData.append('pacs_server_id', selectedPacsServer.value);
       }
       uploadFormData.append('modality', formData.modality);
       uploadFormData.append('study_description', formData.studyDescription);
@@ -466,7 +537,17 @@ const DicomUpload: React.FC<DicomUploadProps> = ({
       wardId: ''
     });
     setSelectedPatient(null);
+    setSelectedPacsServer(null);
     setUploadProgress(0);
+    
+    // Re-select primary PACS server if available
+    const primaryServer = pacsServers.find(server => server.is_primary);
+    if (primaryServer) {
+      setSelectedPacsServer({
+        value: primaryServer.id.toString(),
+        label: `${primaryServer.name} (Primary)`
+      });
+    }
   };
 
   return (
@@ -502,6 +583,33 @@ const DicomUpload: React.FC<DicomUploadProps> = ({
           />
           {isLoadingPatients && (
             <p className="text-sm text-muted-foreground">Loading patients...</p>
+          )}
+        </div>
+
+        {/* PACS Server Selection */}
+        <div className="space-y-2">
+          <Label className="flex items-center gap-2">
+            <Server className="h-4 w-4" />
+            PACS Server (Required)
+          </Label>
+          <Select
+            value={selectedPacsServer}
+            onChange={(option: SingleValue<SelectOption>) => setSelectedPacsServer(option)}
+            options={pacsServerOptions}
+            styles={getSelectStyles(isDark)}
+            isLoading={isLoadingPacsServers}
+            isSearchable={false}
+            placeholder="Select PACS server for upload"
+            loadingMessage={() => "Loading PACS servers..."}
+            noOptionsMessage={() => "No PACS servers available"}
+            menuPortalTarget={isMounted ? document.body : undefined}
+            menuPlacement="auto"
+          />
+          {isLoadingPacsServers && (
+            <p className="text-sm text-muted-foreground">Loading PACS servers...</p>
+          )}
+          {!isLoadingPacsServers && pacsServers.length === 0 && (
+            <p className="text-sm text-red-600">No PACS servers configured. Contact your administrator.</p>
           )}
         </div>
 
@@ -694,7 +802,7 @@ const DicomUpload: React.FC<DicomUploadProps> = ({
           
           <Button 
             onClick={handleUpload}
-            disabled={files.length === 0 || isUploading}
+            disabled={files.length === 0 || isUploading || !selectedPacsServer}
             className="min-w-32"
           >
             {isUploading ? (
