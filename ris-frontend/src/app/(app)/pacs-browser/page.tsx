@@ -266,9 +266,10 @@ export default function PacsBrowserPage() {
     // Apply text filters only if they meet minimum length requirement (use debounced values)
     if (debouncedPatientName.length >= 3) {
       const searchTerm = debouncedPatientName.toLowerCase();
-      filtered = filtered.filter(study => 
-        study.PatientName?.toLowerCase().includes(searchTerm)
-      );
+      filtered = filtered.filter(study => {
+        const patientName = study.PatientName?.replace(/\^/g, ' ').toLowerCase() || '';
+        return patientName.includes(searchTerm);
+      });
     }
 
     if (debouncedPatientId.length >= 3) {
@@ -356,7 +357,7 @@ export default function PacsBrowserPage() {
       
       // Build search parameters (klinik and modality filtering done client-side)
       const searchParams = {
-        patientName: patientName.trim() || undefined,
+        patientName: patientName.trim() ? patientName.trim().replace(/\s+/g, '^') : undefined,
         patientId: patientId.trim() || undefined,
         dateFrom: dateRange.length >= 1 ? (() => {
           // Convert DD/MM/YYYY to YYYY-MM-DD for API
