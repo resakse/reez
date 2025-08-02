@@ -667,7 +667,15 @@ class MediaDistribution(models.Model):
     
     # Core fields
     request_date = models.DateTimeField(default=timezone.now)
-    daftar = models.ForeignKey(Daftar, on_delete=models.CASCADE, related_name='media_distributions')
+    # Support multiple studies in one distribution
+    studies = models.ManyToManyField(Daftar, related_name='media_distributions', help_text="Studies included in this distribution")
+    # Keep legacy single daftar field for backward compatibility (will be deprecated)
+    daftar = models.ForeignKey(Daftar, on_delete=models.CASCADE, related_name='legacy_media_distributions', 
+                              null=True, blank=True, help_text="DEPRECATED: Use studies field instead")
+    
+    # Primary patient (derived from first study)
+    primary_patient = models.ForeignKey('pesakit.Pesakit', on_delete=models.CASCADE, related_name='media_distributions',
+                                       null=True, blank=True, help_text="Primary patient for this distribution")
     
     # Media details
     media_type = models.CharField(max_length=20, choices=MEDIA_TYPE_CHOICES)
@@ -688,6 +696,7 @@ class MediaDistribution(models.Model):
     
     # Additional details
     comments = models.TextField(blank=True, null=True, help_text="Special instructions or notes")
+    cancellation_reason = models.TextField(blank=True, null=True, help_text="Reason for cancellation")
     urgency = models.CharField(max_length=20, choices=[
         ('NORMAL', 'Normal'),
         ('URGENT', 'Urgent'),
@@ -703,4 +712,32 @@ class MediaDistribution(models.Model):
         ordering = ['-request_date']
     
     def __str__(self):
-        return f"{self.daftar.pesakit.nama} - {self.media_type} ({self.status})"
+        if self.primary_patient:
+            return f"{self.primary_patient.nama} - {self.media_type} ({self.status})"
+        elif self.daftar:  # Backward compatibility
+            return f"{self.daftar.pesakit.nama} - {self.media_type} ({self.status})"
+        return f"Media Distribution {self.id} - {self.media_type} ({self.status})"
+    
+    def save(self, *args, **kwargs):
+        # Set primary_patient from daftar if not set (backward compatibility)
+        if not self.primary_patient and self.daftar:
+            self.primary_patient = self.daftar.pesakit
+        super().save(*args, **kwargs)
+        
+        # If using legacy daftar field, automatically add to studies
+        if self.daftar and not self.studies.filter(id=self.daftar.id).exists():
+            self.studies.add(self.daftar)
+    
+    @property
+    def patient_name(self):
+        """Get patient name for display"""
+        if self.primary_patient:
+            return self.primary_patient.nama
+        elif self.daftar:
+            return self.daftar.pesakit.nama
+        return "Unknown Patient"
+    
+    @property
+    def study_count(self):
+        """Get number of studies in this distribution"""
+        return self.studies.count() or (1 if self.daftar else 0)

@@ -457,12 +457,33 @@ class PacsServerListSerializer(serializers.ModelSerializer):
 
 
 class MediaDistributionSerializer(serializers.ModelSerializer):
+    # Support both legacy single study and new multiple studies
     daftar = DaftarSerializer(read_only=True)
     daftar_id = serializers.PrimaryKeyRelatedField(
         queryset=Daftar.objects.all(),
         source='daftar',
-        write_only=True
+        write_only=True,
+        required=False,
+        allow_null=True
     )
+    
+    # New multiple studies support
+    studies = DaftarSerializer(many=True, read_only=True)
+    study_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False,
+        help_text="List of study IDs to include in this distribution"
+    )
+    
+    # Legacy support for old API format
+    daftar_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False,
+        help_text="DEPRECATED: Use study_ids instead"
+    )
+    
     prepared_by = UserSerializer(read_only=True)
     prepared_by_id = serializers.PrimaryKeyRelatedField(
         queryset=User.objects.all(),
@@ -485,26 +506,87 @@ class MediaDistributionSerializer(serializers.ModelSerializer):
     status_choices = serializers.SerializerMethodField()
     urgency_choices = serializers.SerializerMethodField()
     
-    # Patient info (from related daftar)
-    patient_name = serializers.CharField(source='daftar.pesakit.nama', read_only=True)
-    patient_mrn = serializers.CharField(source='daftar.pesakit.mrn', read_only=True)
-    patient_nric = serializers.CharField(source='daftar.pesakit.nric', read_only=True)
-    study_accession = serializers.CharField(source='daftar.parent_accession_number', read_only=True)
+    # Patient info (from primary patient or legacy daftar)
+    patient_name = serializers.SerializerMethodField()
+    patient_mrn = serializers.SerializerMethodField()
+    patient_nric = serializers.SerializerMethodField()
+    study_count = serializers.ReadOnlyField()
     
     class Meta:
         model = MediaDistribution
         fields = [
-            'id', 'request_date', 'daftar', 'daftar_id',
+            'id', 'request_date', 'daftar', 'daftar_id', 'studies', 'study_ids', 'daftar_ids',
             'media_type', 'quantity', 'status', 'urgency',
             'collected_by', 'collected_by_ic', 'relationship_to_patient', 'collection_datetime',
             'prepared_by', 'prepared_by_id', 'handed_over_by', 'handed_over_by_id',
-            'comments', 'created', 'modified',
+            'comments', 'cancellation_reason', 'created', 'modified',
             # Choice fields
             'media_type_choices', 'status_choices', 'urgency_choices',
             # Patient info
-            'patient_name', 'patient_mrn', 'patient_nric', 'study_accession'
+            'patient_name', 'patient_mrn', 'patient_nric', 'study_count'
         ]
-        read_only_fields = ['created', 'modified', 'patient_name', 'patient_mrn', 'patient_nric', 'study_accession']
+        read_only_fields = ['created', 'modified', 'patient_name', 'patient_mrn', 'patient_nric', 'study_count']
+    
+    def get_patient_name(self, obj):
+        if obj.primary_patient:
+            return obj.primary_patient.nama
+        elif obj.daftar:
+            return obj.daftar.pesakit.nama
+        return "Unknown Patient"
+    
+    def get_patient_mrn(self, obj):
+        if obj.primary_patient:
+            return obj.primary_patient.mrn
+        elif obj.daftar:
+            return obj.daftar.pesakit.mrn
+        return None
+    
+    def get_patient_nric(self, obj):
+        if obj.primary_patient:
+            return obj.primary_patient.nric
+        elif obj.daftar:
+            return obj.daftar.pesakit.nric
+        return None
+    
+    def create(self, validated_data):
+        # Handle multiple study IDs
+        study_ids = validated_data.pop('study_ids', None)
+        daftar_ids = validated_data.pop('daftar_ids', None)  # Legacy support
+        
+        # Use daftar_ids if study_ids not provided (backward compatibility)
+        if not study_ids and daftar_ids:
+            study_ids = daftar_ids
+        
+        # Handle single daftar_id (legacy)
+        single_daftar = validated_data.pop('daftar', None)
+        
+        # Create the distribution
+        distribution = MediaDistribution.objects.create(**validated_data)
+        
+        # Handle studies
+        if study_ids:
+            studies = Daftar.objects.filter(id__in=study_ids)
+            if not studies.exists():
+                raise serializers.ValidationError("No valid studies found with provided IDs")
+            
+            # Set primary patient from first study
+            first_study = studies.first()
+            distribution.primary_patient = first_study.pesakit
+            distribution.save()
+            
+            # Add all studies
+            distribution.studies.set(studies)
+            
+        elif single_daftar:
+            # Legacy single study support
+            distribution.daftar = single_daftar
+            distribution.primary_patient = single_daftar.pesakit
+            distribution.save()
+            distribution.studies.add(single_daftar)
+        else:
+            raise serializers.ValidationError("Either study_ids or daftar_id must be provided")
+        
+        return distribution
     
     def get_media_type_choices(self, obj):
         return [{'value': choice[0], 'label': choice[1]} for choice in MediaDistribution.MEDIA_TYPE_CHOICES]
@@ -522,11 +604,10 @@ class MediaDistributionSerializer(serializers.ModelSerializer):
 
 class MediaDistributionListSerializer(serializers.ModelSerializer):
     """Simplified serializer for listing media distributions"""
-    patient_name = serializers.CharField(source='daftar.pesakit.nama', read_only=True)
-    patient_mrn = serializers.CharField(source='daftar.pesakit.mrn', read_only=True)
-    study_accession = serializers.CharField(source='daftar.parent_accession_number', read_only=True)
-    study_date = serializers.DateTimeField(source='daftar.tarikh', read_only=True)
-    study_description = serializers.CharField(source='daftar.study_description', read_only=True)
+    patient_name = serializers.SerializerMethodField()
+    patient_mrn = serializers.SerializerMethodField()
+    study_count = serializers.ReadOnlyField()
+    study_summary = serializers.SerializerMethodField()  # Summary of studies
     prepared_by_name = serializers.SerializerMethodField()
     handed_over_by_name = serializers.SerializerMethodField()
     
@@ -534,9 +615,64 @@ class MediaDistributionListSerializer(serializers.ModelSerializer):
         model = MediaDistribution
         fields = [
             'id', 'request_date', 'media_type', 'quantity', 'status', 'urgency',
-            'collected_by', 'collection_datetime', 'patient_name', 'patient_mrn', 
-            'study_accession', 'study_date', 'study_description', 'prepared_by_name', 'handed_over_by_name'
+            'collected_by', 'collected_by_ic', 'relationship_to_patient', 'collection_datetime', 
+            'patient_name', 'patient_mrn', 'study_count', 'study_summary', 
+            'prepared_by_name', 'handed_over_by_name', 'cancellation_reason', 'comments'
         ]
+    
+    def get_patient_name(self, obj):
+        if obj.primary_patient:
+            return obj.primary_patient.nama
+        elif obj.daftar:
+            return obj.daftar.pesakit.nama
+        return "Unknown Patient"
+    
+    def get_patient_mrn(self, obj):
+        if obj.primary_patient:
+            return obj.primary_patient.mrn
+        elif obj.daftar:
+            return obj.daftar.pesakit.mrn
+        return None
+    
+    def get_study_summary(self, obj):
+        """Get a summary of all studies in this distribution"""
+        studies = obj.studies.all()
+        
+        if studies.exists():
+            # Get the date range of studies
+            study_dates = [study.tarikh for study in studies]
+            earliest_date = min(study_dates)
+            latest_date = max(study_dates)
+            
+            # Format date range
+            if earliest_date == latest_date:
+                date_text = earliest_date.strftime('%Y-%m-%d')
+            else:
+                date_text = f"{earliest_date.strftime('%Y-%m-%d')} to {latest_date.strftime('%Y-%m-%d')}"
+            
+            # Get unique accession numbers
+            accession_numbers = [study.parent_accession_number for study in studies if study.parent_accession_number]
+            
+            return {
+                'date_range': date_text,
+                'accession_numbers': accession_numbers[:3],  # Show max 3 accession numbers
+                'total_studies': studies.count(),
+                'study_descriptions': [study.study_description for study in studies if study.study_description][:2]  # Show max 2 descriptions
+            }
+        elif obj.daftar:  # Fallback for legacy single study
+            return {
+                'date_range': obj.daftar.tarikh.strftime('%Y-%m-%d'),
+                'accession_numbers': [obj.daftar.parent_accession_number] if obj.daftar.parent_accession_number else [],
+                'total_studies': 1,
+                'study_descriptions': [obj.daftar.study_description] if obj.daftar.study_description else []
+            }
+        
+        return {
+            'date_range': 'No studies',
+            'accession_numbers': [],
+            'total_studies': 0,
+            'study_descriptions': []
+        }
     
     def get_prepared_by_name(self, obj):
         return f"{obj.prepared_by.first_name} {obj.prepared_by.last_name}".strip() if obj.prepared_by else None
@@ -551,18 +687,13 @@ class MediaDistributionCollectionSerializer(serializers.ModelSerializer):
         model = MediaDistribution
         fields = [
             'collected_by', 'collected_by_ic', 'relationship_to_patient', 
-            'collection_datetime', 'handed_over_by_id', 'status'
+            'collection_datetime', 'handed_over_by_id'
         ]
     
-    def validate_status(self, value):
-        if value != 'COLLECTED':
-            raise serializers.ValidationError("Status must be set to 'COLLECTED' when recording collection.")
-        return value
-    
     def validate(self, data):
-        if data.get('status') == 'COLLECTED':
-            required_fields = ['collected_by', 'collected_by_ic', 'collection_datetime']
-            for field in required_fields:
-                if not data.get(field):
-                    raise serializers.ValidationError(f"{field.replace('_', ' ').title()} is required when marking as collected.")
+        # Validate required fields for collection
+        required_fields = ['collected_by', 'collected_by_ic', 'collection_datetime']
+        for field in required_fields:
+            if not data.get(field):
+                raise serializers.ValidationError(f"{field.replace('_', ' ').title()} is required when recording collection.")
         return data

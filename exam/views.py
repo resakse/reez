@@ -8,6 +8,7 @@ from django.utils import timezone
 logger = logging.getLogger(__name__)
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.db.models import Q, Count
+from django.db import models
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.shortcuts import render
@@ -89,6 +90,10 @@ class DaftarViewSet(viewsets.ModelViewSet):
     queryset = Daftar.objects.all().select_related('pesakit', 'rujukan', 'jxr').prefetch_related('pemeriksaan', 'pemeriksaan__exam', 'pemeriksaan__exam__modaliti', 'pemeriksaan__jxr').order_by('-tarikh')
     serializer_class = DaftarSerializer
     permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    search_fields = ['pesakit__nama', 'pesakit__mrn', 'pesakit__nric', 'parent_accession_number', 'study_description']
+    ordering_fields = ['tarikh', 'pesakit__nama', 'parent_accession_number', 'study_status']
+    ordering = ['-tarikh']
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -112,6 +117,11 @@ class DaftarViewSet(viewsets.ModelViewSet):
         status = self.request.query_params.get('status')
         if status:
             queryset = queryset.filter(status=status)
+            
+        # Filter by study status
+        study_status = self.request.query_params.get('study_status')
+        if study_status:
+            queryset = queryset.filter(study_status=study_status)
         
         # Filter by date range
         from_date = self.request.query_params.get('from_date')
@@ -2436,13 +2446,14 @@ class MediaDistributionViewSet(viewsets.ModelViewSet):
     API endpoint for CD/Film distribution tracking
     """
     queryset = MediaDistribution.objects.all().select_related(
-        'daftar', 'daftar__pesakit', 'prepared_by', 'handed_over_by'
-    )
+        'daftar', 'daftar__pesakit', 'primary_patient', 'prepared_by', 'handed_over_by'
+    ).prefetch_related('studies', 'studies__pesakit')
     serializer_class = MediaDistributionSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = [
-        'daftar__pesakit__nama', 'daftar__pesakit__mrn', 'collected_by', 
+        'primary_patient__nama', 'primary_patient__mrn', 'daftar__pesakit__nama', 'daftar__pesakit__mrn',
+        'studies__pesakit__nama', 'studies__pesakit__mrn', 'collected_by', 
         'collected_by_ic', 'comments'
     ]
     filterset_fields = ['status', 'media_type', 'urgency']
@@ -2462,10 +2473,14 @@ class MediaDistributionViewSet(viewsets.ModelViewSet):
         """Apply additional filtering"""
         queryset = super().get_queryset()
         
-        # Filter by patient
+        # Filter by patient (support both new and legacy structure)
         patient_id = self.request.query_params.get('patient_id')
         if patient_id:
-            queryset = queryset.filter(daftar__pesakit_id=patient_id)
+            queryset = queryset.filter(
+                models.Q(primary_patient_id=patient_id) |
+                models.Q(daftar__pesakit_id=patient_id) |
+                models.Q(studies__pesakit_id=patient_id)
+            ).distinct()
         
         # Filter by date range
         from_date = self.request.query_params.get('from_date')
@@ -2501,10 +2516,12 @@ class MediaDistributionViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         
         # Set handed_over_by to current user if not specified
+        # Always set status to COLLECTED when recording collection
+        save_kwargs = {'status': 'COLLECTED'}
         if not request.data.get('handed_over_by_id'):
-            serializer.save(handed_over_by=request.user)
-        else:
-            serializer.save()
+            save_kwargs['handed_over_by'] = request.user
+        
+        serializer.save(**save_kwargs)
         
         # Return full object data
         return Response(MediaDistributionSerializer(distribution).data)
@@ -2538,7 +2555,30 @@ class MediaDistributionViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
+        # Get cancellation reason from request data
+        cancellation_reason = request.data.get('reason', '')
+        
         distribution.status = 'CANCELLED'
+        if cancellation_reason:
+            distribution.cancellation_reason = cancellation_reason
+        distribution.save()
+        
+        return Response(MediaDistributionSerializer(distribution).data)
+    
+    @action(detail=True, methods=['patch'], url_path='restore')
+    def restore(self, request, pk=None):
+        """Restore a cancelled distribution request"""
+        distribution = self.get_object()
+        
+        if distribution.status != 'CANCELLED':
+            return Response(
+                {'error': 'Only cancelled distributions can be restored'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Reset to REQUESTED status and clear cancellation reason
+        distribution.status = 'REQUESTED'
+        distribution.cancellation_reason = None
         distribution.save()
         
         return Response(MediaDistributionSerializer(distribution).data)

@@ -38,6 +38,7 @@ export default function CollectionPage() {
   const distributionId = parseInt(params.id as string);
 
   const [distribution, setDistribution] = useState<MediaDistribution | null>(null);
+  const [relatedDistributions, setRelatedDistributions] = useState<MediaDistribution[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -54,6 +55,9 @@ export default function CollectionPage() {
       setIsLoading(true);
       const data = await MediaDistributionAPI.getMediaDistribution(distributionId);
       setDistribution(data);
+      
+      // No need to find related distributions - single distribution contains all studies
+      setRelatedDistributions([]);
       
       if (data.status !== 'READY') {
         toast.warning('This distribution is not ready for collection');
@@ -81,9 +85,9 @@ export default function CollectionPage() {
     }
 
     if (!formData.collected_by_ic.trim()) {
-      newErrors.collected_by_ic = 'IC number is required';
+      newErrors.collected_by_ic = 'IC/Passport number is required';
     } else if (!MediaDistributionUtils.validateIC(formData.collected_by_ic)) {
-      newErrors.collected_by_ic = 'Please enter a valid IC number (format: 123456-12-1234)';
+      newErrors.collected_by_ic = 'Please enter a valid IC (123456-12-1234) or Passport number';
     }
 
     if (!formData.relationship_to_patient.trim()) {
@@ -113,9 +117,11 @@ export default function CollectionPage() {
         comments: formData.comments.trim() || undefined
       };
 
+      // Record collection for the single distribution
       await MediaDistributionAPI.recordCollection(distributionId, collectionDetails);
       
-      toast.success('Collection recorded successfully');
+      const studyCount = distribution.study_count;
+      toast.success(`Collection recorded successfully for ${studyCount} stud${studyCount > 1 ? 'ies' : 'y'}`);
       router.push('/media-distributions');
       
     } catch (error) {
@@ -153,7 +159,7 @@ export default function CollectionPage() {
   if (isLoading) {
     return (
       <ProtectedRoute>
-        <div className="container mx-auto py-6">
+        <div className="container-fluid mx-auto py-6 px-6">
           <div className="flex items-center justify-center min-h-64">
             <Loader2 className="h-8 w-8 animate-spin" />
           </div>
@@ -165,7 +171,7 @@ export default function CollectionPage() {
   if (!distribution) {
     return (
       <ProtectedRoute>
-        <div className="container mx-auto py-6">
+        <div className="container-fluid mx-auto py-6 px-6">
           <Card>
             <CardContent className="p-6 text-center">
               <AlertCircle className="h-12 w-12 mx-auto mb-4 text-red-500" />
@@ -185,7 +191,7 @@ export default function CollectionPage() {
 
   return (
     <ProtectedRoute>
-      <div className="container mx-auto py-6">
+      <div className="container-fluid mx-auto py-6 px-6">
         <div className="mb-6">
           <div className="flex items-center gap-4 mb-4">
             <Link href="/media-distributions">
@@ -204,69 +210,34 @@ export default function CollectionPage() {
           </div>
         </div>
 
-        <div className="max-w-2xl space-y-6">
+        <div className="space-y-6">
           {/* Distribution Details */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5" />
-                Distribution Details
+                Distribution Details ({distribution.study_count} Studies)
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Patient</Label>
-                  <div className="font-medium">{distribution.daftar.pesakit.nama}</div>
+                  <div className="font-medium">{distribution.patient_name}</div>
                   <div className="text-sm text-muted-foreground">
-                    {distribution.daftar.pesakit.mrn || distribution.daftar.pesakit.nric}
+                    {distribution.patient_mrn || distribution.patient_nric}
                   </div>
                 </div>
                 
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Status</Label>
-                  <div>
-                    <Badge className={MEDIA_STATUS_CONFIG[distribution.status]?.color}>
-                      {MEDIA_STATUS_CONFIG[distribution.status]?.icon} {MEDIA_STATUS_CONFIG[distribution.status]?.label}
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Media Type</Label>
                   <div className="flex items-center gap-2">
                     <span>{MEDIA_TYPE_CONFIG[distribution.media_type]?.icon}</span>
                     <span>{MEDIA_TYPE_CONFIG[distribution.media_type]?.label}</span>
-                    <Badge variant="outline">Qty: {distribution.quantity}</Badge>
-                  </div>
-                </div>
-                
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Urgency</Label>
-                  <div>
-                    <Badge className={URGENCY_CONFIG[distribution.urgency]?.color}>
-                      {distribution.urgency}
+                    <Badge variant="outline">
+                      Qty: {distribution.quantity}
                     </Badge>
                   </div>
-                </div>
-              </div>
-
-              <div>
-                <Label className="text-sm font-medium text-muted-foreground">Study Information</Label>
-                <div className="space-y-1">
-                  <div className="text-sm">
-                    Study Date: {formatDate(distribution.daftar.tarikh)}
-                  </div>
-                  <div className="text-sm">
-                    Accession: {distribution.daftar.parent_accession_number}
-                  </div>
-                  {distribution.daftar.study_description && (
-                    <div className="text-sm">
-                      Description: {distribution.daftar.study_description}
-                    </div>
-                  )}
                 </div>
               </div>
 
@@ -275,34 +246,132 @@ export default function CollectionPage() {
                 <div className="text-sm">{formatDate(distribution.request_date)}</div>
               </div>
 
+              {/* All Studies Table */}
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Studies to be Collected</Label>
+                <div className="mt-2 border rounded-lg overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="text-left p-3 font-medium">Study Date</th>
+                        <th className="text-left p-3 font-medium">Accession</th>
+                        <th className="text-left p-3 font-medium">Description</th>
+                        <th className="text-left p-3 font-medium">Quantity</th>
+                        <th className="text-left p-3 font-medium">Status</th>
+                        <th className="text-left p-3 font-medium">Urgency</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {/* All Studies in this Distribution */}
+                      {distribution.studies.map((study, index) => (
+                        <tr key={study.id} className={`border-b ${index === 0 ? 'bg-green-50 dark:bg-green-950/20' : ''}`}>
+                          <td className="p-3">{formatDate(study.tarikh)}</td>
+                          <td className="p-3 font-mono text-xs">{study.parent_accession_number}</td>
+                          <td className="p-3">{study.study_description || 'No description'}</td>
+                          <td className="p-3">
+                            <Badge variant="outline">
+                              {index === 0 ? distribution.quantity : 'Included'}
+                            </Badge>
+                          </td>
+                          <td className="p-3">
+                            <Badge className={MEDIA_STATUS_CONFIG[distribution.status]?.color}>
+                              {MEDIA_STATUS_CONFIG[distribution.status]?.icon} {MEDIA_STATUS_CONFIG[distribution.status]?.label}
+                            </Badge>
+                          </td>
+                          <td className="p-3">
+                            <Badge className={URGENCY_CONFIG[distribution.urgency]?.color}>
+                              {distribution.urgency}
+                            </Badge>
+                          </td>
+                        </tr>
+                      ))}
+                      
+                      {/* Fallback for legacy single study */}
+                      {(!distribution.studies || distribution.studies.length === 0) && distribution.daftar && (
+                        <tr className="border-b bg-green-50 dark:bg-green-950/20">
+                          <td className="p-3">{formatDate(distribution.daftar.tarikh)}</td>
+                          <td className="p-3 font-mono text-xs">{distribution.daftar.parent_accession_number}</td>
+                          <td className="p-3">{distribution.daftar.study_description || 'No description'}</td>
+                          <td className="p-3">
+                            <Badge variant="outline">{distribution.quantity}</Badge>
+                          </td>
+                          <td className="p-3">
+                            <Badge className={MEDIA_STATUS_CONFIG[distribution.status]?.color}>
+                              {MEDIA_STATUS_CONFIG[distribution.status]?.icon} {MEDIA_STATUS_CONFIG[distribution.status]?.label}
+                            </Badge>
+                          </td>
+                          <td className="p-3">
+                            <Badge className={URGENCY_CONFIG[distribution.urgency]?.color}>
+                              {distribution.urgency}
+                            </Badge>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
               {distribution.comments && (
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Request Comments</Label>
-                  <div className="text-sm bg-muted p-2 rounded">{distribution.comments}</div>
+                  <div className="text-sm bg-muted p-2 rounded mt-2">
+                    {distribution.comments}
+                  </div>
                 </div>
               )}
             </CardContent>
           </Card>
 
           {/* Status Alert */}
-          {distribution.status !== 'READY' && (
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                This distribution is currently <strong>{MEDIA_STATUS_CONFIG[distribution.status]?.label}</strong> and not ready for collection.
-                You can still record collection details if needed.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {distribution.status === 'READY' && (
-            <Alert>
-              <CheckCircle2 className="h-4 w-4" />
-              <AlertDescription>
-                This distribution is ready for collection. Please fill in the collection details below.
-              </AlertDescription>
-            </Alert>
-          )}
+          {(() => {
+            if (distribution.status === 'READY') {
+              return (
+                <Alert>
+                  <CheckCircle2 className="h-4 w-4" />
+                  <AlertDescription>
+                    Distribution with {distribution.study_count} stud{distribution.study_count > 1 ? 'ies' : 'y'} is ready for collection. Please fill in the collection details below.
+                  </AlertDescription>
+                </Alert>
+              );
+            } else if (distribution.status === 'PREPARING') {
+              return (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Distribution is still being prepared. You can still record collection details if needed.
+                  </AlertDescription>
+                </Alert>
+              );
+            } else if (distribution.status === 'REQUESTED') {
+              return (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Distribution has been requested but preparation hasn't started yet.
+                  </AlertDescription>
+                </Alert>
+              );
+            } else if (distribution.status === 'COLLECTED') {
+              return (
+                <Alert>
+                  <CheckCircle2 className="h-4 w-4" />
+                  <AlertDescription>
+                    This distribution has already been collected.
+                  </AlertDescription>
+                </Alert>
+              );
+            } else {
+              return (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Distribution status: {distribution.status}
+                  </AlertDescription>
+                </Alert>
+              );
+            }
+          })()}
 
           {/* Collection Form */}
           <Card>
@@ -336,13 +405,13 @@ export default function CollectionPage() {
 
                   <div className="space-y-2">
                     <Label htmlFor="collected-by-ic">
-                      IC Number <span className="text-red-500">*</span>
+                      IC/Passport Number <span className="text-red-500">*</span>
                     </Label>
                     <Input
                       id="collected-by-ic"
                       value={formData.collected_by_ic}
                       onChange={(e) => handleICFormat(e.target.value)}
-                      placeholder="123456-12-1234"
+                      placeholder="123456-12-1234 or A1234567"
                       disabled={isSubmitting}
                     />
                     {errors.collected_by_ic && (

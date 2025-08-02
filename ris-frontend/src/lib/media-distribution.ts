@@ -6,7 +6,8 @@ import {
   MediaDistributionFilters,
   CollectionDetails,
   StudyForMediaDistribution,
-  MEDIA_DISTRIBUTION_ENDPOINTS 
+  MEDIA_DISTRIBUTION_ENDPOINTS,
+  MediaCalculationUtils
 } from '@/types/media-distribution';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -167,6 +168,23 @@ export class MediaDistributionAPI {
     return await response.json();
   }
 
+  // Restore cancelled media distribution
+  static async restoreDistribution(id: number): Promise<MediaDistribution> {
+    const response = await AuthService.authenticatedFetch(
+      `${API_BASE_URL}${MEDIA_DISTRIBUTION_ENDPOINTS.RESTORE(id)}`,
+      {
+        method: 'PATCH',
+      }
+    );
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Failed to restore media distribution');
+    }
+    
+    return await response.json();
+  }
+
   // Get pending distributions (REQUESTED + PREPARING)
   static async getPendingDistributions(): Promise<MediaDistribution[]> {
     const response = await AuthService.authenticatedFetch(
@@ -210,12 +228,12 @@ export class MediaDistributionAPI {
   static async searchStudiesForMedia(patientSearch: string): Promise<StudyForMediaDistribution[]> {
     const params = new URLSearchParams({
       search: patientSearch,
-      limit: '10',
-      status: 'COMPLETED' // Only completed studies can have media distributed
+      limit: '20', // Increased limit to show more options
+      study_status: 'COMPLETED' // Only completed studies can have media distributed
     });
     
     const response = await AuthService.authenticatedFetch(
-      `${API_BASE_URL}/api/studies/?${params.toString()}`
+      `${API_BASE_URL}/api/registrations/?${params.toString()}`
     );
     
     if (!response.ok) {
@@ -223,13 +241,50 @@ export class MediaDistributionAPI {
     }
     
     const data = await response.json();
-    return data.results || [];
+    
+    // Transform the data to include exam details and estimated information
+    const results = (data.results || []).map((study: any) => {
+      // Calculate estimated size based on exams and modality
+      const examDetails = study.pemeriksaan?.map((exam: any) => ({
+        exam_name: exam.exam?.exam || 'Unknown Exam',
+        body_part: exam.exam?.part?.part || null,
+        laterality: exam.laterality || null,
+        modality: exam.exam?.modaliti?.singkatan || study.modality,
+        status: exam.exam_status,
+        xray_number: exam.no_xray,
+        technical_params: {
+          kv: exam.kv,
+          mas: exam.mas,
+          mgy: exam.mgy
+        }
+      })) || [];
+      
+      // Estimate image count based on exam types and modality
+      const modalityType = study.modality || examDetails[0]?.modality || 'XR';
+      const imageCount = MediaCalculationUtils.estimateImageCount(modalityType, examDetails.length);
+      const estimatedSize = MediaCalculationUtils.estimateStudySize(modalityType, imageCount);
+      
+      return {
+        ...study,
+        exam_details: examDetails,
+        image_count: imageCount,
+        series_count: examDetails.length || 1,
+        estimated_size_mb: estimatedSize,
+        // Add formatted study time for same-day differentiation
+        study_time: study.tarikh ? new Date(study.tarikh).toLocaleTimeString('en-MY', {
+          hour: '2-digit',
+          minute: '2-digit'
+        }) : null
+      };
+    });
+    
+    return results;
   }
 
   // Get studies for a specific patient
   static async getPatientStudies(patientId: number): Promise<StudyForMediaDistribution[]> {
     const response = await AuthService.authenticatedFetch(
-      `${API_BASE_URL}/api/studies/?patient_id=${patientId}&status=COMPLETED`
+      `${API_BASE_URL}/api/registrations/?pesakit=${patientId}&study_status=COMPLETED`
     );
     
     if (!response.ok) {
@@ -255,19 +310,25 @@ export const MediaDistributionUtils = {
     });
   },
 
-  // Validate Malaysian IC format
+  // Validate Malaysian IC or passport format
   validateIC(ic: string): boolean {
+    // Malaysian IC format: 123456-12-1234
     const icRegex = /^\d{6}-\d{2}-\d{4}$/;
-    return icRegex.test(ic);
+    // Passport format: Allow alphanumeric, 6-15 characters
+    const passportRegex = /^[A-Z0-9]{6,15}$/i;
+    
+    return icRegex.test(ic) || passportRegex.test(ic);
   },
 
-  // Format IC number
+  // Format IC number (only format Malaysian IC, leave passports as-is)
   formatIC(ic: string): string {
+    // Check if it looks like a Malaysian IC (all digits)
     const cleaned = ic.replace(/\D/g, '');
-    if (cleaned.length === 12) {
+    if (cleaned.length === 12 && /^\d+$/.test(ic.replace(/-/g, ''))) {
       return `${cleaned.slice(0, 6)}-${cleaned.slice(6, 8)}-${cleaned.slice(8, 12)}`;
     }
-    return ic;
+    // For passports and other formats, return as-is but uppercase
+    return ic.toUpperCase().trim();
   },
 
   // Get urgency priority for sorting
