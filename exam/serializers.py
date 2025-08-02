@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Modaliti, Part, Exam, Daftar, Pemeriksaan, PacsConfig, PacsServer
+from .models import Modaliti, Part, Exam, Daftar, Pemeriksaan, PacsConfig, PacsServer, MediaDistribution
 from pesakit.models import Pesakit
 from wad.models import Ward
 from pesakit.serializers import PesakitSerializer
@@ -454,3 +454,115 @@ class PacsServerListSerializer(serializers.ModelSerializer):
     class Meta:
         model = PacsServer
         fields = ['id', 'name', 'orthancurl', 'is_active', 'is_primary', 'comments']
+
+
+class MediaDistributionSerializer(serializers.ModelSerializer):
+    daftar = DaftarSerializer(read_only=True)
+    daftar_id = serializers.PrimaryKeyRelatedField(
+        queryset=Daftar.objects.all(),
+        source='daftar',
+        write_only=True
+    )
+    prepared_by = UserSerializer(read_only=True)
+    prepared_by_id = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(),
+        source='prepared_by',
+        write_only=True,
+        allow_null=True,
+        required=False
+    )
+    handed_over_by = UserSerializer(read_only=True)
+    handed_over_by_id = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(),
+        source='handed_over_by',
+        write_only=True,
+        allow_null=True,
+        required=False
+    )
+    
+    # Choice fields for frontend
+    media_type_choices = serializers.SerializerMethodField()
+    status_choices = serializers.SerializerMethodField()
+    urgency_choices = serializers.SerializerMethodField()
+    
+    # Patient info (from related daftar)
+    patient_name = serializers.CharField(source='daftar.pesakit.nama', read_only=True)
+    patient_mrn = serializers.CharField(source='daftar.pesakit.mrn', read_only=True)
+    patient_nric = serializers.CharField(source='daftar.pesakit.nric', read_only=True)
+    study_accession = serializers.CharField(source='daftar.parent_accession_number', read_only=True)
+    
+    class Meta:
+        model = MediaDistribution
+        fields = [
+            'id', 'request_date', 'daftar', 'daftar_id',
+            'media_type', 'quantity', 'status', 'urgency',
+            'collected_by', 'collected_by_ic', 'relationship_to_patient', 'collection_datetime',
+            'prepared_by', 'prepared_by_id', 'handed_over_by', 'handed_over_by_id',
+            'comments', 'created', 'modified',
+            # Choice fields
+            'media_type_choices', 'status_choices', 'urgency_choices',
+            # Patient info
+            'patient_name', 'patient_mrn', 'patient_nric', 'study_accession'
+        ]
+        read_only_fields = ['created', 'modified', 'patient_name', 'patient_mrn', 'patient_nric', 'study_accession']
+    
+    def get_media_type_choices(self, obj):
+        return [{'value': choice[0], 'label': choice[1]} for choice in MediaDistribution.MEDIA_TYPE_CHOICES]
+    
+    def get_status_choices(self, obj):
+        return [{'value': choice[0], 'label': choice[1]} for choice in MediaDistribution.STATUS_CHOICES]
+    
+    def get_urgency_choices(self, obj):
+        return [
+            {'value': 'NORMAL', 'label': 'Normal'},
+            {'value': 'URGENT', 'label': 'Urgent'},
+            {'value': 'STAT', 'label': 'STAT'},
+        ]
+
+
+class MediaDistributionListSerializer(serializers.ModelSerializer):
+    """Simplified serializer for listing media distributions"""
+    patient_name = serializers.CharField(source='daftar.pesakit.nama', read_only=True)
+    patient_mrn = serializers.CharField(source='daftar.pesakit.mrn', read_only=True)
+    study_accession = serializers.CharField(source='daftar.parent_accession_number', read_only=True)
+    study_date = serializers.DateTimeField(source='daftar.tarikh', read_only=True)
+    study_description = serializers.CharField(source='daftar.study_description', read_only=True)
+    prepared_by_name = serializers.SerializerMethodField()
+    handed_over_by_name = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = MediaDistribution
+        fields = [
+            'id', 'request_date', 'media_type', 'quantity', 'status', 'urgency',
+            'collected_by', 'collection_datetime', 'patient_name', 'patient_mrn', 
+            'study_accession', 'study_date', 'study_description', 'prepared_by_name', 'handed_over_by_name'
+        ]
+    
+    def get_prepared_by_name(self, obj):
+        return f"{obj.prepared_by.first_name} {obj.prepared_by.last_name}".strip() if obj.prepared_by else None
+    
+    def get_handed_over_by_name(self, obj):
+        return f"{obj.handed_over_by.first_name} {obj.handed_over_by.last_name}".strip() if obj.handed_over_by else None
+
+
+class MediaDistributionCollectionSerializer(serializers.ModelSerializer):
+    """Serializer for recording collection details"""
+    class Meta:
+        model = MediaDistribution
+        fields = [
+            'collected_by', 'collected_by_ic', 'relationship_to_patient', 
+            'collection_datetime', 'handed_over_by_id', 'status'
+        ]
+    
+    def validate_status(self, value):
+        if value != 'COLLECTED':
+            raise serializers.ValidationError("Status must be set to 'COLLECTED' when recording collection.")
+        return value
+    
+    def validate(self, data):
+        if data.get('status') == 'COLLECTED':
+            required_fields = ['collected_by', 'collected_by_ic', 'collection_datetime']
+            for field in required_fields:
+                if not data.get(field):
+                    raise serializers.ValidationError(f"{field.replace('_', ' ').title()} is required when marking as collected.")
+        return data

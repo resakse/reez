@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Users, Settings, BarChart, Home, Stethoscope, X, Bone, FileText, ClipboardList, ListChecks, UserCog, Archive, Upload } from "lucide-react";
+import { LayoutDashboard, Users, Settings, BarChart, Home, Stethoscope, X, Bone, FileText, ClipboardList, ListChecks, UserCog, Archive, Upload, Disc3 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -115,6 +115,14 @@ export default function Sidebar({ className, isCollapsed }: SidebarProps) {
               <Link href="/upload" className={getLinkClasses("/upload")}>
                 <Upload className={getIconClasses("/upload")} />
                 {!isCollapsed && "Upload DICOM"}
+              </Link>
+            </li>
+          )}
+          {!isNormalUser && (
+            <li>
+              <Link href="/media-distributions" className={getLinkClasses("/media-distributions")}>
+                <Disc3 className={getIconClasses("/media-distributions")} />
+                {!isCollapsed && "CD/Film Distribution"}
               </Link>
             </li>
           )}

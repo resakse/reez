@@ -646,3 +646,61 @@ class PacsExam(models.Model):
             return f"/api/pacs/instances/{self.pacs_server.id}/{orthanc_id}/{endpoint_type}"
         # Fallback to legacy URL structure
         return f"/api/pacs/instances/{orthanc_id}/{endpoint_type}"
+
+
+class MediaDistribution(models.Model):
+    MEDIA_TYPE_CHOICES = [
+        ('CD', 'CD'),
+        ('DVD', 'DVD'),
+        ('XRAY_FILM', 'X-Ray Film'),
+        ('USB', 'USB Drive'),
+        ('DIGITAL_COPY', 'Digital Copy'),
+    ]
+    
+    STATUS_CHOICES = [
+        ('REQUESTED', 'Requested'),
+        ('PREPARING', 'Preparing'),
+        ('READY', 'Ready for Collection'),
+        ('COLLECTED', 'Collected'),
+        ('CANCELLED', 'Cancelled'),
+    ]
+    
+    # Core fields
+    request_date = models.DateTimeField(default=timezone.now)
+    daftar = models.ForeignKey(Daftar, on_delete=models.CASCADE, related_name='media_distributions')
+    
+    # Media details
+    media_type = models.CharField(max_length=20, choices=MEDIA_TYPE_CHOICES)
+    quantity = models.PositiveIntegerField(default=1, help_text="Number of CDs/films")
+    
+    # Status tracking
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='REQUESTED')
+    
+    # Collection details
+    collected_by = models.CharField(max_length=100, blank=True, null=True, help_text="Name of person collecting")
+    collected_by_ic = models.CharField(max_length=25, blank=True, null=True, help_text="IC of collector")
+    relationship_to_patient = models.CharField(max_length=50, blank=True, null=True, help_text="Relationship to patient")
+    collection_datetime = models.DateTimeField(blank=True, null=True)
+    
+    # Staff handling
+    prepared_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='prepared_media')
+    handed_over_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='handed_media')
+    
+    # Additional details
+    comments = models.TextField(blank=True, null=True, help_text="Special instructions or notes")
+    urgency = models.CharField(max_length=20, choices=[
+        ('NORMAL', 'Normal'),
+        ('URGENT', 'Urgent'),
+        ('STAT', 'STAT'),
+    ], default='NORMAL')
+    
+    created = models.DateTimeField(auto_now_add=True)
+    modified = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Media Distribution"
+        verbose_name_plural = "Media Distributions"
+        ordering = ['-request_date']
+    
+    def __str__(self):
+        return f"{self.daftar.pesakit.nama} - {self.media_type} ({self.status})"

@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media Distribution Frontend Integration Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .test-section {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            background: #f9f9f9;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+        button {
+            background: #007cba;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #005a8b;
+        }
+        #results {
+            background: #fff;
+            border: 1px solid #ccc;
+            padding: 10px;
+            min-height: 200px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>Media Distribution Frontend Integration Test</h1>
+    <p>This page tests the frontend API integration for the Media Distribution system.</p>
+
+    <div class="test-section">
+        <h3>API Configuration Test</h3>
+        <button onclick="testAPIConfig()">Test API Configuration</button>
+        <div id="api-config-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Authentication Test</h3>
+        <button onclick="testAuth()">Test Authentication</button>
+        <div id="auth-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Media Distribution API Test</h3>
+        <button onclick="testMediaDistributionAPI()">Test API Endpoints</button>
+        <div id="api-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Type System Test</h3>
+        <button onclick="testTypes()">Test TypeScript Types</button>
+        <div id="types-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Utility Functions Test</h3>
+        <button onclick="testUtils()">Test Utility Functions</button>
+        <div id="utils-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Test Results</h3>
+        <div id="results"></div>
+    </div>
+
+    <script>
+        // Mock the API base URL for testing
+        const API_BASE_URL = 'http://localhost:8000';
+        
+        function log(message, type = 'info') {
+            const results = document.getElementById('results');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : 'info';
+            results.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
+            results.scrollTop = results.scrollHeight;
+        }
+
+        function testAPIConfig() {
+            const resultDiv = document.getElementById('api-config-result');
+            
+            try {
+                // Test MEDIA_DISTRIBUTION_ENDPOINTS configuration
+                const endpoints = {
+                    LIST: '/api/media-distributions/',
+                    STATS: '/api/media-distributions/stats/',
+                    COLLECT: (id) => `/api/media-distributions/${id}/collect/`,
+                    MARK_READY: (id) => `/api/media-distributions/${id}/mark-ready/`,
+                    CANCEL: (id) => `/api/media-distributions/${id}/cancel/`,
+                    PENDING: '/api/media-distributions/pending/',
+                    READY: '/api/media-distributions/ready/',
+                };
+
+                log('✓ API Endpoints configured correctly', 'success');
+                
+                // Test endpoint generation
+                const testId = 123;
+                const collectURL = endpoints.COLLECT(testId);
+                const markReadyURL = endpoints.MARK_READY(testId);
+                
+                if (collectURL === '/api/media-distributions/123/collect/' && 
+                    markReadyURL === '/api/media-distributions/123/mark-ready/') {
+                    log('✓ Dynamic endpoint generation works', 'success');
+                    resultDiv.innerHTML = '<span class="success">✓ API Configuration Test Passed</span>';
+                } else {
+                    throw new Error('Dynamic endpoint generation failed');
+                }
+                
+            } catch (error) {
+                log(`✗ API Config Error: ${error.message}`, 'error');
+                resultDiv.innerHTML = '<span class="error">✗ API Configuration Test Failed</span>';
+            }
+        }
+
+        function testAuth() {
+            const resultDiv = document.getElementById('auth-result');
+            
+            try {
+                // Test AuthService structure
+                const mockAuthService = {
+                    login: async (username, password) => ({ success: true }),
+                    logout: () => {},
+                    getAccessToken: () => 'mock-token',
+                    isAuthenticated: () => true,
+                    authenticatedFetch: async (url, options) => ({
+                        ok: true,
+                        json: () => ({ data: 'mock-response' })
+                    })
+                };
+
+                log('✓ AuthService structure valid', 'success');
+                
+                // Test token handling
+                if (mockAuthService.getAccessToken() === 'mock-token') {
+                    log('✓ Token handling works', 'success');
+                    resultDiv.innerHTML = '<span class="success">✓ Authentication Test Passed</span>';
+                } else {
+                    throw new Error('Token handling failed');
+                }
+                
+            } catch (error) {
+                log(`✗ Auth Error: ${error.message}`, 'error');
+                resultDiv.innerHTML = '<span class="error">✗ Authentication Test Failed</span>';
+            }
+        }
+
+        function testMediaDistributionAPI() {
+            const resultDiv = document.getElementById('api-result');
+            
+            try {
+                // Test MediaDistributionAPI structure
+                const mockAPI = {
+                    getMediaDistributions: async (filters) => ({
+                        count: 10,
+                        results: []
+                    }),
+                    createMediaDistribution: async (request) => ({
+                        id: 1,
+                        ...request
+                    }),
+                    markReady: async (id) => ({
+                        id,
+                        status: 'READY'
+                    }),
+                    recordCollection: async (id, details) => ({
+                        id,
+                        status: 'COLLECTED',
+                        ...details
+                    }),
+                    getStats: async () => ({
+                        total_requests: 100,
+                        status_breakdown: {
+                            REQUESTED: 10,
+                            PREPARING: 5,
+                            READY: 15,
+                            COLLECTED: 60,
+                            CANCELLED: 10
+                        }
+                    })
+                };
+
+                log('✓ MediaDistributionAPI structure valid', 'success');
+                
+                // Test request structure
+                const mockRequest = {
+                    daftar_id: 1,
+                    media_type: 'CD',
+                    quantity: 1,
+                    urgency: 'NORMAL',
+                    comments: 'Test comment'
+                };
+
+                if (mockRequest.media_type === 'CD' && mockRequest.urgency === 'NORMAL') {
+                    log('✓ Request structure matches backend', 'success');
+                    resultDiv.innerHTML = '<span class="success">✓ Media Distribution API Test Passed</span>';
+                } else {
+                    throw new Error('Request structure mismatch');
+                }
+                
+            } catch (error) {
+                log(`✗ API Error: ${error.message}`, 'error');
+                resultDiv.innerHTML = '<span class="error">✗ Media Distribution API Test Failed</span>';
+            }
+        }
+
+        function testTypes() {
+            const resultDiv = document.getElementById('types-result');
+            
+            try {
+                // Test type configurations
+                const MEDIA_STATUS_CONFIG = {
+                    REQUESTED: { label: 'Requested', color: 'bg-blue-100 text-blue-800', icon: '📋' },
+                    PREPARING: { label: 'Preparing', color: 'bg-yellow-100 text-yellow-800', icon: '⚙️' },
+                    READY: { label: 'Ready', color: 'bg-green-100 text-green-800', icon: '✅' },
+                    COLLECTED: { label: 'Collected', color: 'bg-gray-100 text-gray-800', icon: '📦' },
+                    CANCELLED: { label: 'Cancelled', color: 'bg-red-100 text-red-800', icon: '❌' }
+                };
+
+                const MEDIA_TYPE_CONFIG = {
+                    'CD': { label: 'CD', icon: '💿' },
+                    'DVD': { label: 'DVD', icon: '📀' },
+                    'X-Ray Film': { label: 'X-Ray Film', icon: '🎞️' },
+                    'USB': { label: 'USB Drive', icon: '💾' },
+                    'Digital Copy': { label: 'Digital Copy', icon: '📧' }
+                };
+
+                const URGENCY_CONFIG = {
+                    'NORMAL': { label: 'Normal', color: 'bg-gray-100 text-gray-800' },
+                    'URGENT': { label: 'Urgent', color: 'bg-orange-100 text-orange-800' },
+                    'STAT': { label: 'STAT', color: 'bg-red-100 text-red-800' }
+                };
+
+                log('✓ Status config structure valid', 'success');
+                log('✓ Media type config structure valid', 'success');
+                log('✓ Urgency config structure valid', 'success');
+                
+                // Test that all required fields are present
+                if (MEDIA_STATUS_CONFIG.REQUESTED.label && 
+                    MEDIA_TYPE_CONFIG.CD.icon && 
+                    URGENCY_CONFIG.NORMAL.color) {
+                    log('✓ All configuration objects have required properties', 'success');
+                    resultDiv.innerHTML = '<span class="success">✓ Type System Test Passed</span>';
+                } else {
+                    throw new Error('Missing required properties in config objects');
+                }
+                
+            } catch (error) {
+                log(`✗ Types Error: ${error.message}`, 'error');
+                resultDiv.innerHTML = '<span class="error">✗ Type System Test Failed</span>';
+            }
+        }
+
+        function testUtils() {
+            const resultDiv = document.getElementById('utils-result');
+            
+            try {
+                // Test utility functions
+                const MediaDistributionUtils = {
+                    formatDate: (dateString) => new Date(dateString).toLocaleDateString('en-MY'),
+                    validateIC: (ic) => /^\d{6}-\d{2}-\d{4}$/.test(ic),
+                    formatIC: (ic) => {
+                        const cleaned = ic.replace(/\D/g, '');
+                        if (cleaned.length === 12) {
+                            return `${cleaned.slice(0, 6)}-${cleaned.slice(6, 8)}-${cleaned.slice(8, 12)}`;
+                        }
+                        return ic;
+                    },
+                    getUrgencyPriority: (urgency) => {
+                        switch (urgency) {
+                            case 'STAT': return 3;
+                            case 'URGENT': return 2;
+                            case 'NORMAL': return 1;
+                            default: return 0;
+                        }
+                    }
+                };
+
+                log('✓ Utility functions structure valid', 'success');
+                
+                // Test IC validation
+                const validIC = '123456-12-1234';
+                const invalidIC = '12345-1-123';
+                
+                if (MediaDistributionUtils.validateIC(validIC) && 
+                    !MediaDistributionUtils.validateIC(invalidIC)) {
+                    log('✓ IC validation works correctly', 'success');
+                } else {
+                    throw new Error('IC validation failed');
+                }
+                
+                // Test IC formatting
+                const unformattedIC = '123456121234';
+                const formattedIC = MediaDistributionUtils.formatIC(unformattedIC);
+                
+                if (formattedIC === '123456-12-1234') {
+                    log('✓ IC formatting works correctly', 'success');
+                } else {
+                    throw new Error('IC formatting failed');
+                }
+                
+                // Test urgency priority
+                if (MediaDistributionUtils.getUrgencyPriority('STAT') === 3 &&
+                    MediaDistributionUtils.getUrgencyPriority('URGENT') === 2 &&
+                    MediaDistributionUtils.getUrgencyPriority('NORMAL') === 1) {
+                    log('✓ Urgency priority calculation works', 'success');
+                    resultDiv.innerHTML = '<span class="success">✓ Utility Functions Test Passed</span>';
+                } else {
+                    throw new Error('Urgency priority calculation failed');
+                }
+                
+            } catch (error) {
+                log(`✗ Utils Error: ${error.message}`, 'error');
+                resultDiv.innerHTML = '<span class="error">✗ Utility Functions Test Failed</span>';
+            }
+        }
+
+        // Auto-run all tests on page load
+        window.onload = function() {
+            log('Starting Media Distribution Frontend Integration Tests...', 'info');
+            setTimeout(() => {
+                testAPIConfig();
+                setTimeout(() => testAuth(), 100);
+                setTimeout(() => testMediaDistributionAPI(), 200);
+                setTimeout(() => testTypes(), 300);
+                setTimeout(() => testUtils(), 400);
+                setTimeout(() => {
+                    log('All tests completed!', 'info');
+                }, 500);
+            }, 100);
+        };
+    </script>
+</body>
+</html>

@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from . import views
 from .views import (
     ModalitiViewSet, PartViewSet, ExamViewSet, 
-    DaftarViewSet, PemeriksaanViewSet, 
+    DaftarViewSet, PemeriksaanViewSet, MediaDistributionViewSet,
     RegistrationWorkflowView, MWLWorklistView,
     GroupedExaminationView, GroupedMWLView, PositionChoicesView,
     DicomWorklistExportView, upload_dicom_files,
@@ -29,6 +29,7 @@ router.register(r'exams', ExamViewSet, basename='exam')
 router.register(r'registrations', DaftarViewSet, basename='registration')
 router.register(r'examinations', PemeriksaanViewSet, basename='examination')
 router.register(r'pacs-servers', PacsServerViewSet, basename='pacs-server')
+router.register(r'media-distributions', MediaDistributionViewSet, basename='media-distribution')
 
 urlpatterns = [
     path("", views.orthanc_study, name="orthanc-study"),

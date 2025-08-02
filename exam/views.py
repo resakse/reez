@@ -15,7 +15,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 from django_htmx.http import trigger_client_event, push_url
 
-from exam.models import Pemeriksaan, Daftar, Exam, Modaliti, Part, Region, generate_exam_accession
+from exam.models import Pemeriksaan, Daftar, Exam, Modaliti, Part, Region, generate_exam_accession, MediaDistribution
 from pesakit.models import Pesakit
 from exam.models import PacsConfig, DashboardConfig
 from .filters import DaftarFilter
@@ -43,7 +43,9 @@ from .serializers import (
     DaftarSerializer, PemeriksaanSerializer, 
     RegistrationWorkflowSerializer, MWLWorklistSerializer,
     GroupedExaminationSerializer, GroupedMWLWorklistSerializer,
-    PositionChoicesSerializer, PacsConfigSerializer
+    PositionChoicesSerializer, PacsConfigSerializer,
+    MediaDistributionSerializer, MediaDistributionListSerializer,
+    MediaDistributionCollectionSerializer
 )
 import os
 import tempfile
@@ -2427,3 +2429,183 @@ class DashboardBodypartsExamTypesAPIView(APIView):
             }
         
         return Response(bodyparts_exam_stats)
+
+
+class MediaDistributionViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for CD/Film distribution tracking
+    """
+    queryset = MediaDistribution.objects.all().select_related(
+        'daftar', 'daftar__pesakit', 'prepared_by', 'handed_over_by'
+    )
+    serializer_class = MediaDistributionSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    search_fields = [
+        'daftar__pesakit__nama', 'daftar__pesakit__mrn', 'collected_by', 
+        'collected_by_ic', 'comments'
+    ]
+    filterset_fields = ['status', 'media_type', 'urgency']
+    ordering_fields = ['request_date', 'collection_datetime', 'status', 'urgency']
+    ordering = ['-request_date']
+    pagination_class = CustomPagination
+    
+    def get_serializer_class(self):
+        """Return appropriate serializer based on action"""
+        if self.action == 'list':
+            return MediaDistributionListSerializer
+        elif self.action == 'collect':
+            return MediaDistributionCollectionSerializer
+        return MediaDistributionSerializer
+    
+    def get_queryset(self):
+        """Apply additional filtering"""
+        queryset = super().get_queryset()
+        
+        # Filter by patient
+        patient_id = self.request.query_params.get('patient_id')
+        if patient_id:
+            queryset = queryset.filter(daftar__pesakit_id=patient_id)
+        
+        # Filter by date range
+        from_date = self.request.query_params.get('from_date')
+        to_date = self.request.query_params.get('to_date')
+        if from_date:
+            queryset = queryset.filter(request_date__date__gte=from_date)
+        if to_date:
+            queryset = queryset.filter(request_date__date__lte=to_date)
+            
+        return queryset
+    
+    def perform_create(self, serializer):
+        """Set prepared_by to current user if not specified"""
+        if not serializer.validated_data.get('prepared_by'):
+            serializer.save(prepared_by=self.request.user)
+        else:
+            serializer.save()
+    
+    @action(detail=True, methods=['patch'], url_path='collect')
+    def collect(self, request, pk=None):
+        """Record collection details for a media distribution"""
+        distribution = self.get_object()
+        
+        if distribution.status == 'COLLECTED':
+            return Response(
+                {'error': 'This distribution has already been collected'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        serializer = MediaDistributionCollectionSerializer(
+            distribution, data=request.data, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        
+        # Set handed_over_by to current user if not specified
+        if not request.data.get('handed_over_by_id'):
+            serializer.save(handed_over_by=request.user)
+        else:
+            serializer.save()
+        
+        # Return full object data
+        return Response(MediaDistributionSerializer(distribution).data)
+    
+    @action(detail=True, methods=['patch'], url_path='mark-ready')
+    def mark_ready(self, request, pk=None):
+        """Mark a distribution as ready for collection"""
+        distribution = self.get_object()
+        
+        if distribution.status in ['COLLECTED', 'CANCELLED']:
+            return Response(
+                {'error': f'Cannot mark as ready - distribution is {distribution.status.lower()}'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        distribution.status = 'READY'
+        if not distribution.prepared_by:
+            distribution.prepared_by = request.user
+        distribution.save()
+        
+        return Response(MediaDistributionSerializer(distribution).data)
+    
+    @action(detail=True, methods=['patch'], url_path='cancel')
+    def cancel(self, request, pk=None):
+        """Cancel a distribution request"""
+        distribution = self.get_object()
+        
+        if distribution.status == 'COLLECTED':
+            return Response(
+                {'error': 'Cannot cancel - distribution has already been collected'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        distribution.status = 'CANCELLED'
+        distribution.save()
+        
+        return Response(MediaDistributionSerializer(distribution).data)
+    
+    @action(detail=False, methods=['get'], url_path='pending')
+    def pending(self, request):
+        """Get all pending distributions (requested, preparing, ready)"""
+        pending_distributions = self.get_queryset().filter(
+            status__in=['REQUESTED', 'PREPARING', 'READY']
+        )
+        serializer = MediaDistributionListSerializer(
+            pending_distributions, many=True
+        )
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'], url_path='ready')
+    def ready(self, request):
+        """Get all distributions ready for collection"""
+        ready_distributions = self.get_queryset().filter(status='READY')
+        serializer = MediaDistributionListSerializer(
+            ready_distributions, many=True
+        )
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'], url_path='stats')
+    def stats(self, request):
+        """Get distribution statistics"""
+        queryset = self.get_queryset()
+        
+        # Status breakdown
+        status_stats = {}
+        for status_choice in MediaDistribution.STATUS_CHOICES:
+            status_key = status_choice[0]
+            status_stats[status_key] = queryset.filter(status=status_key).count()
+        
+        # Media type breakdown
+        media_type_stats = {}
+        for media_choice in MediaDistribution.MEDIA_TYPE_CHOICES:
+            media_key = media_choice[0]
+            media_type_stats[media_key] = queryset.filter(media_type=media_key).count()
+        
+        # Urgency breakdown
+        urgency_stats = {}
+        urgency_choices = [
+            ('NORMAL', 'Normal'),
+            ('URGENT', 'Urgent'),
+            ('STAT', 'STAT'),
+        ]
+        for urgency_choice in urgency_choices:
+            urgency_key = urgency_choice[0]
+            urgency_stats[urgency_key] = queryset.filter(urgency=urgency_key).count()
+        
+        # Recent activity (last 30 days)
+        thirty_days_ago = timezone.now() - timedelta(days=30)
+        recent_requests = queryset.filter(request_date__gte=thirty_days_ago).count()
+        recent_collections = queryset.filter(
+            collection_datetime__gte=thirty_days_ago,
+            status='COLLECTED'
+        ).count()
+        
+        return Response({
+            'status_breakdown': status_stats,
+            'media_type_breakdown': media_type_stats,
+            'urgency_breakdown': urgency_stats,
+            'recent_activity': {
+                'requests_last_30_days': recent_requests,
+                'collections_last_30_days': recent_collections
+            },
+            'total_distributions': queryset.count()
+        })
