@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Users, Settings, BarChart, Home, Stethoscope, X, Bone, FileText, ClipboardList, ListChecks, UserCog, Archive, Upload, Disc3, AlertTriangle, TrendingUp, Menu, Moon, Sun, Monitor } from "lucide-react";
+import { LayoutDashboard, Users, Settings, BarChart, Home, Stethoscope, X, Bone, FileText, ClipboardList, ListChecks, UserCog, Archive, Upload, Disc3, AlertTriangle, TrendingUp, Menu, Moon, Sun, Monitor, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "next-themes";
+import Swal from 'sweetalert2';
 import { Button } from "./ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import {
@@ -143,10 +144,37 @@ function ThemeIconOnly() {
 
 export default function Sidebar({ className, isCollapsed, onToggleCollapse }: SidebarProps) {
   const { user, isLoading, logout } = useAuth();
+  const { theme } = useTheme();
   const pathname = usePathname();
   const isSupervisor = user?.is_superuser || false;
   const isStaff = user?.is_staff || false;
   const isNormalUser = user && !isStaff;
+
+  const handleLogout = async () => {
+    const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    
+    const result = await Swal.fire({
+      title: 'Are you sure?',
+      text: 'You will be logged out of the system.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Yes, logout',
+      cancelButtonText: 'Cancel',
+      background: isDark ? '#1f2937' : '#ffffff',
+      color: isDark ? '#f9fafb' : '#1f2937',
+      customClass: {
+        popup: isDark ? 'dark-popup' : '',
+        title: isDark ? 'dark-title' : '',
+        content: isDark ? 'dark-content' : ''
+      }
+    });
+
+    if (result.isConfirmed) {
+      logout();
+    }
+  };
   
   // Don't render menu items while loading authentication state
   if (isLoading) {
@@ -484,11 +512,21 @@ export default function Sidebar({ className, isCollapsed, onToggleCollapse }: Si
                 </Avatar>
                 <span className="text-sm font-medium truncate">{user?.username}</span>
               </div>
-              <Link href="/profile">
-                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-white/10 hover:text-white">
-                  <Settings className="h-4 w-4" />
+              <div className="flex items-center gap-1">
+                <Link href="/profile">
+                  <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-white/10 hover:text-white">
+                    <Settings className="h-4 w-4" />
+                  </Button>
+                </Link>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-8 w-8 hover:bg-white/10 hover:text-white" 
+                  onClick={handleLogout}
+                >
+                  <LogOut className="h-4 w-4" />
                 </Button>
-              </Link>
+              </div>
             </div>
           </div>
         ) : (
@@ -515,6 +553,21 @@ export default function Sidebar({ className, isCollapsed, onToggleCollapse }: Si
               </TooltipTrigger>
               <TooltipContent side="right">
                 <p>Profile Settings</p>
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-8 w-8 hover:bg-white/10 hover:text-white" 
+                  onClick={handleLogout}
+                >
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <p>Logout</p>
               </TooltipContent>
             </Tooltip>
           </div>

@@ -45,6 +45,8 @@ class AuthService {
   static logout() {
     CookieStorage.delete(this.ACCESS_TOKEN_KEY);
     CookieStorage.delete(this.REFRESH_TOKEN_KEY);
+    // Redirect to login page
+    window.location.href = '/auth/login';
   }
 
   static getAccessToken(): string | null {

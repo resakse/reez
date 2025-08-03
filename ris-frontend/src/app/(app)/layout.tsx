@@ -20,6 +20,13 @@ export default function AppLayout({
     setIsSidebarCollapsed(!isSidebarCollapsed);
   };
 
+  // Redirect unauthenticated users to login page
+  useEffect(() => {
+    if (!isLoading && !user) {
+      router.push('/auth/login');
+    }
+  }, [user, isLoading, router]);
+
   // Redirect normal users away from restricted pages
   useEffect(() => {
     if (!isLoading && user && !user.is_staff) {
