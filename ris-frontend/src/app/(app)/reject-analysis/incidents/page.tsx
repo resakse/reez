@@ -137,7 +137,7 @@ export default function RejectIncidentsPage() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search by patient name, MRN, accession number..."
+              placeholder="Search by reject reason, notes, or category..."
               value={searchTerm}
               onChange={(e) => handleSearch(e.target.value)}
               className="pl-10"
@@ -185,14 +185,6 @@ export default function RejectIncidentsPage() {
                 </Select>
               </div>
               
-              <div>
-                <label className="text-sm font-medium mb-2 block">Modality</label>
-                <Input
-                  placeholder="e.g., XR, CT, MRI"
-                  value={filters.modality || ''}
-                  onChange={(e) => handleFilterChange('modality', e.target.value)}
-                />
-              </div>
               
               <div>
                 <label className="text-sm font-medium mb-2 block">Severity</label>

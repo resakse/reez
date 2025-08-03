@@ -45,7 +45,7 @@ export default function NewRejectIncidentPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Log Reject Incident</h1>
           <p className="text-muted-foreground">
-            Record a new image reject incident for quality analysis
+            Quick reject logging for quality analysis (anonymous)
           </p>
         </div>
       </div>
@@ -53,9 +53,9 @@ export default function NewRejectIncidentPage() {
       {/* Form */}
       <Card>
         <CardHeader>
-          <CardTitle>Incident Details</CardTitle>
+          <CardTitle>Quick Reject Entry</CardTitle>
           <CardDescription>
-            Fill in the details of the reject incident. All fields marked with * are required.
+            Simple form for logging image rejects. Only essential information required.
           </CardDescription>
         </CardHeader>
         
@@ -76,12 +76,12 @@ export default function NewRejectIncidentPage() {
         
         <CardContent className="space-y-4">
           <div>
-            <h4 className="font-medium mb-2">When to Log an Incident:</h4>
+            <h4 className="font-medium mb-2">When to Log a Reject:</h4>
             <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-              <li>Any image rejected due to technical or positioning errors</li>
-              <li>Images that require a retake for diagnostic quality</li>
-              <li>Patient-related issues affecting image quality</li>
-              <li>Equipment malfunctions resulting in poor image quality</li>
+              <li>Technical errors (positioning, exposure, motion)</li>
+              <li>Equipment malfunctions</li>
+              <li>Processing artifacts</li>
+              <li>Any image requiring retake</li>
             </ul>
           </div>
           
@@ -98,10 +98,10 @@ export default function NewRejectIncidentPage() {
           <div>
             <h4 className="font-medium mb-2">Best Practices:</h4>
             <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-              <li>Log incidents as soon as possible after they occur</li>
-              <li>Provide detailed descriptions to help with analysis</li>
-              <li>Include corrective actions taken when applicable</li>
-              <li>Follow up on incidents that require further action</li>
+              <li>Log rejects immediately</li>
+              <li>Select correct category and modality</li>
+              <li>Brief but clear reject reason</li>
+              <li>No patient details needed</li>
             </ul>
           </div>
         </CardContent>

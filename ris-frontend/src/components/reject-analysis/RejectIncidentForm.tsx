@@ -25,6 +25,7 @@ import { toast } from '@/lib/toast';
 import {
   RejectIncident,
   RejectCategory,
+  RejectReason,
   RejectIncidentFormData,
   Language,
   SEVERITY_CONFIG
@@ -208,7 +209,7 @@ export default function RejectIncidentForm({
   const t = translations[language];
   
   const [incident, setIncident] = useState<RejectIncident | null>(null);
-  const [categories, setCategories] = useState<RejectCategory[]>([]);
+  const [rejectReasons, setRejectReasons] = useState<RejectReason[]>([]);
   const [loading, setLoading] = useState(!!incidentId);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -216,48 +217,42 @@ export default function RejectIncidentForm({
 
   // Form state
   const [formData, setFormData] = useState<RejectIncidentFormData>({
-    study_instance_uid: '',
-    accession_number: '',
-    patient_name: '',
-    patient_mrn: '',
-    exam_date: new Date().toISOString().split('T')[0],
-    modality: '',
-    exam_description: '',
-    category_id: 0,
-    subcategory: '',
-    reason_detail: '',
-    reason_detail_english: '',
-    incident_date: new Date().toISOString().split('T')[0],
-    retake_performed: false,
-    retake_date: '',
-    severity: 'MEDIUM',
-    corrective_action: '',
-    corrective_action_english: '',
+    reject_reason: 0,
+    reject_date: new Date().toISOString().split('T')[0],
+    examination: null,
+    retake_count: 0,
+    original_technique: '',
+    corrected_technique: '',
+    technologist: null,
+    patient_factors: '',
+    equipment_factors: '',
+    notes: '',
+    immediate_action_taken: '',
     follow_up_required: false,
+    severity_level: 'MEDIUM',
     ...preFilledData
   });
 
   const [formErrors, setFormErrors] = useState<Partial<Record<keyof RejectIncidentFormData, string>>>({});
 
   useEffect(() => {
-    loadCategories();
+    loadRejectReasons();
     if (incidentId) {
       loadIncident();
     }
   }, [incidentId]);
 
-  const loadCategories = async () => {
+  const loadRejectReasons = async () => {
     try {
       setCategoriesLoading(true);
 
-      const data = await rejectAnalysisApi.categories.getCategories({ 
-        is_active: true, 
-        ordering: 'position' 
-      });
-      setCategories(data.results || data);
+      // Load reject reasons - assuming there's an API endpoint
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/reject-reasons/?is_active=true`);
+      const data = await response.json();
+      setRejectReasons(data.results || data);
     } catch (err) {
-      console.error('Error loading categories:', err);
-      toast.error('Failed to load reject categories');
+      console.error('Error loading reject reasons:', err);
+      toast.error('Failed to load reject reasons');
     } finally {
       setCategoriesLoading(false);
     }
@@ -305,52 +300,16 @@ export default function RejectIncidentForm({
   const validateForm = (): boolean => {
     const errors: Partial<Record<keyof RejectIncidentFormData, string>> = {};
 
-    if (!formData.study_instance_uid.trim()) {
-      errors.study_instance_uid = t.validation.studyUidRequired;
+    if (!formData.reject_reason || formData.reject_reason === 0) {
+      errors.reject_reason = 'Please select a reject reason';
     }
 
-    if (!formData.accession_number.trim()) {
-      errors.accession_number = t.validation.accessionRequired;
+    if (!formData.reject_date) {
+      errors.reject_date = 'Incident date is required';
     }
 
-    if (!formData.patient_name.trim()) {
-      errors.patient_name = t.validation.patientNameRequired;
-    }
-
-    if (!formData.exam_date) {
-      errors.exam_date = t.validation.examDateRequired;
-    }
-
-    if (!formData.modality) {
-      errors.modality = t.validation.modalityRequired;
-    }
-
-    if (!formData.exam_description.trim()) {
-      errors.exam_description = t.validation.examDescRequired;
-    }
-
-    if (!formData.category_id || formData.category_id === 0) {
-      errors.category_id = t.validation.categoryRequired;
-    }
-
-    if (!formData.reason_detail.trim()) {
-      errors.reason_detail = t.validation.reasonDetailRequired;
-    }
-
-    if (!formData.reason_detail_english.trim()) {
-      errors.reason_detail_english = t.validation.reasonDetailEnglishRequired;
-    }
-
-    if (!formData.incident_date) {
-      errors.incident_date = t.validation.incidentDateRequired;
-    }
-
-    if (!formData.severity) {
-      errors.severity = t.validation.severityRequired;
-    }
-
-    if (formData.retake_performed && !formData.retake_date) {
-      errors.retake_date = t.validation.retakeDateRequired;
+    if (!formData.severity_level) {
+      errors.severity_level = 'Severity level is required';
     }
 
     setFormErrors(errors);
@@ -362,10 +321,14 @@ export default function RejectIncidentForm({
 
     try {
       setSaving(true);
+      
+      console.log('Submitting form data:', formData);
 
       const savedIncident = incidentId
         ? await rejectAnalysisApi.incidents.updateIncident(incidentId, formData)
         : await rejectAnalysisApi.incidents.createIncident(formData);
+      
+      console.log('Saved incident:', savedIncident);
 
       if (onSave) {
         onSave(savedIncident);
@@ -433,110 +396,55 @@ export default function RejectIncidentForm({
         </CardHeader>
         
         <CardContent className="space-y-6">
-          {/* Study Information */}
+          {/* Basic Information */}
           <div>
             <h3 className="text-lg font-medium mb-4 flex items-center gap-2">
-              <Search className="h-5 w-5" />
-              {t.studyInfo}
+              <AlertTriangle className="h-5 w-5" />
+              Basic Information
             </h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="study_uid">{t.studyUidLabel}</Label>
-                <Input
-                  id="study_uid"
-                  value={formData.study_instance_uid}
-                  onChange={(e) => setFormData({ ...formData, study_instance_uid: e.target.value })}
-                  placeholder={t.placeholders.studyUid}
-                />
-                {formErrors.study_instance_uid && (
-                  <p className="text-sm text-red-500">{formErrors.study_instance_uid}</p>
+                <Label htmlFor="reject_reason">Reject Reason *</Label>
+                {categoriesLoading ? (
+                  <Skeleton className="h-10 w-full" />
+                ) : (
+                  <Select
+                    value={formData.reject_reason.toString()}
+                    onValueChange={(value) => setFormData({ ...formData, reject_reason: parseInt(value) })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a reject reason" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {rejectReasons.map((reason) => (
+                        <SelectItem key={reason.id} value={reason.id.toString()}>
+                          <div className="flex flex-col">
+                            <span>{reason.reason}</span>
+                            <span className="text-xs text-muted-foreground">{reason.category_name}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {formErrors.reject_reason && (
+                  <p className="text-sm text-red-500">{formErrors.reject_reason}</p>
                 )}
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="accession">{t.accessionLabel}</Label>
+                <Label htmlFor="reject_date">Incident Date *</Label>
                 <Input
-                  id="accession"
-                  value={formData.accession_number}
-                  onChange={(e) => setFormData({ ...formData, accession_number: e.target.value })}
-                  placeholder={t.placeholders.accession}
-                />
-                {formErrors.accession_number && (
-                  <p className="text-sm text-red-500">{formErrors.accession_number}</p>
-                )}
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="patient_name">{t.patientNameLabel}</Label>
-                <Input
-                  id="patient_name"
-                  value={formData.patient_name}
-                  onChange={(e) => setFormData({ ...formData, patient_name: e.target.value })}
-                  placeholder={t.placeholders.patientName}
-                />
-                {formErrors.patient_name && (
-                  <p className="text-sm text-red-500">{formErrors.patient_name}</p>
-                )}
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="patient_mrn">{t.patientMrnLabel}</Label>
-                <Input
-                  id="patient_mrn"
-                  value={formData.patient_mrn}
-                  onChange={(e) => setFormData({ ...formData, patient_mrn: e.target.value })}
-                  placeholder={t.placeholders.patientMrn}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="exam_date">{t.examDateLabel}</Label>
-                <Input
-                  id="exam_date"
+                  id="reject_date"
                   type="date"
-                  value={formData.exam_date}
-                  onChange={(e) => setFormData({ ...formData, exam_date: e.target.value })}
+                  value={formData.reject_date}
+                  onChange={(e) => setFormData({ ...formData, reject_date: e.target.value })}
                 />
-                {formErrors.exam_date && (
-                  <p className="text-sm text-red-500">{formErrors.exam_date}</p>
+                {formErrors.reject_date && (
+                  <p className="text-sm text-red-500">{formErrors.reject_date}</p>
                 )}
               </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="modality">{t.modalityLabel}</Label>
-                <Select
-                  value={formData.modality}
-                  onValueChange={(value) => setFormData({ ...formData, modality: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={t.selectModality} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {t.modalities.map((modality) => (
-                      <SelectItem key={modality} value={modality}>
-                        {modality}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {formErrors.modality && (
-                  <p className="text-sm text-red-500">{formErrors.modality}</p>
-                )}
-              </div>
-            </div>
-            
-            <div className="mt-4 space-y-2">
-              <Label htmlFor="exam_desc">{t.examDescLabel}</Label>
-              <Input
-                id="exam_desc"
-                value={formData.exam_description}
-                onChange={(e) => setFormData({ ...formData, exam_description: e.target.value })}
-                placeholder={t.placeholders.examDesc}
-              />
-              {formErrors.exam_description && (
-                <p className="text-sm text-red-500">{formErrors.exam_description}</p>
-              )}
             </div>
           </div>
 
@@ -546,12 +454,12 @@ export default function RejectIncidentForm({
           <div>
             <h3 className="text-lg font-medium mb-4 flex items-center gap-2">
               <AlertTriangle className="h-5 w-5" />
-              {t.incidentDetails}
+              Additional Details
             </h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="category">{t.categoryLabel}</Label>
+                <Label htmlFor="category">{t.categoryLabel} *</Label>
                 {categoriesLoading ? (
                   <Skeleton className="h-10 w-full" />
                 ) : (
@@ -593,20 +501,7 @@ export default function RejectIncidentForm({
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="incident_date">{t.incidentDateLabel}</Label>
-                <Input
-                  id="incident_date"
-                  type="date"
-                  value={formData.incident_date}
-                  onChange={(e) => setFormData({ ...formData, incident_date: e.target.value })}
-                />
-                {formErrors.incident_date && (
-                  <p className="text-sm text-red-500">{formErrors.incident_date}</p>
-                )}
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="severity">{t.severityLabel}</Label>
+                <Label htmlFor="severity">{t.severityLabel} *</Label>
                 <Select
                   value={formData.severity}
                   onValueChange={(value) => setFormData({ ...formData, severity: value as any })}
@@ -636,34 +531,22 @@ export default function RejectIncidentForm({
               </div>
             </div>
             
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="reason_detail">{t.reasonDetailLabel}</Label>
-                <Textarea
-                  id="reason_detail"
-                  value={formData.reason_detail}
-                  onChange={(e) => setFormData({ ...formData, reason_detail: e.target.value })}
-                  placeholder={t.placeholders.reasonDetail}
-                  rows={4}
-                />
-                {formErrors.reason_detail && (
-                  <p className="text-sm text-red-500">{formErrors.reason_detail}</p>
-                )}
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="reason_detail_english">{t.reasonDetailEnglishLabel}</Label>
-                <Textarea
-                  id="reason_detail_english"
-                  value={formData.reason_detail_english}
-                  onChange={(e) => setFormData({ ...formData, reason_detail_english: e.target.value })}
-                  placeholder={t.placeholders.reasonDetailEnglish}
-                  rows={4}
-                />
-                {formErrors.reason_detail_english && (
-                  <p className="text-sm text-red-500">{formErrors.reason_detail_english}</p>
-                )}
-              </div>
+            <div className="mt-4 space-y-2">
+              <Label htmlFor="reason_detail">Reject Reason *</Label>
+              <Textarea
+                id="reason_detail"
+                value={formData.reason_detail}
+                onChange={(e) => setFormData({ 
+                  ...formData, 
+                  reason_detail: e.target.value,
+                  reason_detail_english: e.target.value
+                })}
+                placeholder="Brief description of why the image was rejected..."
+                rows={3}
+              />
+              {formErrors.reason_detail && (
+                <p className="text-sm text-red-500">{formErrors.reason_detail}</p>
+              )}
             </div>
           </div>
 
@@ -728,28 +611,19 @@ export default function RejectIncidentForm({
                 <Label htmlFor="follow_up_required">{t.followUpRequiredLabel}</Label>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="corrective_action">{t.correctiveActionLabel}</Label>
-                  <Textarea
-                    id="corrective_action"
-                    value={formData.corrective_action}
-                    onChange={(e) => setFormData({ ...formData, corrective_action: e.target.value })}
-                    placeholder={t.placeholders.correctiveAction}
-                    rows={4}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="corrective_action_english">{t.correctiveActionEnglishLabel}</Label>
-                  <Textarea
-                    id="corrective_action_english"
-                    value={formData.corrective_action_english}
-                    onChange={(e) => setFormData({ ...formData, corrective_action_english: e.target.value })}
-                    placeholder={t.placeholders.correctiveActionEnglish}
-                    rows={4}
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="corrective_action">Corrective Action (Optional)</Label>
+                <Textarea
+                  id="corrective_action"
+                  value={formData.corrective_action}
+                  onChange={(e) => setFormData({ 
+                    ...formData, 
+                    corrective_action: e.target.value,
+                    corrective_action_english: e.target.value
+                  })}
+                  placeholder="What was done to correct the issue..."
+                  rows={3}
+                />
               </div>
             </div>
           </div>

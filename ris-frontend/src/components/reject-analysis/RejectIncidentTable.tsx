@@ -45,25 +45,28 @@ import {
 } from '@/types/reject-analysis';
 
 interface RejectIncidentTableProps {
+  incidents?: RejectIncident[];
+  loading?: boolean;
   language?: Language;
   embedded?: boolean;
   limit?: number;
+  onEdit?: (incident: RejectIncident) => void;
+  onDelete?: (incident: RejectIncident) => void;
+  onView?: (incident: RejectIncident) => void;
 }
 
 const translations = {
   en: {
     title: 'Reject Incidents',
     subtitle: 'View and manage individual image reject incidents',
-    searchPlaceholder: 'Search incidents (patient name, accession, etc.)',
+    searchPlaceholder: 'Search incidents (reject reason, notes, etc.),',
     filterByCategory: 'Filter by Category',
-    filterByModality: 'Filter by Modality',
     filterBySeverity: 'Filter by Severity',
     filterByRetake: 'Retake Status',
     filterByFollowUp: 'Follow-up Status',
     dateFrom: 'Date From',
     dateTo: 'Date To',
     allCategories: 'All Categories',
-    allModalities: 'All Modalities',
     allSeverities: 'All Severities',
     allRetakeStatuses: 'All',
     allFollowUpStatuses: 'All',
@@ -85,11 +88,8 @@ const translations = {
     previous: 'Previous',
     next: 'Next',
     last: 'Last',
-    patient: 'Patient',
-    accession: 'Accession',
-    examDate: 'Exam Date',
+    incidentId: 'Incident ID',
     incidentDate: 'Incident Date',
-    modality: 'Modality',
     category: 'Category',
     severity: 'Severity',
     retake: 'Retake',
@@ -113,16 +113,14 @@ const translations = {
   ms: {
     title: 'Insiden Penolakan',
     subtitle: 'Lihat dan urus insiden penolakan imej individu',
-    searchPlaceholder: 'Cari insiden (nama pesakit, akses, dll.)',
+    searchPlaceholder: 'Cari insiden (sebab penolakan, nota, dll.),',
     filterByCategory: 'Tapis mengikut Kategori',
-    filterByModality: 'Tapis mengikut Modaliti',
     filterBySeverity: 'Tapis mengikut Keterukan',
     filterByRetake: 'Status Retake',
     filterByFollowUp: 'Status Susulan',
     dateFrom: 'Tarikh Dari',
     dateTo: 'Tarikh Hingga',
     allCategories: 'Semua Kategori',
-    allModalities: 'Semua Modaliti',
     allSeverities: 'Semua Keterukan',
     allRetakeStatuses: 'Semua',
     allFollowUpStatuses: 'Semua',
@@ -144,11 +142,8 @@ const translations = {
     previous: 'Sebelumnya',
     next: 'Seterusnya',
     last: 'Terakhir',
-    patient: 'Pesakit',
-    accession: 'Akses',
-    examDate: 'Tarikh Pemeriksaan',
+    incidentId: 'ID Insiden',
     incidentDate: 'Tarikh Insiden',
-    modality: 'Modaliti',
     category: 'Kategori',
     severity: 'Keterukan',
     retake: 'Retake',
@@ -172,15 +167,20 @@ const translations = {
 };
 
 export default function RejectIncidentTable({ 
+  incidents: propsIncidents,
+  loading: propsLoading = false,
   language = 'en',
   embedded = false,
-  limit
+  limit,
+  onEdit,
+  onDelete,
+  onView
 }: RejectIncidentTableProps) {
   const t = translations[language];
   
-  const [incidents, setIncidents] = useState<RejectIncident[]>([]);
+  const [incidents, setIncidents] = useState<RejectIncident[]>(propsIncidents || []);
   const [categories, setCategories] = useState<RejectCategory[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(propsIncidents ? false : true);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -200,27 +200,46 @@ export default function RejectIncidentTable({
   const [sortField, setSortField] = useState<string>('-incident_date');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
-  const modalities = ['CR', 'CT', 'MR', 'US', 'MG', 'RF', 'XA', 'PT', 'NM', 'DX'];
+
+  // When incidents are provided as props, use them directly
+  useEffect(() => {
+    if (propsIncidents !== undefined) {
+      setIncidents(propsIncidents);
+      setLoading(propsLoading);
+      setTotalCount(propsIncidents.length);
+      setTotalPages(1);
+    }
+  }, [propsIncidents, propsLoading]);
 
   useEffect(() => {
     loadCategories();
+    // Only fetch data if no props provided
+    if (propsIncidents === undefined) {
+      fetchIncidents();
+    }
   }, []);
 
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      setCurrentPage(1);
-      fetchIncidents();
-    }, searchTerm === '' ? 0 : 800);
-
-    return () => clearTimeout(timeoutId);
+    // Only auto-fetch if not using props
+    if (propsIncidents === undefined) {
+      const timeoutId = setTimeout(() => {
+        setCurrentPage(1);
+        fetchIncidents();
+      }, searchTerm === '' ? 0 : 800);
+      return () => clearTimeout(timeoutId);
+    }
   }, [searchTerm, filters]);
 
   useEffect(() => {
-    setCurrentPage(1);
+    if (propsIncidents === undefined) {
+      setCurrentPage(1);
+    }
   }, [sortField, pageSize]);
 
   useEffect(() => {
-    fetchIncidents();
+    if (propsIncidents === undefined) {
+      fetchIncidents();
+    }
   }, [currentPage, pageSize, sortField]);
 
   const loadCategories = async () => {
@@ -241,30 +260,26 @@ export default function RejectIncidentTable({
       setLoading(true);
       setError(null);
       
-      const params = new URLSearchParams();
-      params.append('ordering', sortField);
-      params.append('page', currentPage.toString());
+      const data: RejectIncidentListResponse = await rejectAnalysisApi.incidents.getIncidents({
+        ...filters,
+        ordering: sortField,
+        page: currentPage,
+        page_size: embedded && limit ? limit : pageSize,
+        search: searchTerm || undefined
+      });
       
-      if (!embedded) {
-        params.append('page_size', pageSize.toString());
-      } else if (limit) {
-        params.append('page_size', limit.toString());
-      }
-      
-      if (searchTerm) {
-        params.append('search', searchTerm);
-      }
-      
-      // Apply filters
-      const data: RejectIncidentListResponse = await rejectAnalysisApi.incidents.getIncidents(filters);
-      setIncidents(data.results);
-      setTotalCount(data.count);
-      setTotalPages(Math.ceil(data.count / pageSize));
+      setIncidents(data.results || []);
+      setTotalCount(data.count || 0);
+      setTotalPages(Math.ceil((data.count || 0) / pageSize));
       
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
       setError(errorMessage);
-      toast.error(`${t.error}: ${errorMessage}`);
+      console.error('Error fetching incidents:', err);
+      // Don't show toast in embedded mode to avoid cluttering parent UI
+      if (!embedded) {
+        toast.error(`${t.error}: ${errorMessage}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -301,9 +316,10 @@ export default function RejectIncidentTable({
     setFilters({ ordering: '-incident_date' });
   };
 
-  const getSeverityBadge = (severity: string) => {
+  const getSeverityBadge = (severity: string | null | undefined) => {
+    if (!severity) return <Badge variant="secondary">Unknown</Badge>;
     const config = SEVERITY_CONFIG[severity as keyof typeof SEVERITY_CONFIG];
-    if (!config) return null;
+    if (!config) return <Badge variant="secondary">{severity}</Badge>;
 
     return (
       <Badge className={config.color}>
@@ -355,11 +371,14 @@ export default function RejectIncidentTable({
     );
   };
 
-  const formatDate = (dateString: string): string => {
+  const formatDate = (dateString: string | null | undefined): string => {
+    if (!dateString) return 'N/A';
     try {
-      return new Date(dateString).toLocaleDateString();
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return 'Invalid Date';
+      return date.toLocaleDateString();
     } catch {
-      return dateString;
+      return 'Invalid Date';
     }
   };
 
@@ -413,7 +432,7 @@ export default function RejectIncidentTable({
       
       <CardContent>
         {/* Search and Filters */}
-        {!embedded && (
+        {!embedded && propsIncidents === undefined && (
           <div className="mb-6 p-4 border rounded-lg space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div className="lg:col-span-3">
@@ -474,25 +493,6 @@ export default function RejectIncidentTable({
                 </Select>
               </div>
               
-              <div>
-                <Label>{t.filterByModality}</Label>
-                <Select 
-                  value={filters.modality || ''} 
-                  onValueChange={(value) => setFilters({...filters, modality: value && value !== '__all__' ? value : undefined})}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={t.allModalities} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">{t.allModalities}</SelectItem>
-                    {modalities.map((modality) => (
-                      <SelectItem key={modality} value={modality}>
-                        {modality}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
               
               <div>
                 <Label>{t.filterBySeverity}</Label>
@@ -570,43 +570,10 @@ export default function RejectIncidentTable({
                     variant="ghost" 
                     size="sm" 
                     className="font-medium hover:bg-transparent p-0 h-auto justify-start"
-                    onClick={() => handleSort('patient_name')}
+                    onClick={() => handleSort('id')}
                   >
-                    {t.patient}
-                    {getSortIcon('patient_name')}
-                  </Button>
-                </TableHead>
-                <TableHead>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="font-medium hover:bg-transparent p-0 h-auto justify-start"
-                    onClick={() => handleSort('accession_number')}
-                  >
-                    {t.accession}
-                    {getSortIcon('accession_number')}
-                  </Button>
-                </TableHead>
-                <TableHead>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="font-medium hover:bg-transparent p-0 h-auto justify-start"
-                    onClick={() => handleSort('exam_date')}
-                  >
-                    {t.examDate}
-                    {getSortIcon('exam_date')}
-                  </Button>
-                </TableHead>
-                <TableHead>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="font-medium hover:bg-transparent p-0 h-auto justify-start"
-                    onClick={() => handleSort('modality')}
-                  >
-                    {t.modality}
-                    {getSortIcon('modality')}
+                    {t.incidentId}
+                    {getSortIcon('id')}
                   </Button>
                 </TableHead>
                 <TableHead>{t.category}</TableHead>
@@ -630,7 +597,7 @@ export default function RejectIncidentTable({
             <TableBody>
               {incidents.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center py-6 text-gray-500">
+                  <TableCell colSpan={6} className="text-center py-6 text-gray-500">
                     {loading ? t.loading : t.noData}
                   </TableCell>
                 </TableRow>
@@ -638,36 +605,21 @@ export default function RejectIncidentTable({
                 incidents.map((incident) => (
                   <TableRow key={incident.id}>
                     <TableCell className="font-medium">
-                      <div>
-                        <div>{incident.patient_name}</div>
-                        {incident.patient_mrn && (
-                          <div className="text-sm text-muted-foreground">
-                            MRN: {incident.patient_mrn}
-                          </div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>{incident.accession_number}</TableCell>
-                    <TableCell>{formatDate(incident.exam_date)}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{incident.modality}</Badge>
+                      #{incident.id}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <div 
                           className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: incident.category?.color_code || '#3b82f6' }}
+                          style={{ backgroundColor: '#3b82f6' }}
                         />
                         <span className="text-sm">
-                          {incident.category 
-                            ? (language === 'ms' ? incident.category.nama : incident.category.nama_english)
-                            : 'Unknown Category'
-                          }
+                          {incident.reject_category_name || 'Unknown Category'}
                         </span>
                       </div>
                     </TableCell>
                     <TableCell>
-                      {getSeverityBadge(incident.severity)}
+                      {getSeverityBadge(incident.severity_level)}
                     </TableCell>
                     <TableCell>
                       {getRetakeBadge(incident.retake_performed, incident.retake_date)}
@@ -675,19 +627,31 @@ export default function RejectIncidentTable({
                     <TableCell>
                       {getFollowUpBadge(incident.follow_up_required, incident.follow_up_completed)}
                     </TableCell>
-                    <TableCell>{formatDate(incident.incident_date)}</TableCell>
+                    <TableCell>{formatDate(incident.reject_date)}</TableCell>
                     <TableCell>
                       <div className="flex gap-1">
-                        <Button asChild variant="outline" size="sm">
-                          <Link href={`/reject-analysis/incidents/${incident.id}`}>
+                        {onView ? (
+                          <Button variant="outline" size="sm" onClick={() => onView(incident)}>
                             <Eye className="h-4 w-4" />
-                          </Link>
-                        </Button>
-                        <Button asChild variant="outline" size="sm">
-                          <Link href={`/reject-analysis/incidents/${incident.id}/edit`}>
+                          </Button>
+                        ) : (
+                          <Button asChild variant="outline" size="sm">
+                            <Link href={`/reject-analysis/incidents/${incident.id}`}>
+                              <Eye className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                        )}
+                        {onEdit ? (
+                          <Button variant="outline" size="sm" onClick={() => onEdit(incident)}>
                             <Edit className="h-4 w-4" />
-                          </Link>
-                        </Button>
+                          </Button>
+                        ) : (
+                          <Button asChild variant="outline" size="sm">
+                            <Link href={`/reject-analysis/incidents/${incident.id}/edit`}>
+                              <Edit className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

@@ -1,52 +1,73 @@
 // Types for the reject analysis system
 
+export interface RejectReason {
+  id: number;
+  reason: string;
+  description?: string;
+  is_active: boolean;
+  qap_code?: string;
+  severity_level: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  severity_level_display: string;
+  category: number;
+  category_name: string;
+  order: number;
+  created: string;
+  modified: string;
+}
+
 export interface RejectCategory {
   id: number;
-  nama: string;
-  nama_english: string;
-  keterangan?: string;
+  name: string;
   description?: string;
-  color_code?: string;
-  position: number;
   is_active: boolean;
+  order: number;
+  reasons?: RejectReason[];
+  reasons_count?: number;
   created: string;
   modified: string;
 }
 
 export interface RejectIncident {
   id: number;
-  study_instance_uid: string;
-  accession_number: string;
-  patient_name: string;
-  patient_mrn?: string;
-  exam_date: string;
-  modality: string;
-  exam_description: string;
   
-  // Reject details
-  category: RejectCategory;
-  subcategory?: string;
-  reason_detail: string;
-  reason_detail_english: string;
+  // Examination details (from backend API)
+  examination?: number | null;
+  examination_number?: string | null;
+  examination_accession?: string | null;
+  patient_name?: string | null;
+  patient_mrn?: string | null;
+  modality_name?: string | null;
+  exam_name?: string | null;
+  
+  // Reject details (from backend API)
+  reject_reason: number;
+  reject_reason_name: string;
+  reject_category_name: string;
+  reject_category_type?: string;
+  reject_date: string;
+  
+  // Additional fields
+  retake_count: number;
+  original_technique?: string | null;
+  corrected_technique?: string | null;
+  technologist?: number | null;
+  technologist_name?: string | null;
   
   // Staff and timing
-  reported_by: {
-    id: number;
-    username: string;
-    first_name: string;
-    last_name: string;
-  };
-  incident_date: string;
-  retake_performed: boolean;
-  retake_date?: string;
+  reported_by: number;
+  reported_by_name: string;
   
-  // Analysis
-  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-  corrective_action?: string;
-  corrective_action_english?: string;
+  // Technical details
+  patient_factors?: string | null;
+  equipment_factors?: string | null;
+  notes?: string | null;
+  immediate_action_taken?: string | null;
   follow_up_required: boolean;
-  follow_up_completed: boolean;
-  follow_up_date?: string;
+  severity_level: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  
+  // Timestamps
+  created: string;
+  modified: string;
   
   // Metadata
   created: string;
@@ -176,27 +197,26 @@ export interface RejectCategoryFormData {
 }
 
 export interface RejectIncidentFormData {
-  study_instance_uid: string;
-  accession_number: string;
-  patient_name: string;
-  patient_mrn?: string;
-  exam_date: string;
-  modality: string;
-  exam_description: string;
+  // Core fields for quick entry
+  reject_reason: number;
+  reject_date?: string;
   
-  category_id: number;
-  subcategory?: string;
-  reason_detail: string;
-  reason_detail_english: string;
+  // Optional examination link
+  examination?: number | null;
   
-  incident_date: string;
-  retake_performed: boolean;
-  retake_date?: string;
+  // Technical details
+  retake_count?: number;
+  original_technique?: string;
+  corrected_technique?: string;
+  technologist?: number | null;
   
-  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-  corrective_action?: string;
-  corrective_action_english?: string;
-  follow_up_required: boolean;
+  // Analysis fields
+  patient_factors?: string;
+  equipment_factors?: string;
+  notes?: string;
+  immediate_action_taken?: string;
+  follow_up_required?: boolean;
+  severity_level?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 }
 
 export interface MonthlyAnalysisFormData {
