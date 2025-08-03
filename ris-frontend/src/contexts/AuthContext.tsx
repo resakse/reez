@@ -8,9 +8,13 @@ interface User {
   username: string;
   is_staff?: boolean;
   is_superuser?: boolean;
+  is_active?: boolean;
   first_name?: string;
   last_name?: string;
   email?: string;
+  jawatan?: string;
+  klinik?: string;
+  komen?: string;
 }
 
 interface AuthContextType {
@@ -47,9 +51,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             username: userData.username,
             is_staff: userData.is_staff,
             is_superuser: userData.is_superuser,
+            is_active: userData.is_active,
             first_name: userData.first_name,
             last_name: userData.last_name,
             email: userData.email,
+            jawatan: userData.jawatan,
+            klinik: userData.klinik,
+            komen: userData.komen,
           });
         } else {
           // Fallback to token data if API call fails

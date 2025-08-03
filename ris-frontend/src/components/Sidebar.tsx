@@ -3,15 +3,106 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Users, Settings, BarChart, Home, Stethoscope, X, Bone, FileText, ClipboardList, ListChecks, UserCog, Archive, Upload, Disc3, AlertTriangle, TrendingUp } from "lucide-react";
+import { LayoutDashboard, Users, Settings, BarChart, Home, Stethoscope, X, Bone, FileText, ClipboardList, ListChecks, UserCog, Archive, Upload, Disc3, AlertTriangle, TrendingUp, Menu, Moon, Sun, Monitor } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTheme } from "next-themes";
+import { Button } from "./ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Separator } from "@/components/ui/separator";
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
   isCollapsed: boolean;
+  onToggleCollapse: () => void;
 }
 
-export default function Sidebar({ className, isCollapsed }: SidebarProps) {
-  const { user, isLoading } = useAuth();
+// Custom theme display components
+function ThemeRow() {
+  const { theme, setTheme } = useTheme();
+  
+  const getThemeIcon = () => {
+    if (theme === 'light') return <Sun className="h-4 w-4" />;
+    if (theme === 'dark') return <Moon className="h-4 w-4" />;
+    return <Monitor className="h-4 w-4" />;
+  };
+  
+  const getThemeLabel = () => {
+    if (theme === 'light') return 'Light Mode';
+    if (theme === 'dark') return 'Dark Mode';
+    return 'System';
+  };
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" className="w-full justify-start h-8 px-2 hover:bg-white/10 hover:text-white">
+          <div className="flex items-center gap-2">
+            {getThemeIcon()}
+            <span className="text-sm">{getThemeLabel()}</span>
+          </div>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start">
+        <DropdownMenuItem onClick={() => setTheme("light")}>
+          <Sun className="mr-2 h-4 w-4" />
+          Light Mode
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme("dark")}>
+          <Moon className="mr-2 h-4 w-4" />
+          Dark Mode
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme("system")}>
+          <Monitor className="mr-2 h-4 w-4" />
+          System
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function ThemeIconOnly() {
+  const { theme, setTheme } = useTheme();
+  
+  const getThemeIcon = () => {
+    if (theme === 'light') return <Sun className="h-4 w-4" />;
+    if (theme === 'dark') return <Moon className="h-4 w-4" />;
+    return <Monitor className="h-4 w-4" />;
+  };
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-white/10 hover:text-white">
+          {getThemeIcon()}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start">
+        <DropdownMenuItem onClick={() => setTheme("light")}>
+          <Sun className="mr-2 h-4 w-4" />
+          Light Mode
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme("dark")}>
+          <Moon className="mr-2 h-4 w-4" />
+          Dark Mode
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme("system")}>
+          <Monitor className="mr-2 h-4 w-4" />
+          System
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+export default function Sidebar({ className, isCollapsed, onToggleCollapse }: SidebarProps) {
+  const { user, isLoading, logout } = useAuth();
   const pathname = usePathname();
   const isSupervisor = user?.is_superuser || false;
   const isStaff = user?.is_staff || false;
@@ -20,8 +111,20 @@ export default function Sidebar({ className, isCollapsed }: SidebarProps) {
   // Don't render menu items while loading authentication state
   if (isLoading) {
     return (
-      <aside className={cn("hidden md:block text-white bg-sidebar", isCollapsed ? "w-20" : "w-64", "transition-all duration-300", className)}>
-        <nav className="p-4">
+      <aside className={cn("flex flex-col text-white bg-sidebar", isCollapsed ? "w-20" : "w-64", "transition-all duration-300", className)}>
+        <div className="flex h-14 items-center justify-between px-4 border-b border-white/10">
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={onToggleCollapse} className="hover:bg-white/10 hover:text-white">
+              <Menu className="h-6 w-6" />
+            </Button>
+            {!isCollapsed && (
+              <Link href="/" className="flex items-center space-x-2">
+                <span className="font-bold">Radiology IS</span>
+              </Link>
+            )}
+          </div>
+        </div>
+        <nav className="flex-1 p-4">
           <div className="flex items-center justify-center h-32">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
           </div>
@@ -33,8 +136,20 @@ export default function Sidebar({ className, isCollapsed }: SidebarProps) {
   // Don't render menu items if user is not authenticated
   if (!user) {
     return (
-      <aside className={cn("hidden md:block text-white bg-sidebar", isCollapsed ? "w-20" : "w-64", "transition-all duration-300", className)}>
-        <nav className="p-4">
+      <aside className={cn("flex flex-col text-white bg-sidebar", isCollapsed ? "w-20" : "w-64", "transition-all duration-300", className)}>
+        <div className="flex h-14 items-center justify-between px-4 border-b border-white/10">
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={onToggleCollapse} className="hover:bg-white/10 hover:text-white">
+              <Menu className="h-6 w-6" />
+            </Button>
+            {!isCollapsed && (
+              <Link href="/" className="flex items-center space-x-2">
+                <span className="font-bold">Radiology IS</span>
+              </Link>
+            )}
+          </div>
+        </div>
+        <nav className="flex-1 p-4">
           <div className="flex items-center justify-center h-32 text-white/60 text-sm">
             {!isCollapsed && "Please log in"}
           </div>
@@ -71,8 +186,23 @@ export default function Sidebar({ className, isCollapsed }: SidebarProps) {
   };
 
   return (
-    <aside className={cn("hidden md:block text-white bg-sidebar", isCollapsed ? "w-20" : "w-64", "transition-all duration-300", className)}>
-      <nav className="p-4">
+    <aside className={cn("flex flex-col text-white bg-sidebar", isCollapsed ? "w-20" : "w-64", "transition-all duration-300", className)}>
+      {/* Header Section */}
+      <div className="flex h-14 items-center justify-between px-4 border-b border-white/10">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={onToggleCollapse} className="hover:bg-white/10 hover:text-white">
+            <Menu className="h-6 w-6" />
+          </Button>
+          {!isCollapsed && (
+            <Link href="/" className="flex items-center space-x-2">
+              <span className="font-bold">Radiology IS</span>
+            </Link>
+          )}
+        </div>
+      </div>
+
+      {/* Navigation Section */}
+      <nav className="flex-1 p-4">
         <ul className="space-y-2">
           {!isNormalUser && (
             <li>
@@ -208,6 +338,45 @@ export default function Sidebar({ className, isCollapsed }: SidebarProps) {
           )}
         </ul>
       </nav>
+
+      {/* Footer Section with Custom Theme and Profile Layout */}
+      <div className="p-4 border-t border-white/10">
+        {!isCollapsed ? (
+          <div className="space-y-3">
+            {/* Theme Toggle Row */}
+            <ThemeRow />
+            
+            {/* Profile Row */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 flex-1">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src="" alt={user?.username ?? ""} />
+                  <AvatarFallback>{user?.username?.[0].toUpperCase()}</AvatarFallback>
+                </Avatar>
+                <span className="text-sm font-medium truncate">{user?.username}</span>
+              </div>
+              <Link href="/profile">
+                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-white/10 hover:text-white">
+                  <Settings className="h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2 items-center">
+            <ThemeIconOnly />
+            <Avatar className="h-8 w-8">
+              <AvatarImage src="" alt={user?.username ?? ""} />
+              <AvatarFallback>{user?.username?.[0].toUpperCase()}</AvatarFallback>
+            </Avatar>
+            <Link href="/profile">
+              <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-white/10 hover:text-white">
+                <Settings className="h-4 w-4" />
+              </Button>
+            </Link>
+          </div>
+        )}
+      </div>
     </aside>
   );
 } 
