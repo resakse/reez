@@ -638,3 +638,260 @@ def update_patient_race_if_empty(patient):
         return True
     
     return False
+
+
+def get_orthanc_monthly_images(year, month, modality=None, pacs_server=None):
+    """
+    Get monthly image counts from Orthanc PACS servers for reject analysis
+    
+    Args:
+        year (int): Year for analysis
+        month (int): Month for analysis (1-12)
+        modality (str, optional): Filter by specific modality
+        pacs_server (PacsServer, optional): Specific PACS server to query
+        
+    Returns:
+        dict: Statistics containing total_images, total_studies, modality_breakdown
+    """
+    import requests
+    import calendar
+    from datetime import datetime, date
+    from exam.models import PacsServer
+    
+    # Get target month date range
+    start_date = date(year, month, 1)
+    _, last_day = calendar.monthrange(year, month)
+    end_date = date(year, month, last_day)
+    
+    # Convert to DICOM date format (YYYYMMDD)
+    start_dicom = start_date.strftime('%Y%m%d')
+    end_dicom = end_date.strftime('%Y%m%d')
+    
+    # Get PACS servers to query
+    if pacs_server:
+        pacs_servers = [pacs_server]
+    else:
+        pacs_servers = PacsServer.objects.filter(
+            is_active=True,
+            include_in_reject_analysis=True
+        )
+    
+    if not pacs_servers:
+        return {
+            'total_images': 0,
+            'total_studies': 0,
+            'modality_breakdown': {},
+            'error': 'No active PACS servers configured for reject analysis'
+        }
+    
+    total_images = 0
+    total_studies = 0
+    modality_breakdown = {}
+    errors = []
+    
+    for server in pacs_servers:
+        try:
+            # Build Orthanc API URL
+            base_url = server.orthancurl.rstrip('/')
+            
+            # Query studies for the month
+            studies_url = f"{base_url}/studies"
+            
+            # Get all studies (Orthanc doesn't support date filtering directly)
+            response = requests.get(studies_url, timeout=30)
+            response.raise_for_status()
+            
+            study_ids = response.json()
+            
+            monthly_studies = []
+            server_images = 0
+            server_modality_breakdown = {}
+            
+            # Filter studies by date and modality
+            for study_id in study_ids:
+                try:
+                    # Get study metadata
+                    study_url = f"{base_url}/studies/{study_id}"
+                    study_response = requests.get(study_url, timeout=10)
+                    study_response.raise_for_status()
+                    
+                    study_data = study_response.json()
+                    main_dicom_tags = study_data.get('MainDicomTags', {})
+                    
+                    # Check study date
+                    study_date = main_dicom_tags.get('StudyDate', '')
+                    if not study_date or len(study_date) != 8:
+                        continue
+                    
+                    # Filter by date range
+                    if not (start_dicom <= study_date <= end_dicom):
+                        continue
+                    
+                    # Get modality from series
+                    series_ids = study_data.get('Series', [])
+                    study_modalities = set()
+                    study_image_count = 0
+                    
+                    for series_id in series_ids:
+                        try:
+                            series_url = f"{base_url}/series/{series_id}"
+                            series_response = requests.get(series_url, timeout=10)
+                            series_response.raise_for_status()
+                            
+                            series_data = series_response.json()
+                            series_tags = series_data.get('MainDicomTags', {})
+                            series_modality = series_tags.get('Modality', 'UN')
+                            
+                            # Filter by modality if specified
+                            if modality and series_modality != modality:
+                                continue
+                            
+                            study_modalities.add(series_modality)
+                            
+                            # Count instances (images) in this series
+                            instance_count = len(series_data.get('Instances', []))
+                            study_image_count += instance_count
+                            
+                            # Update modality breakdown
+                            if series_modality not in server_modality_breakdown:
+                                server_modality_breakdown[series_modality] = {
+                                    'images': 0,
+                                    'studies': 0
+                                }
+                            server_modality_breakdown[series_modality]['images'] += instance_count
+                            
+                        except requests.RequestException:
+                            # Skip problematic series but continue
+                            continue
+                    
+                    # Only count study if it matches our criteria
+                    if study_image_count > 0 and (not modality or modality in study_modalities):
+                        monthly_studies.append(study_id)
+                        server_images += study_image_count
+                        
+                        # Update study counts for modalities
+                        for mod in study_modalities:
+                            if not modality or mod == modality:
+                                if mod in server_modality_breakdown:
+                                    server_modality_breakdown[mod]['studies'] += 1
+                
+                except requests.RequestException:
+                    # Skip problematic studies but continue
+                    continue
+            
+            # Aggregate results from this server
+            total_images += server_images
+            total_studies += len(monthly_studies)
+            
+            # Merge modality breakdowns
+            for mod, counts in server_modality_breakdown.items():
+                if mod not in modality_breakdown:
+                    modality_breakdown[mod] = {'images': 0, 'studies': 0}
+                modality_breakdown[mod]['images'] += counts['images']
+                modality_breakdown[mod]['studies'] += counts['studies']
+            
+            print(f"DEBUG: PACS {server.name} - Found {server_images} images in {len(monthly_studies)} studies for {year}-{month:02d}")
+            
+        except requests.RequestException as e:
+            error_msg = f"Failed to query PACS server {server.name}: {str(e)}"
+            errors.append(error_msg)
+            print(f"ERROR: {error_msg}")
+            continue
+        except Exception as e:
+            error_msg = f"Unexpected error with PACS server {server.name}: {str(e)}"
+            errors.append(error_msg)
+            print(f"ERROR: {error_msg}")
+            continue
+    
+    result = {
+        'total_images': total_images,
+        'total_studies': total_studies,
+        'modality_breakdown': modality_breakdown,
+        'month_year': f"{calendar.month_name[month]} {year}",
+        'date_range': f"{start_dicom} - {end_dicom}"
+    }
+    
+    if errors:
+        result['warnings'] = errors
+    
+    return result
+
+
+def calculate_reject_analysis_from_pacs(analysis_date, modality, auto_save=True):
+    """
+    Calculate reject analysis statistics by querying PACS servers
+    
+    Args:
+        analysis_date (date): First day of the month to analyze
+        modality (Modaliti): Modality object to analyze
+        auto_save (bool): Whether to automatically save the analysis
+        
+    Returns:
+        dict: Analysis data or RejectAnalysis object if auto_save=True
+    """
+    from exam.models import RejectAnalysis, Pemeriksaan
+    from django.db.models import Count
+    
+    year = analysis_date.year
+    month = analysis_date.month
+    
+    # Get PACS image counts
+    pacs_data = get_orthanc_monthly_images(year, month, modality.singkatan)
+    
+    if 'error' in pacs_data:
+        return {'error': pacs_data['error']}
+    
+    # Get examination counts from RIS database
+    # Count examinations created in the month for this modality
+    examination_count = Pemeriksaan.objects.filter(
+        created__year=year,
+        created__month=month,
+        exam__modaliti=modality
+    ).count()
+    
+    # Get modality-specific data from PACS
+    modality_data = pacs_data['modality_breakdown'].get(modality.singkatan, {
+        'images': 0,
+        'studies': 0
+    })
+    
+    total_images = modality_data['images']
+    total_studies = modality_data['studies']
+    
+    # Use examination count from RIS if higher than PACS studies
+    # (RIS is more reliable for examination counts)
+    total_examinations = max(examination_count, total_studies)
+    
+    # For reject analysis, we need to estimate retakes
+    # This is a simplified calculation - in reality, you'd need DICOM tags or manual data entry
+    # For now, assume retakes are images beyond 1 per examination
+    estimated_retakes = max(0, total_images - total_examinations)
+    
+    analysis_data = {
+        'analysis_date': analysis_date,
+        'modality': modality,
+        'total_examinations': total_examinations,
+        'total_images': total_images,
+        'total_retakes': estimated_retakes,
+        'pacs_studies': total_studies,
+        'ris_examinations': examination_count,
+        'calculation_method': 'PACS_AUTOMATED',
+        'pacs_warnings': pacs_data.get('warnings', [])
+    }
+    
+    if auto_save:
+        # Create or update analysis
+        analysis, created = RejectAnalysis.objects.update_or_create(
+            analysis_date=analysis_date,
+            modality=modality,
+            defaults={
+                'total_examinations': total_examinations,
+                'total_images': total_images,
+                'total_retakes': estimated_retakes,
+                'comments': f"Auto-calculated from PACS data. RIS exams: {examination_count}, PACS studies: {total_studies}"
+            }
+        )
+        analysis_data['analysis_object'] = analysis
+        analysis_data['created'] = created
+    
+    return analysis_data

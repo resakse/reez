@@ -9,6 +9,7 @@ from custom.katanama import titlecase
 from ordered_model.models import OrderedModel
 import auto_prefetch
 import uuid
+from decimal import Decimal
 
 User = settings.AUTH_USER_MODEL
 
@@ -169,6 +170,12 @@ class PacsServer(models.Model):
     is_active = models.BooleanField(default=True, help_text="Enable/disable this PACS server")
     is_primary = models.BooleanField(default=False, help_text="Primary PACS server for new examinations")
     is_deleted = models.BooleanField(default=False, help_text="Soft delete flag for servers with historical data")
+    include_in_reject_analysis = models.BooleanField(
+        default=True, 
+        help_text="Include this PACS server in reject analysis calculations. "
+                 "Uncheck for imported data from other facilities or archived data "
+                 "that shouldn't count towards institution's statistics."
+    )
     created = models.DateTimeField(auto_now_add=True)
     modified = models.DateTimeField(auto_now=True)
     
@@ -741,3 +748,302 @@ class MediaDistribution(models.Model):
     def study_count(self):
         """Get number of studies in this distribution"""
         return self.studies.count() or (1 if self.daftar else 0)
+
+
+# ========== REJECT ANALYSIS MODELS ==========
+
+class RejectCategory(OrderedModel):
+    """Main categories for reject analysis with drag-and-drop ordering"""
+    CATEGORY_TYPES = [
+        ('HUMAN_FAULTS', 'Human Faults'),
+        ('EQUIPMENT', 'Equipment'),
+        ('PROCESSING', 'Processing'),
+        ('OTHERS', 'Others'),
+    ]
+    
+    name = models.CharField(max_length=100, help_text="Category name (e.g., 'Positioning Errors')")
+    category_type = models.CharField(max_length=20, choices=CATEGORY_TYPES, help_text="Main category classification")
+    description = models.TextField(blank=True, null=True, help_text="Detailed description of this category")
+    is_active = models.BooleanField(default=True, help_text="Enable/disable this category")
+    created = models.DateTimeField(auto_now_add=True)
+    modified = models.DateTimeField(auto_now=True)
+    
+    class Meta(OrderedModel.Meta):
+        verbose_name = "Reject Category"
+        verbose_name_plural = "Reject Categories"
+        ordering = ['category_type', 'order']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['category_type', 'name'],
+                name='unique_category_name_per_type'
+            )
+        ]
+    
+    def __str__(self):
+        return f"{self.get_category_type_display()} - {self.name}"
+    
+    def save(self, *args, **kwargs):
+        self.name = titlecase(self.name)
+        super().save(*args, **kwargs)
+
+
+class RejectReason(OrderedModel):
+    """Specific reasons within each category with drag-and-drop ordering"""
+    category = auto_prefetch.ForeignKey(RejectCategory, on_delete=models.CASCADE, related_name='reasons')
+    reason = models.CharField(max_length=200, help_text="Specific reject reason (e.g., 'Over Exposure / High Index')")
+    description = models.TextField(blank=True, null=True, help_text="Detailed description and guidance")
+    is_active = models.BooleanField(default=True, help_text="Enable/disable this reason")
+    
+    # Malaysian QAP compliance fields
+    qap_code = models.CharField(
+        max_length=20, blank=True, null=True,
+        help_text="Malaysian QAP classification code if applicable"
+    )
+    severity_level = models.CharField(
+        max_length=20, 
+        choices=[
+            ('LOW', 'Low Impact'),
+            ('MEDIUM', 'Medium Impact'),
+            ('HIGH', 'High Impact'),
+            ('CRITICAL', 'Critical - Immediate Action Required')
+        ],
+        default='MEDIUM',
+        help_text="Severity level for prioritizing corrective actions"
+    )
+    
+    created = models.DateTimeField(auto_now_add=True)
+    modified = models.DateTimeField(auto_now=True)
+    
+    class Meta(OrderedModel.Meta):
+        verbose_name = "Reject Reason"
+        verbose_name_plural = "Reject Reasons"
+        ordering = ['category', 'order']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['category', 'reason'],
+                name='unique_reason_per_category'
+            )
+        ]
+    
+    def __str__(self):
+        return f"{self.category.name} - {self.reason}"
+    
+    def save(self, *args, **kwargs):
+        self.reason = titlecase(self.reason)
+        super().save(*args, **kwargs)
+
+
+class RejectAnalysis(auto_prefetch.Model):
+    """Monthly reject analysis tracking with Malaysian QAP compliance"""
+    analysis_date = models.DateField(help_text="Month and year for this analysis (typically first day of month)")
+    modality = auto_prefetch.ForeignKey(Modaliti, on_delete=models.CASCADE, help_text="Modality being analyzed")
+    
+    # Calculated statistics
+    total_examinations = models.PositiveIntegerField(
+        help_text="Total examinations performed for the month"
+    )
+    total_images = models.PositiveIntegerField(
+        help_text="Total images produced (including retakes and originals)"
+    )
+    total_retakes = models.PositiveIntegerField(
+        help_text="Total number of retake images"
+    )
+    
+    # Calculated percentages
+    reject_rate = models.DecimalField(
+        max_digits=5, decimal_places=2,
+        help_text="Reject rate percentage: (total_retakes/total_images) * 100"
+    )
+    
+    # Malaysian QAP specific fields
+    drl_compliance = models.BooleanField(
+        default=True,
+        help_text="Indicates if reject rate meets Malaysian DRL guidelines"
+    )
+    qap_target_rate = models.DecimalField(
+        max_digits=5, decimal_places=2, default=8.00,
+        help_text="Target reject rate for this modality (default 8% per international guidelines)"
+    )
+    
+    # Analysis and corrective actions
+    comments = models.TextField(
+        blank=True, null=True, 
+        help_text="Analysis comments and findings for the month"
+    )
+    corrective_actions = models.TextField(
+        blank=True, null=True,
+        help_text="Corrective actions taken or planned based on this analysis"
+    )
+    root_cause_analysis = models.TextField(
+        blank=True, null=True,
+        help_text="Root cause analysis for high reject rates"
+    )
+    
+    # Staff and approval tracking
+    created_by = auto_prefetch.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='created_reject_analyses',
+        help_text="Quality manager who created this analysis"
+    )
+    approved_by = auto_prefetch.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='approved_reject_analyses',
+        help_text="Senior staff who approved this analysis"
+    )
+    approval_date = models.DateTimeField(
+        blank=True, null=True,
+        help_text="Date when analysis was approved"
+    )
+    
+    # Audit fields
+    created = models.DateTimeField(auto_now_add=True)
+    modified = models.DateTimeField(auto_now=True)
+    
+    class Meta(auto_prefetch.Model.Meta):
+        verbose_name = "Reject Analysis"
+        verbose_name_plural = "Reject Analyses"
+        ordering = ['-analysis_date', 'modality']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['analysis_date', 'modality'],
+                name='unique_analysis_per_month_modality'
+            )
+        ]
+    
+    def __str__(self):
+        return f"{self.modality.nama.title()} - {self.analysis_date.strftime('%B %Y')} ({self.reject_rate:.2f}%)"
+    
+    def save(self, *args, **kwargs):
+        # Auto-calculate reject rate if not provided
+        if self.total_images > 0:
+            rate_calculation = (self.total_retakes / self.total_images) * 100
+            self.reject_rate = Decimal(str(rate_calculation)).quantize(Decimal('0.01'))
+        else:
+            self.reject_rate = Decimal('0.00')
+        
+        # Check DRL compliance
+        self.drl_compliance = self.reject_rate <= self.qap_target_rate
+        
+        super().save(*args, **kwargs)
+    
+    @property
+    def status_indicator(self):
+        """Get status indicator based on reject rate"""
+        if self.reject_rate <= self.qap_target_rate:
+            return 'GOOD'
+        elif self.reject_rate <= (self.qap_target_rate * Decimal('1.5')):
+            return 'WARNING'
+        else:
+            return 'CRITICAL'
+    
+    @property
+    def month_year_display(self):
+        """Display month and year in readable format"""
+        return self.analysis_date.strftime('%B %Y')
+
+
+class RejectIncident(auto_prefetch.Model):
+    """Individual reject incidents linked to examinations"""
+    examination = auto_prefetch.ForeignKey(
+        Pemeriksaan, on_delete=models.CASCADE, 
+        related_name='reject_incidents',
+        help_text="The examination that had a reject/retake"
+    )
+    analysis = auto_prefetch.ForeignKey(
+        RejectAnalysis, on_delete=models.CASCADE,
+        related_name='incidents',
+        help_text="Monthly analysis this incident belongs to",
+        null=True, blank=True
+    )
+    
+    # Reject details
+    reject_reason = auto_prefetch.ForeignKey(RejectReason, on_delete=models.CASCADE)
+    reject_date = models.DateTimeField(
+        default=timezone.now,
+        help_text="Date and time when reject was identified"
+    )
+    
+    # Technical details
+    retake_count = models.PositiveSmallIntegerField(
+        default=1,
+        help_text="Number of retakes required for this examination"
+    )
+    original_technique = models.CharField(
+        max_length=100, blank=True, null=True,
+        help_text="Original technique used (kVp, mAs, etc.)"
+    )
+    corrected_technique = models.CharField(
+        max_length=100, blank=True, null=True,
+        help_text="Corrected technique for retake"
+    )
+    
+    # Staff involved
+    technologist = auto_prefetch.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='reject_incidents_as_tech',
+        help_text="Radiographer who performed the examination"
+    )
+    reported_by = auto_prefetch.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='reject_incidents_reported',
+        help_text="Staff member who identified and reported the reject"
+    )
+    
+    # Additional context
+    patient_factors = models.TextField(
+        blank=True, null=True,
+        help_text="Patient-related factors that contributed to the reject (motion, cooperation, etc.)"
+    )
+    equipment_factors = models.TextField(
+        blank=True, null=True,
+        help_text="Equipment-related factors (calibration, malfunction, etc.)"
+    )
+    notes = models.TextField(
+        blank=True, null=True,
+        help_text="Additional notes about the reject incident"
+    )
+    
+    # Malaysian QAP compliance
+    immediate_action_taken = models.TextField(
+        blank=True, null=True,
+        help_text="Immediate corrective action taken"
+    )
+    follow_up_required = models.BooleanField(
+        default=False,
+        help_text="Indicates if follow-up action is required"
+    )
+    
+    # Audit fields
+    created = models.DateTimeField(auto_now_add=True)
+    modified = models.DateTimeField(auto_now=True)
+    
+    class Meta(auto_prefetch.Model.Meta):
+        verbose_name = "Reject Incident"
+        verbose_name_plural = "Reject Incidents"
+        ordering = ['-reject_date']
+        indexes = [
+            models.Index(fields=['reject_date']),
+            models.Index(fields=['analysis', 'reject_date']),
+            models.Index(fields=['examination']),
+        ]
+    
+    def __str__(self):
+        return f"{self.examination.no_xray} - {self.reject_reason.reason} ({self.reject_date.strftime('%d/%m/%Y')})"
+    
+    def save(self, *args, **kwargs):
+        # Ensure analysis matches the examination date
+        if self.examination and self.analysis_id is None:
+            # Try to find or create appropriate analysis
+            exam_date = self.examination.created.date()
+            analysis_date = exam_date.replace(day=1)  # First day of month
+            
+            try:
+                self.analysis = RejectAnalysis.objects.get(
+                    analysis_date=analysis_date,
+                    modality=self.examination.exam.modaliti
+                )
+            except RejectAnalysis.DoesNotExist:
+                # Analysis will need to be created separately
+                pass
+        
+        super().save(*args, **kwargs)

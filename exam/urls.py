@@ -9,7 +9,9 @@ from .views import (
     DicomWorklistExportView, upload_dicom_files,
     DashboardStatsAPIView, DashboardDemographicsAPIView, 
     DashboardModalityStatsAPIView, DashboardStorageAPIView,
-    DashboardConfigAPIView, DashboardBodypartsExamTypesAPIView
+    DashboardConfigAPIView, DashboardBodypartsExamTypesAPIView,
+    RejectCategoryViewSet, RejectReasonViewSet, RejectAnalysisViewSet,
+    RejectIncidentViewSet, RejectAnalysisStatisticsView, RejectAnalysisTrendsView
 )
 from .settings_views import PacsConfigListCreateAPIView, PacsConfigDetailAPIView, get_current_pacs_config, get_pacs_orthanc_url
 from .pacs_management_views import PacsServerViewSet, MultiplePacsSearchView, PacsUploadDestinationsView
@@ -30,6 +32,12 @@ router.register(r'registrations', DaftarViewSet, basename='registration')
 router.register(r'examinations', PemeriksaanViewSet, basename='examination')
 router.register(r'pacs-servers', PacsServerViewSet, basename='pacs-server')
 router.register(r'media-distributions', MediaDistributionViewSet, basename='media-distribution')
+
+# Reject Analysis ViewSets
+router.register(r'reject-categories', RejectCategoryViewSet, basename='reject-category')
+router.register(r'reject-reasons', RejectReasonViewSet, basename='reject-reason')
+router.register(r'reject-analyses', RejectAnalysisViewSet, basename='reject-analysis')
+router.register(r'reject-incidents', RejectIncidentViewSet, basename='reject-incident')
 
 urlpatterns = [
     path("", views.orthanc_study, name="orthanc-study"),
@@ -125,4 +133,8 @@ urlpatterns = [
     path('dashboard/storage/', DashboardStorageAPIView.as_view(), name='dashboard-storage'),
     path('dashboard/config/', DashboardConfigAPIView.as_view(), name='dashboard-config'),
     path('dashboard/bodyparts-examtypes/', DashboardBodypartsExamTypesAPIView.as_view(), name='dashboard-bodyparts-examtypes'),
+    
+    # Reject Analysis Statistics API endpoints
+    path('reject-analysis/statistics/', RejectAnalysisStatisticsView.as_view(), name='reject-analysis-statistics'),
+    path('reject-analysis/trends/', RejectAnalysisTrendsView.as_view(), name='reject-analysis-trends'),
 ]

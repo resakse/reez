@@ -1,11 +1,15 @@
 from rest_framework import serializers
-from .models import Modaliti, Part, Exam, Daftar, Pemeriksaan, PacsConfig, PacsServer, MediaDistribution
+from .models import (
+    Modaliti, Part, Exam, Daftar, Pemeriksaan, PacsConfig, PacsServer, MediaDistribution,
+    RejectCategory, RejectReason, RejectAnalysis, RejectIncident
+)
 from pesakit.models import Pesakit
 from wad.models import Ward
 from pesakit.serializers import PesakitSerializer
 from wad.serializers import WardSerializer
 from staff.serializers import UserSerializer
 from django.contrib.auth import get_user_model
+from decimal import Decimal
 
 User = get_user_model()
 
@@ -428,8 +432,8 @@ class PacsServerSerializer(serializers.ModelSerializer):
     class Meta:
         model = PacsServer
         fields = ['id', 'name', 'orthancurl', 'viewrurl', 'endpoint_style', 
-                 'is_active', 'is_primary', 'comments', 'endpoint_style_choices',
-                 'created', 'modified']
+                 'is_active', 'is_primary', 'include_in_reject_analysis', 'comments', 
+                 'endpoint_style_choices', 'created', 'modified']
         read_only_fields = ['created', 'modified', 'endpoint_style_choices']
     
     def get_endpoint_style_choices(self, obj):
@@ -453,7 +457,7 @@ class PacsServerListSerializer(serializers.ModelSerializer):
     """Simplified serializer for listing PACS servers"""
     class Meta:
         model = PacsServer
-        fields = ['id', 'name', 'orthancurl', 'is_active', 'is_primary', 'comments']
+        fields = ['id', 'name', 'orthancurl', 'is_active', 'is_primary', 'include_in_reject_analysis', 'comments']
 
 
 class MediaDistributionSerializer(serializers.ModelSerializer):
@@ -697,3 +701,253 @@ class MediaDistributionCollectionSerializer(serializers.ModelSerializer):
             if not data.get(field):
                 raise serializers.ValidationError(f"{field.replace('_', ' ').title()} is required when recording collection.")
         return data
+
+
+# ===============================================
+# REJECT ANALYSIS SERIALIZERS
+# ===============================================
+
+class RejectReasonSerializer(serializers.ModelSerializer):
+    """Serializer for reject reasons with validation"""
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    severity_level_display = serializers.CharField(source='get_severity_level_display', read_only=True)
+    
+    class Meta:
+        model = RejectReason
+        fields = [
+            'id', 'reason', 'description', 'is_active', 'qap_code', 'severity_level',
+            'severity_level_display', 'category', 'category_name', 'order', 'created', 'modified'
+        ]
+        read_only_fields = ['created', 'modified']
+    
+    def validate_reason(self, value):
+        """Validate reason uniqueness within category"""
+        category = self.initial_data.get('category')
+        if category:
+            existing = RejectReason.objects.filter(
+                category_id=category, 
+                reason__iexact=value
+            ).exclude(pk=self.instance.pk if self.instance else None)
+            
+            if existing.exists():
+                raise serializers.ValidationError(
+                    "A reason with this name already exists in this category."
+                )
+        return value
+
+
+class RejectCategorySerializer(serializers.ModelSerializer):
+    """Serializer for reject categories with nested reasons"""
+    reasons = RejectReasonSerializer(many=True, read_only=True)
+    reasons_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = RejectCategory
+        fields = [
+            'id', 'name', 'description', 'is_active', 'order', 
+            'reasons', 'reasons_count', 'created', 'modified'
+        ]
+        read_only_fields = ['created', 'modified']
+    
+    def get_reasons_count(self, obj):
+        """Get count of active reasons in this category"""
+        return obj.reasons.filter(is_active=True).count()
+    
+    def validate_name(self, value):
+        """Validate category name uniqueness"""
+        existing = RejectCategory.objects.filter(
+            name__iexact=value
+        ).exclude(pk=self.instance.pk if self.instance else None)
+        
+        if existing.exists():
+            raise serializers.ValidationError(
+                "A category with this name already exists."
+            )
+        return value
+
+
+class RejectIncidentSerializer(serializers.ModelSerializer):
+    """Serializer for reject incidents with related field names"""
+    # Related field displays
+    examination_number = serializers.CharField(source='examination.no_xray', read_only=True)
+    examination_accession = serializers.CharField(source='examination.accession_number', read_only=True)
+    patient_name = serializers.CharField(source='examination.daftar.pesakit.nama', read_only=True)
+    patient_mrn = serializers.CharField(source='examination.daftar.pesakit.mrn', read_only=True)
+    modality_name = serializers.CharField(source='examination.exam.modaliti.nama', read_only=True)
+    exam_name = serializers.CharField(source='examination.exam.exam', read_only=True)
+    
+    # Reject reason details
+    reject_reason_name = serializers.CharField(source='reject_reason.reason', read_only=True)
+    reject_category_name = serializers.CharField(source='reject_reason.category.name', read_only=True)
+    reject_category_type = serializers.CharField(source='reject_reason.category.category_type', read_only=True)
+    severity_level = serializers.CharField(source='reject_reason.severity_level', read_only=True)
+    
+    # Staff details
+    technologist_name = serializers.SerializerMethodField()
+    reported_by_name = serializers.SerializerMethodField()
+    
+    # Analysis details
+    analysis_month_year = serializers.CharField(source='analysis.month_year_display', read_only=True)
+    
+    class Meta:
+        model = RejectIncident
+        fields = [
+            'id', 'examination', 'analysis', 'reject_reason', 'reject_date',
+            'retake_count', 'original_technique', 'corrected_technique',
+            'technologist', 'reported_by', 'patient_factors', 'equipment_factors',
+            'notes', 'immediate_action_taken', 'follow_up_required',
+            # Related field displays
+            'examination_number', 'examination_accession', 'patient_name', 'patient_mrn',
+            'modality_name', 'exam_name', 'reject_reason_name', 'reject_category_name',
+            'reject_category_type', 'severity_level', 'technologist_name', 'reported_by_name',
+            'analysis_month_year', 'created', 'modified'
+        ]
+        read_only_fields = ['created', 'modified']
+    
+    def get_technologist_name(self, obj):
+        if obj.technologist:
+            return f"{obj.technologist.first_name} {obj.technologist.last_name}".strip()
+        return None
+    
+    def get_reported_by_name(self, obj):
+        if obj.reported_by:
+            return f"{obj.reported_by.first_name} {obj.reported_by.last_name}".strip()
+        return None
+    
+    def validate(self, data):
+        """Validate incident data"""
+        # Ensure examination and analysis modalities match
+        examination = data.get('examination')
+        analysis = data.get('analysis')
+        
+        if examination and analysis:
+            if examination.exam.modaliti != analysis.modality:
+                raise serializers.ValidationError(
+                    "Examination modality must match the analysis modality."
+                )
+        
+        # Validate retake count
+        retake_count = data.get('retake_count', 1)
+        if retake_count < 1:
+            raise serializers.ValidationError("Retake count must be at least 1.")
+        
+        return data
+
+
+class RejectAnalysisSerializer(serializers.ModelSerializer):
+    """Serializer for reject analysis with calculated fields and incidents"""
+    modality_name = serializers.CharField(source='modality.nama', read_only=True)
+    modality_singkatan = serializers.CharField(source='modality.singkatan', read_only=True)
+    
+    # Calculated fields
+    status_indicator = serializers.CharField(read_only=True)
+    month_year_display = serializers.CharField(read_only=True)
+    
+    # Staff details
+    created_by_name = serializers.SerializerMethodField()
+    approved_by_name = serializers.SerializerMethodField()
+    
+    # Related incidents
+    incidents = RejectIncidentSerializer(many=True, read_only=True)
+    incidents_count = serializers.SerializerMethodField()
+    
+    # Choice fields for frontend
+    qap_target_rate_display = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = RejectAnalysis
+        fields = [
+            'id', 'analysis_date', 'modality', 'modality_name', 'modality_singkatan',
+            'total_examinations', 'total_images', 'total_retakes', 'reject_rate',
+            'drl_compliance', 'qap_target_rate', 'qap_target_rate_display',
+            'comments', 'corrective_actions', 'root_cause_analysis',
+            'created_by', 'created_by_name', 'approved_by', 'approved_by_name',
+            'approval_date', 'status_indicator', 'month_year_display',
+            'incidents', 'incidents_count', 'created', 'modified'
+        ]
+        read_only_fields = ['reject_rate', 'drl_compliance', 'created', 'modified']
+    
+    def get_created_by_name(self, obj):
+        if obj.created_by:
+            return f"{obj.created_by.first_name} {obj.created_by.last_name}".strip()
+        return None
+    
+    def get_approved_by_name(self, obj):
+        if obj.approved_by:
+            return f"{obj.approved_by.first_name} {obj.approved_by.last_name}".strip()
+        return None
+    
+    def get_incidents_count(self, obj):
+        return obj.incidents.count()
+    
+    def get_qap_target_rate_display(self, obj):
+        return f"{obj.qap_target_rate}%"
+    
+    def validate(self, data):
+        """Validate analysis data"""
+        total_images = data.get('total_images', 0)
+        total_retakes = data.get('total_retakes', 0)
+        total_examinations = data.get('total_examinations', 0)
+        
+        # Validate totals
+        if total_retakes > total_images:
+            raise serializers.ValidationError(
+                "Total retakes cannot exceed total images."
+            )
+        
+        if total_images < total_examinations:
+            raise serializers.ValidationError(
+                "Total images should be at least equal to total examinations."
+            )
+        
+        # Validate analysis date uniqueness for modality
+        analysis_date = data.get('analysis_date')
+        modality = data.get('modality')
+        
+        if analysis_date and modality:
+            existing = RejectAnalysis.objects.filter(
+                analysis_date=analysis_date,
+                modality=modality
+            ).exclude(pk=self.instance.pk if self.instance else None)
+            
+            if existing.exists():
+                raise serializers.ValidationError(
+                    "An analysis for this modality and month already exists."
+                )
+        
+        return data
+    
+    def create(self, validated_data):
+        """Create analysis with auto-calculation logic"""
+        # Set created_by from request user
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            validated_data['created_by'] = request.user
+        
+        return super().create(validated_data)
+
+
+class RejectAnalysisListSerializer(serializers.ModelSerializer):
+    """Simplified serializer for listing reject analyses"""
+    modality_name = serializers.CharField(source='modality.nama', read_only=True)
+    status_indicator = serializers.CharField(read_only=True)
+    month_year_display = serializers.CharField(read_only=True)
+    created_by_name = serializers.SerializerMethodField()
+    incidents_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = RejectAnalysis
+        fields = [
+            'id', 'analysis_date', 'modality', 'modality_name', 'reject_rate',
+            'qap_target_rate', 'drl_compliance', 'status_indicator',
+            'month_year_display', 'created_by_name', 'incidents_count',
+            'approval_date', 'created', 'modified'
+        ]
+    
+    def get_created_by_name(self, obj):
+        if obj.created_by:
+            return f"{obj.created_by.first_name} {obj.created_by.last_name}".strip()
+        return None
+    
+    def get_incidents_count(self, obj):
+        return obj.incidents.count()

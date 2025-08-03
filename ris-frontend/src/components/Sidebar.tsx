@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Users, Settings, BarChart, Home, Stethoscope, X, Bone, FileText, ClipboardList, ListChecks, UserCog, Archive, Upload, Disc3 } from "lucide-react";
+import { LayoutDashboard, Users, Settings, BarChart, Home, Stethoscope, X, Bone, FileText, ClipboardList, ListChecks, UserCog, Archive, Upload, Disc3, AlertTriangle, TrendingUp } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -129,6 +129,19 @@ export default function Sidebar({ className, isCollapsed }: SidebarProps) {
           
           {!isNormalUser && (
             <>
+              <li className="pt-4 pb-2">
+                <div className={cn("text-xs font-semibold text-gray-400 uppercase", isCollapsed && "text-center")}>
+                  {!isCollapsed ? "Quality Management" : "QM"}
+                </div>
+              </li>
+              
+              <li>
+                <Link href="/reject-analysis" className={getLinkClasses("/reject-analysis")}>
+                  <AlertTriangle className={getIconClasses("/reject-analysis")} />
+                  {!isCollapsed && "Reject Analysis"}
+                </Link>
+              </li>
+              
               <li className="pt-4 pb-2">
                 <div className={cn("text-xs font-semibold text-gray-400 uppercase", isCollapsed && "text-center")}>
                   {!isCollapsed ? "Configuration" : "Config"}

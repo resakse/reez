@@ -1,0 +1,470 @@
+[
+    {
+        "model": "exam.rejectreason",
+        "pk": 1,
+        "fields": {
+            "category": 1,
+            "reason": "Over Exposure / High Index",
+            "description": "Image appears too dark due to excessive radiation exposure. Often caused by incorrect kVp/mAs selection or automatic exposure control (AEC) malfunction. Requires immediate technique adjustment.",
+            "qap_code": "HF-EXP-01",
+            "severity_level": "MEDIUM",
+            "is_active": true,
+            "order": 1
+        }
+    },
+    {
+        "model": "exam.rejectreason",
+        "pk": 2,
+        "fields": {
+            "category": 1,
+            "reason": "Under Exposure / Low Index",
+            "description": "Image appears too light with insufficient contrast for diagnosis. Usually results from inadequate radiation exposure or incorrect technique factors.",
+            "qap_code": "HF-EXP-02",
+            "severity_level": "MEDIUM",
+            "is_active": true,
+            "order": 2
+        }
+    },
+    {
+        "model": "exam.rejectreason",
+        "pk": 3,
+        "fields": {
+            "category": 1,
+            "reason": "Anatomy Cutoff",
+            "description": "Essential anatomical structures are cut off from the field of view due to improper centering or inadequate collimation adjustment.",
+            "qap_code": "HF-POS-01",
+            "severity_level": "HIGH",
+            "is_active": true,
+            "order": 3
+        }
+    },
+    {
+        "model": "exam.rejectreason",
+        "pk": 4,
+        "fields": {
+            "category": 1,
+            "reason": "Patient Motion",
+            "description": "Image blur or ghosting artifacts caused by patient movement during exposure. May require immobilization devices or shorter exposure times.",
+            "qap_code": "HF-MOT-01",
+            "severity_level": "MEDIUM",
+            "is_active": true,
+            "order": 4
+        }
+    },
+    {
+        "model": "exam.rejectreason",
+        "pk": 5,
+        "fields": {
+            "category": 1,
+            "reason": "Incorrect Positioning",
+            "description": "Patient positioning does not follow standard radiographic protocols, resulting in suboptimal visualization of anatomical structures.",
+            "qap_code": "HF-POS-02",
+            "severity_level": "HIGH",
+            "is_active": true,
+            "order": 5
+        }
+    },
+    {
+        "model": "exam.rejectreason",
+        "pk": 6,
+        "fields": {
+            "category": 1,
+            "reason": "Collimation Error",
+            "description": "Inappropriate beam collimation resulting in either excessive radiation field or inadequate coverage of anatomy of interest.",
+            "qap_code": "HF-COL-01",
+            "severity_level": "MEDIUM",
+            "is_active": true,
+            "order": 6
+        }
+    },
+    {
+        "model": "exam.rejectreason",
+        "pk": 7,
+        "fields": {
+            "category": 3,
+            "reason": "Wrong Patient Identification",
+            "description": "Incorrect patient demographics or examination details recorded, potentially leading to misdiagnosis or treatment errors.",
+            "qap_code": "HF-ID-01",
+            "severity_level": "CRITICAL",
+            "is_active": true,
+            "order": 1
+        }
+    },
+    {
+        "model": "exam.rejectreason",
+        "pk": 8,
+        "fields": {
+            "category": 3,
+            "reason": "Missing Patient Markers",
+            "description": "Anatomical side markers (L/R) or other required patient identification markers are missing or incorrectly placed.",
+            "qap_code": "HF-ID-02",
+            "severity_level": "HIGH",
+            "is_active": true,
+            "order": 2
+        }
+    },
+    {
+        "model": "exam.rejectreason",
+        "pk": 9,
+        "fields": {
+            "category": 4,
+            "reason": "X-Ray Tube Malfunction",
+            "description": "X-ray tube failure, filament burnout, or anode damage resulting in inconsistent or no radiation output.",
+            "qap_code": "EQ-TUBE-01",
+            "severity_level": "CRITICAL",
+            "is_active": true,
+            "order": 1
+        }
+    },
+    {
+        "model": "exam.rejectreason",
+        "pk": 10,
+        "fields": {
+            "category": 4,
+            "reason": "Generator Malfunction",
+            "description": "High voltage generator failure or instability affecting radiation quality and quantity output.",
+            "qap_code": "EQ-GEN-01",
+            "severity_level": "CRITICAL",
+            "is_active": true,
+            "order": 2
+        }
+    },
+    {
+        "model": "exam.rejectreason",
+        "pk": 11,
+        "fields": {
+            "category": 4,
+            "reason": "Detector Malfunction",
+            "description": "Digital detector failure, dead pixels, or sensitivity issues affecting image acquisition and quality.",
+            "qap_code": "EQ-DET-01",
+            "severity_level": "HIGH",
+            "is_active": true,
+            "order": 3
+        }
+    },
+    {
+        "model": "exam.rejectreason",
+        "pk": 12,
+        "fields": {
+            "category": 4,
+            "reason": "Cassette / CR Plate Issue",
+            "description": "Computed radiography cassette or imaging plate damage, contamination, or malfunction affecting image quality.",
+            "qap_code": "EQ-CAS-01",
+            "severity_level": "MEDIUM",
+            "is_active": true,
+            "order": 4
+        }
+    },
+    {
+        "model": "exam.rejectreason",
+        "pk": 13,
+        "fields": {
+            "category": 5,
+            "reason": "kVp Calibration Error",
+            "description": "X-ray beam energy calibration outside acceptable limits affecting image contrast and penetration.",
+            "qap_code": "EQ-CAL-01",
+            "severity_level": "HIGH",
+            "is_active": true,
+            "order": 1
+        }
+    },
+    {
+        "model": "exam.rejectreason",
+        "pk": 14,
+        "fields": {
+            "category": 5,
+            "reason": "Timer Accuracy Issue",
+            "description": "Exposure timer calibration error resulting in incorrect exposure times and image density variations.",
+            "qap_code": "EQ-CAL-02",
+            "severity_level": "MEDIUM",
+            "is_active": true,
+            "order": 2
+        }
+    },
+    {
+        "model": "exam.rejectreason",
+        "pk": 15,
+        "fields": {
+            "category": 5,
+            "reason": "AEC Calibration Error",
+            "description": "Automatic Exposure Control system calibration drift leading to inconsistent exposure termination.",
+            "qap_code": "EQ-CAL-03",
+            "severity_level": "HIGH",
+            "is_active": true,
+            "order": 3
+        }
+    },
+    {
+        "model": "exam.rejectreason",
+        "pk": 16,
+        "fields": {
+            "category": 6,
+            "reason": "Grid Cutoff",
+            "description": "Anti-scatter grid misalignment causing characteristic grid line artifacts or image density variations.",
+            "qap_code": "EQ-GRID-01",
+            "severity_level": "MEDIUM",
+            "is_active": true,
+            "order": 1
+        }
+    },
+    {
+        "model": "exam.rejectreason",
+        "pk": 17,
+        "fields": {
+            "category": 6,
+            "reason": "Grid Artifact",
+            "description": "Visible grid lines or moiré patterns in the image due to grid-to-detector alignment issues.",
+            "qap_code": "EQ-GRID-02",
+            "severity_level": "LOW",
+            "is_active": true,
+            "order": 2
+        }
+    },
+    {
+        "model": "exam.rejectreason",
+        "pk": 18,
+        "fields": {
+            "category": 6,
+            "reason": "Light Field Misalignment",
+            "description": "Collimator light field does not accurately represent the radiation field boundaries.",
+            "qap_code": "EQ-COL-01",
+            "severity_level": "MEDIUM",
+            "is_active": true,
+            "order": 3
+        }
+    },
+    {
+        "model": "exam.rejectreason",
+        "pk": 19,
+        "fields": {
+            "category": 7,
+            "reason": "Image Processing Error",
+            "description": "Software malfunction during digital image processing resulting in artifacts or incorrect image enhancement.",
+            "qap_code": "PR-SOFT-01",
+            "severity_level": "MEDIUM",
+            "is_active": true,
+            "order": 1
+        }
+    },
+    {
+        "model": "exam.rejectreason",
+        "pk": 20,
+        "fields": {
+            "category": 7,
+            "reason": "Incorrect Algorithm Selection",
+            "description": "Wrong image processing algorithm applied for the examination type, affecting diagnostic quality.",
+            "qap_code": "PR-SOFT-02",
+            "severity_level": "LOW",
+            "is_active": true,
+            "order": 2
+        }
+    },
+    {
+        "model": "exam.rejectreason",
+        "pk": 21,
+        "fields": {
+            "category": 7,
+            "reason": "Software Crash",
+            "description": "Complete software system failure during image acquisition or processing requiring system restart.",
+            "qap_code": "PR-SOFT-03",
+            "severity_level": "HIGH",
+            "is_active": true,
+            "order": 3
+        }
+    },
+    {
+        "model": "exam.rejectreason",
+        "pk": 22,
+        "fields": {
+            "category": 8,
+            "reason": "PACS Network Failure",
+            "description": "Network connectivity issues preventing proper image transmission to Picture Archiving and Communication System.",
+            "qap_code": "PR-NET-01",
+            "severity_level": "HIGH",
+            "is_active": true,
+            "order": 1
+        }
+    },
+    {
+        "model": "exam.rejectreason",
+        "pk": 23,
+        "fields": {
+            "category": 8,
+            "reason": "DICOM Transfer Error",
+            "description": "Failure in DICOM standard image transfer protocol causing incomplete or corrupted image data.",
+            "qap_code": "PR-NET-02",
+            "severity_level": "MEDIUM",
+            "is_active": true,
+            "order": 2
+        }
+    },
+    {
+        "model": "exam.rejectreason",
+        "pk": 24,
+        "fields": {
+            "category": 8,
+            "reason": "Server Connectivity Issue",
+            "description": "Connection problems with imaging servers affecting image storage or retrieval capabilities.",
+            "qap_code": "PR-NET-03",
+            "severity_level": "MEDIUM",
+            "is_active": true,
+            "order": 3
+        }
+    },
+    {
+        "model": "exam.rejectreason",
+        "pk": 25,
+        "fields": {
+            "category": 9,
+            "reason": "Image Corruption",
+            "description": "Digital image file corruption during storage or transfer resulting in unreadable or distorted images.",
+            "qap_code": "PR-STOR-01",
+            "severity_level": "HIGH",
+            "is_active": true,
+            "order": 1
+        }
+    },
+    {
+        "model": "exam.rejectreason",
+        "pk": 26,
+        "fields": {
+            "category": 9,
+            "reason": "Storage Media Failure",
+            "description": "Physical storage device failure affecting image archival and retrieval systems.",
+            "qap_code": "PR-STOR-02",
+            "severity_level": "CRITICAL",
+            "is_active": true,
+            "order": 2
+        }
+    },
+    {
+        "model": "exam.rejectreason",
+        "pk": 27,
+        "fields": {
+            "category": 10,
+            "reason": "Patient Movement",
+            "description": "Involuntary patient movement due to medical condition, pain, or inability to maintain position during exposure.",
+            "qap_code": "OT-PAT-01",
+            "severity_level": "LOW",
+            "is_active": true,
+            "order": 1
+        }
+    },
+    {
+        "model": "exam.rejectreason",
+        "pk": 28,
+        "fields": {
+            "category": 10,
+            "reason": "Patient Cooperation Issues",
+            "description": "Patient unable or unwilling to follow positioning instructions due to cognitive or physical limitations.",
+            "qap_code": "OT-PAT-02",
+            "severity_level": "LOW",
+            "is_active": true,
+            "order": 2
+        }
+    },
+    {
+        "model": "exam.rejectreason",
+        "pk": 29,
+        "fields": {
+            "category": 10,
+            "reason": "Physical Limitations",
+            "description": "Patient's physical condition prevents standard positioning or examination completion (fractures, surgical hardware, etc.).",
+            "qap_code": "OT-PAT-03",
+            "severity_level": "LOW",
+            "is_active": true,
+            "order": 3
+        }
+    },
+    {
+        "model": "exam.rejectreason",
+        "pk": 30,
+        "fields": {
+            "category": 10,
+            "reason": "Respiratory Motion",
+            "description": "Patient unable to hold breath or maintain breathing pattern required for optimal image quality.",
+            "qap_code": "OT-PAT-04",
+            "severity_level": "LOW",
+            "is_active": true,
+            "order": 4
+        }
+    },
+    {
+        "model": "exam.rejectreason",
+        "pk": 31,
+        "fields": {
+            "category": 11,
+            "reason": "Power Supply Fluctuation",
+            "description": "Electrical power instability affecting equipment performance and image quality consistency.",
+            "qap_code": "OT-ENV-01",
+            "severity_level": "MEDIUM",
+            "is_active": true,
+            "order": 1
+        }
+    },
+    {
+        "model": "exam.rejectreason",
+        "pk": 32,
+        "fields": {
+            "category": 11,
+            "reason": "Temperature Variation",
+            "description": "Extreme temperature conditions affecting equipment operation and image quality parameters.",
+            "qap_code": "OT-ENV-02",
+            "severity_level": "LOW",
+            "is_active": true,
+            "order": 2
+        }
+    },
+    {
+        "model": "exam.rejectreason",
+        "pk": 33,
+        "fields": {
+            "category": 11,
+            "reason": "Humidity Issues",
+            "description": "High humidity levels causing equipment malfunction or image quality degradation.",
+            "qap_code": "OT-ENV-03",
+            "severity_level": "LOW",
+            "is_active": true,
+            "order": 3
+        }
+    },
+    {
+        "model": "exam.rejectreason",
+        "pk": 34,
+        "fields": {
+            "category": 12,
+            "reason": "Emergency Situation",
+            "description": "Medical emergency requiring immediate imaging with potentially compromised technique or positioning protocols.",
+            "qap_code": "OT-URG-01",
+            "severity_level": "LOW",
+            "is_active": true,
+            "order": 1
+        }
+    },
+    {
+        "model": "exam.rejectreason",
+        "pk": 35,
+        "fields": {
+            "category": 12,
+            "reason": "Time Constraints",
+            "description": "Critical time limitations preventing optimal examination technique due to patient condition or clinical urgency.",
+            "qap_code": "OT-URG-02",
+            "severity_level": "LOW",
+            "is_active": true,
+            "order": 2
+        }
+    },
+    {
+        "model": "exam.rejectreason",
+        "pk": 36,
+        "fields": {
+            "category": 12,
+            "reason": "Trauma Protocol",
+            "description": "Modified examination technique required for trauma patients where standard protocols cannot be safely applied.",
+            "qap_code": "OT-URG-03",
+            "severity_level": "LOW",
+            "is_active": true,
+            "order": 3
+        }
+    }
+]

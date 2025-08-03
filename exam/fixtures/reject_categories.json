@@ -1,0 +1,134 @@
+[
+    {
+        "model": "exam.rejectcategory",
+        "pk": 1,
+        "fields": {
+            "name": "Positioning Errors",
+            "category_type": "HUMAN_FAULTS",
+            "description": "Errors related to patient positioning, anatomical alignment, and radiographic technique that result in inadequate diagnostic images requiring retakes.",
+            "is_active": true,
+            "order": 1
+        }
+    },
+    {
+        "model": "exam.rejectcategory",
+        "pk": 2,
+        "fields": {
+            "name": "Exposure Errors",
+            "category_type": "HUMAN_FAULTS",
+            "description": "Incorrect exposure parameters leading to over-exposed or under-exposed images that do not meet diagnostic quality standards.",
+            "is_active": true,
+            "order": 2
+        }
+    },
+    {
+        "model": "exam.rejectcategory",
+        "pk": 3,
+        "fields": {
+            "name": "Patient Identification",
+            "category_type": "HUMAN_FAULTS",
+            "description": "Errors in patient identification, wrong patient studies, or missing/incorrect patient markers and demographics.",
+            "is_active": true,
+            "order": 3
+        }
+    },
+    {
+        "model": "exam.rejectcategory",
+        "pk": 4,
+        "fields": {
+            "name": "Equipment Malfunction",
+            "category_type": "EQUIPMENT",
+            "description": "Hardware failures, mechanical issues, or equipment malfunction that result in poor image quality or examination failures.",
+            "is_active": true,
+            "order": 1
+        }
+    },
+    {
+        "model": "exam.rejectcategory",
+        "pk": 5,
+        "fields": {
+            "name": "Calibration Issues",
+            "category_type": "EQUIPMENT",
+            "description": "Equipment calibration problems affecting image quality, dose accuracy, or measurement precision in radiographic examinations.",
+            "is_active": true,
+            "order": 2
+        }
+    },
+    {
+        "model": "exam.rejectcategory",
+        "pk": 6,
+        "fields": {
+            "name": "Grid And Collimation",
+            "category_type": "EQUIPMENT",
+            "description": "Problems with anti-scatter grids, collimation errors, or beam alignment issues affecting image quality and radiation protection.",
+            "is_active": true,
+            "order": 3
+        }
+    },
+    {
+        "model": "exam.rejectcategory",
+        "pk": 7,
+        "fields": {
+            "name": "Image Processing",
+            "category_type": "PROCESSING",
+            "description": "Digital image processing errors, software glitches, or incorrect image enhancement parameters affecting final image quality.",
+            "is_active": true,
+            "order": 1
+        }
+    },
+    {
+        "model": "exam.rejectcategory",
+        "pk": 8,
+        "fields": {
+            "name": "Network And Transfer",
+            "category_type": "PROCESSING",
+            "description": "Network connectivity issues, DICOM transfer failures, or data corruption during image transmission to PACS systems.",
+            "is_active": true,
+            "order": 2
+        }
+    },
+    {
+        "model": "exam.rejectcategory",
+        "pk": 9,
+        "fields": {
+            "name": "Storage Media",
+            "category_type": "PROCESSING",
+            "description": "Issues with image storage media, corrupted files, or problems with image archiving and retrieval systems.",
+            "is_active": true,
+            "order": 3
+        }
+    },
+    {
+        "model": "exam.rejectcategory",
+        "pk": 10,
+        "fields": {
+            "name": "Patient Factors",
+            "category_type": "OTHERS",
+            "description": "Patient-related factors beyond technical control including motion, cooperation issues, physical limitations, or medical conditions.",
+            "is_active": true,
+            "order": 1
+        }
+    },
+    {
+        "model": "exam.rejectcategory",
+        "pk": 11,
+        "fields": {
+            "name": "Environmental Factors",
+            "category_type": "OTHERS",
+            "description": "External environmental conditions affecting examination quality such as power fluctuations, temperature, humidity, or emergency situations.",
+            "is_active": true,
+            "order": 2
+        }
+    },
+    {
+        "model": "exam.rejectcategory",
+        "pk": 12,
+        "fields": {
+            "name": "Urgent Circumstances",
+            "category_type": "OTHERS",
+            "description": "Emergency or urgent clinical situations where standard protocols may be compromised due to patient condition or time constraints.",
+            "is_active": true,
+            "order": 3
+        }
+    }
+]

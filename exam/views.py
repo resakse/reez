@@ -16,7 +16,10 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 from django_htmx.http import trigger_client_event, push_url
 
-from exam.models import Pemeriksaan, Daftar, Exam, Modaliti, Part, Region, generate_exam_accession, MediaDistribution
+from exam.models import (
+    Pemeriksaan, Daftar, Exam, Modaliti, Part, Region, generate_exam_accession, 
+    MediaDistribution, RejectCategory, RejectReason, RejectAnalysis, RejectIncident
+)
 from pesakit.models import Pesakit
 from exam.models import PacsConfig, DashboardConfig
 from .filters import DaftarFilter
@@ -46,7 +49,9 @@ from .serializers import (
     GroupedExaminationSerializer, GroupedMWLWorklistSerializer,
     PositionChoicesSerializer, PacsConfigSerializer,
     MediaDistributionSerializer, MediaDistributionListSerializer,
-    MediaDistributionCollectionSerializer
+    MediaDistributionCollectionSerializer, RejectCategorySerializer,
+    RejectReasonSerializer, RejectAnalysisSerializer, RejectAnalysisListSerializer,
+    RejectIncidentSerializer
 )
 import os
 import tempfile
@@ -2649,3 +2654,674 @@ class MediaDistributionViewSet(viewsets.ModelViewSet):
             },
             'total_distributions': queryset.count()
         })
+
+
+# ===============================================
+# REJECT ANALYSIS VIEWSETS
+# ===============================================
+
+class RejectCategoryViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for reject categories with drag-and-drop ordering
+    """
+    queryset = RejectCategory.objects.all().prefetch_related('reasons').order_by('order', 'name')
+    serializer_class = RejectCategorySerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['is_active']
+    search_fields = ['name', 'description']
+    ordering_fields = ['name', 'order', 'created']
+    ordering = ['order', 'name']
+    pagination_class = CustomPagination
+    
+    def get_queryset(self):
+        """Filter by active status by default"""
+        queryset = super().get_queryset()
+        
+        # Filter by active status (default: active only)
+        show_inactive = self.request.query_params.get('show_inactive', 'false').lower() == 'true'
+        if not show_inactive:
+            queryset = queryset.filter(is_active=True)
+        
+        return queryset
+    
+    @action(detail=False, methods=['post'], url_path='reorder')
+    def reorder(self, request):
+        """
+        Reorder categories
+        Expects: {'category_orders': [{'id': 1, 'position': 1}, {'id': 2, 'position': 2}]}
+        """
+        category_orders = request.data.get('category_orders', [])
+        
+        if not category_orders:
+            return Response(
+                {'error': 'category_orders is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Update order for each category
+        for item in category_orders:
+            category_id = item.get('id')
+            position = item.get('position')
+            
+            if category_id and position:
+                try:
+                    category = RejectCategory.objects.get(id=category_id)
+                    category.order = position
+                    category.save()
+                except RejectCategory.DoesNotExist:
+                    continue
+        
+        return Response({'message': 'Categories reordered successfully'})
+    
+    @action(detail=True, methods=['get'])
+    def reasons(self, request, pk=None):
+        """Get all reasons for this category"""
+        category = self.get_object()
+        reasons = category.reasons.filter(is_active=True).order_by('order')
+        serializer = RejectReasonSerializer(reasons, many=True)
+        return Response(serializer.data)
+
+
+class RejectReasonViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for reject reasons with filtering by category
+    """
+    queryset = RejectReason.objects.all().select_related('category').order_by('category__order', 'order')
+    serializer_class = RejectReasonSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['category', 'is_active', 'severity_level']
+    search_fields = ['reason', 'description', 'qap_code']
+    ordering_fields = ['reason', 'category__name', 'severity_level', 'order', 'created']
+    ordering = ['category__order', 'order']
+    pagination_class = CustomPagination
+    
+    def get_queryset(self):
+        """Filter by active status and category for list views only"""
+        queryset = super().get_queryset()
+        
+        # For detail views (retrieve, update, delete), don't filter by active status
+        # so that inactive reasons can still be edited
+        if self.action not in ['retrieve', 'update', 'partial_update', 'destroy']:
+            # Filter by active status (default: active only) for list views
+            show_inactive = self.request.query_params.get('show_inactive', 'false').lower() == 'true'
+            if not show_inactive:
+                queryset = queryset.filter(is_active=True)
+        
+        # Filter by category
+        category_id = self.request.query_params.get('category_id')
+        if category_id:
+            queryset = queryset.filter(category_id=category_id)
+        
+        return queryset
+    
+    @action(detail=False, methods=['post'], url_path='reorder')
+    def reorder(self, request):
+        """
+        Reorder reasons within their category
+        Expects: {'category_id': 1, 'reason_orders': [{'id': 1, 'position': 1}, {'id': 2, 'position': 2}]}
+        """
+        category_id = request.data.get('category_id')
+        reason_orders = request.data.get('reason_orders', [])
+        
+        if not category_id or not reason_orders:
+            return Response(
+                {'error': 'category_id and reason_orders are required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Update order for each reason
+        for item in reason_orders:
+            reason_id = item.get('id')
+            position = item.get('position')
+            
+            if reason_id and position:
+                try:
+                    reason = RejectReason.objects.get(id=reason_id, category_id=category_id)
+                    reason.order = position
+                    reason.save()
+                except RejectReason.DoesNotExist:
+                    continue
+        
+        return Response({'message': 'Reasons reordered successfully'})
+
+
+class RejectAnalysisViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for reject analysis with auto-calculation logic
+    """
+    queryset = RejectAnalysis.objects.all().select_related('modality', 'created_by', 'approved_by').prefetch_related('incidents__reject_reason__category', 'incidents__examination__daftar__pesakit').order_by('-analysis_date', 'modality__nama')
+    serializer_class = RejectAnalysisSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['modality', 'drl_compliance', 'created_by', 'approved_by']
+    search_fields = ['modality__nama', 'comments', 'corrective_actions']
+    ordering_fields = ['analysis_date', 'modality__nama', 'reject_rate', 'total_examinations', 'created']
+    ordering = ['-analysis_date', 'modality__nama']
+    pagination_class = CustomPagination
+    
+    def get_serializer_class(self):
+        """Return appropriate serializer based on action"""
+        if self.action == 'list':
+            return RejectAnalysisListSerializer
+        return RejectAnalysisSerializer
+    
+    def get_queryset(self):
+        """Apply additional filtering"""
+        queryset = super().get_queryset()
+        
+        # Filter by date range
+        from_date = self.request.query_params.get('from_date')
+        to_date = self.request.query_params.get('to_date')
+        if from_date:
+            queryset = queryset.filter(analysis_date__gte=from_date)
+        if to_date:
+            queryset = queryset.filter(analysis_date__lte=to_date)
+        
+        # Filter by year/month
+        year = self.request.query_params.get('year')
+        month = self.request.query_params.get('month')
+        if year:
+            queryset = queryset.filter(analysis_date__year=year)
+        if month:
+            queryset = queryset.filter(analysis_date__month=month)
+        
+        # Filter by compliance status
+        compliance_filter = self.request.query_params.get('drl_compliance')
+        if compliance_filter is not None:
+            queryset = queryset.filter(drl_compliance=(compliance_filter.lower() == 'true'))
+        
+        # Filter by approval status
+        approval_status = self.request.query_params.get('approval_status')
+        if approval_status == 'approved':
+            queryset = queryset.filter(approved_by__isnull=False)
+        elif approval_status == 'pending':
+            queryset = queryset.filter(approved_by__isnull=True)
+        
+        return queryset
+    
+    @action(detail=True, methods=['post'], url_path='approve')
+    def approve(self, request, pk=None):
+        """Approve analysis (for senior staff)"""
+        analysis = self.get_object()
+        
+        if analysis.approved_by:
+            return Response(
+                {'error': 'Analysis is already approved'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        analysis.approved_by = request.user
+        analysis.approval_date = timezone.now()
+        analysis.save()
+        
+        serializer = self.get_serializer(analysis)
+        return Response({
+            'message': 'Analysis approved successfully',
+            'analysis': serializer.data
+        })
+    
+    @action(detail=True, methods=['post'], url_path='calculate-from-pacs')
+    def calculate_from_pacs(self, request, pk=None):
+        """Auto-calculate analysis from PACS data"""
+        analysis = self.get_object()
+        
+        try:
+            from .utils import calculate_reject_analysis_from_pacs
+            
+            result = calculate_reject_analysis_from_pacs(
+                analysis.analysis_date, 
+                analysis.modality, 
+                auto_save=False
+            )
+            
+            if 'error' in result:
+                return Response(
+                    {'error': result['error']}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Update analysis with PACS data
+            analysis.total_examinations = result['total_examinations']
+            analysis.total_images = result['total_images']
+            analysis.total_retakes = result['total_retakes']
+            analysis.comments = f"{analysis.comments}\n\nPACS Auto-calculation: {result['calculation_method']}"
+            analysis.save()
+            
+            serializer = self.get_serializer(analysis)
+            return Response({
+                'message': 'Analysis updated from PACS data',
+                'analysis': serializer.data,
+                'pacs_data': result
+            })
+            
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to calculate from PACS: {str(e)}'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['post'], url_path='create-from-pacs')
+    def create_from_pacs(self, request):
+        """Create new analysis from PACS data"""
+        analysis_date = request.data.get('analysis_date')
+        modality_id = request.data.get('modality_id')
+        
+        if not analysis_date or not modality_id:
+            return Response(
+                {'error': 'analysis_date and modality_id are required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            from datetime import datetime
+            from .utils import calculate_reject_analysis_from_pacs
+            
+            # Parse date
+            if isinstance(analysis_date, str):
+                analysis_date = datetime.strptime(analysis_date, '%Y-%m-%d').date()
+            
+            # Get modality
+            modality = Modaliti.objects.get(id=modality_id)
+            
+            # Check if analysis already exists
+            if RejectAnalysis.objects.filter(analysis_date=analysis_date, modality=modality).exists():
+                return Response(
+                    {'error': 'Analysis for this modality and month already exists'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Calculate from PACS
+            result = calculate_reject_analysis_from_pacs(
+                analysis_date, 
+                modality, 
+                auto_save=True
+            )
+            
+            if 'error' in result:
+                return Response(
+                    {'error': result['error']}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            analysis = result['analysis_object']
+            serializer = self.get_serializer(analysis)
+            
+            return Response({
+                'message': 'Analysis created from PACS data',
+                'analysis': serializer.data,
+                'created': result['created'],
+                'pacs_data': result
+            }, status=status.HTTP_201_CREATED)
+            
+        except Modaliti.DoesNotExist:
+            return Response(
+                {'error': 'Modality not found'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to create analysis: {str(e)}'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class RejectIncidentViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for reject incidents with search capabilities
+    """
+    queryset = RejectIncident.objects.all().select_related(
+        'examination', 'examination__daftar__pesakit', 'examination__exam__modaliti',
+        'analysis', 'reject_reason', 'reject_reason__category',
+        'technologist', 'reported_by'
+    ).order_by('-reject_date')
+    serializer_class = RejectIncidentSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = [
+        'analysis', 'reject_reason', 'reject_reason__category', 
+        'reject_reason__severity_level', 'technologist', 'reported_by',
+        'follow_up_required'
+    ]
+    search_fields = [
+        'examination__no_xray', 'examination__daftar__pesakit__nama',
+        'examination__daftar__pesakit__mrn', 'reject_reason__reason',
+        'notes', 'immediate_action_taken'
+    ]
+    ordering_fields = [
+        'reject_date', 'examination__no_xray', 'reject_reason__reason',
+        'retake_count', 'examination__daftar__pesakit__nama', 'created'
+    ]
+    ordering = ['-reject_date']
+    pagination_class = CustomPagination
+    
+    def get_queryset(self):
+        """Apply additional filtering"""
+        queryset = super().get_queryset()
+        
+        # Filter by date range
+        from_date = self.request.query_params.get('from_date')
+        to_date = self.request.query_params.get('to_date')
+        if from_date:
+            queryset = queryset.filter(reject_date__date__gte=from_date)
+        if to_date:
+            queryset = queryset.filter(reject_date__date__lte=to_date)
+        
+        # Filter by modality
+        modality_id = self.request.query_params.get('modality_id')
+        if modality_id:
+            queryset = queryset.filter(examination__exam__modaliti_id=modality_id)
+        
+        # Filter by examination
+        examination_id = self.request.query_params.get('examination_id')
+        if examination_id:
+            queryset = queryset.filter(examination_id=examination_id)
+        
+        # Filter by patient
+        patient_id = self.request.query_params.get('patient_id')
+        if patient_id:
+            queryset = queryset.filter(examination__daftar__pesakit_id=patient_id)
+        
+        # Filter by category type
+        category_type = self.request.query_params.get('category_type')
+        if category_type:
+            queryset = queryset.filter(reject_reason__category__category_type=category_type)
+        
+        return queryset
+    
+    @action(detail=False, methods=['get'], url_path='by-examination/(?P<examination_id>[^/.]+)')
+    def by_examination(self, request, examination_id=None):
+        """Get all incidents for a specific examination"""
+        incidents = self.get_queryset().filter(examination_id=examination_id)
+        serializer = self.get_serializer(incidents, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'], url_path='summary')
+    def summary(self, request):
+        """Get reject incident summary statistics"""
+        queryset = self.get_queryset()
+        
+        # Category breakdown
+        from django.db.models import Count
+        
+        category_stats = queryset.values(
+            'reject_reason__category__category_type',
+            'reject_reason__category__name'
+        ).annotate(
+            count=Count('id')
+        ).order_by('reject_reason__category__category_type', '-count')
+        
+        # Severity level breakdown
+        severity_stats = queryset.values(
+            'reject_reason__severity_level'
+        ).annotate(
+            count=Count('id')
+        ).order_by('-count')
+        
+        # Top reasons
+        reason_stats = queryset.values(
+            'reject_reason__id',
+            'reject_reason__reason',
+            'reject_reason__category__name'
+        ).annotate(
+            count=Count('id')
+        ).order_by('-count')[:10]
+        
+        # Monthly trends (last 12 months)
+        from datetime import datetime, timedelta
+        from django.db.models import Q
+        
+        twelve_months_ago = timezone.now() - timedelta(days=365)
+        monthly_data = []
+        
+        for i in range(12):
+            month_start = twelve_months_ago + timedelta(days=i*30)
+            month_end = month_start + timedelta(days=30)
+            
+            monthly_count = queryset.filter(
+                reject_date__range=[month_start, month_end]
+            ).count()
+            
+            monthly_data.append({
+                'month': month_start.strftime('%Y-%m'),
+                'incidents': monthly_count
+            })
+        
+        return Response({
+            'total_incidents': queryset.count(),
+            'category_breakdown': list(category_stats),
+            'severity_breakdown': list(severity_stats),
+            'top_reasons': list(reason_stats),
+            'monthly_trends': monthly_data,
+            'follow_up_required': queryset.filter(follow_up_required=True).count()
+        })
+
+
+class RejectAnalysisStatisticsView(APIView):
+    """
+    API endpoint for reject analysis statistics and trends
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        """Get comprehensive reject analysis statistics"""
+        from django.db.models import Avg, Max, Min, Count
+        from datetime import datetime, timedelta
+        import calendar
+        
+        # Get query parameters
+        year = request.query_params.get('year', timezone.now().year)
+        modality_id = request.query_params.get('modality_id')
+        
+        try:
+            year = int(year)
+        except (ValueError, TypeError):
+            year = timezone.now().year
+        
+        # Base queryset
+        analyses = RejectAnalysis.objects.filter(analysis_date__year=year)
+        
+        if modality_id:
+            analyses = analyses.filter(modality_id=modality_id)
+        
+        # Annual summary
+        annual_stats = analyses.aggregate(
+            avg_reject_rate=Avg('reject_rate'),
+            max_reject_rate=Max('reject_rate'),
+            min_reject_rate=Min('reject_rate'),
+            total_examinations=models.Sum('total_examinations'),
+            total_images=models.Sum('total_images'),
+            total_retakes=models.Sum('total_retakes'),
+            analyses_count=Count('id')
+        )
+        
+        # Monthly breakdown
+        monthly_data = []
+        for month in range(1, 13):
+            month_analyses = analyses.filter(analysis_date__month=month)
+            month_stats = month_analyses.aggregate(
+                avg_reject_rate=Avg('reject_rate'),
+                total_examinations=models.Sum('total_examinations'),
+                total_images=models.Sum('total_images'),
+                total_retakes=models.Sum('total_retakes'),
+                analyses_count=Count('id')
+            )
+            
+            monthly_data.append({
+                'month': month,
+                'month_name': calendar.month_name[month],
+                'avg_reject_rate': round(month_stats['avg_reject_rate'] or 0, 2),
+                'total_examinations': month_stats['total_examinations'] or 0,
+                'total_images': month_stats['total_images'] or 0,
+                'total_retakes': month_stats['total_retakes'] or 0,
+                'analyses_count': month_stats['analyses_count']
+            })
+        
+        # Modality breakdown
+        modality_stats = RejectAnalysis.objects.filter(
+            analysis_date__year=year
+        ).values(
+            'modality__id',
+            'modality__nama',
+            'modality__singkatan'
+        ).annotate(
+            avg_reject_rate=Avg('reject_rate'),
+            total_examinations=models.Sum('total_examinations'),
+            total_images=models.Sum('total_images'),
+            total_retakes=models.Sum('total_retakes'),
+            analyses_count=Count('id'),
+            compliance_rate=Avg(
+                models.Case(
+                    models.When(drl_compliance=True, then=1),
+                    default=0,
+                    output_field=models.FloatField()
+                )
+            ) * 100
+        ).order_by('-avg_reject_rate')
+        
+        # Trend analysis (compare with previous year)
+        previous_year = year - 1
+        previous_year_stats = RejectAnalysis.objects.filter(
+            analysis_date__year=previous_year
+        ).aggregate(
+            avg_reject_rate=Avg('reject_rate'),
+            total_examinations=models.Sum('total_examinations'),
+            total_retakes=models.Sum('total_retakes')
+        )
+        
+        # Calculate trends
+        trends = {}
+        if previous_year_stats['avg_reject_rate']:
+            current_avg = annual_stats['avg_reject_rate'] or 0
+            previous_avg = previous_year_stats['avg_reject_rate']
+            trends['reject_rate_change'] = round(
+                ((current_avg - previous_avg) / previous_avg) * 100, 2
+            )
+        else:
+            trends['reject_rate_change'] = None
+        
+        # DRL compliance summary
+        compliance_stats = analyses.aggregate(
+            total_analyses=Count('id'),
+            compliant_analyses=Count('id', filter=models.Q(drl_compliance=True)),
+            non_compliant_analyses=Count('id', filter=models.Q(drl_compliance=False))
+        )
+        
+        compliance_rate = 0
+        if compliance_stats['total_analyses'] > 0:
+            compliance_rate = (
+                compliance_stats['compliant_analyses'] / 
+                compliance_stats['total_analyses']
+            ) * 100
+        
+        # Top reject reasons (from incidents)
+        incidents = RejectIncident.objects.filter(
+            analysis__analysis_date__year=year
+        )
+        
+        if modality_id:
+            incidents = incidents.filter(analysis__modality_id=modality_id)
+        
+        top_reasons = incidents.values(
+            'reject_reason__id',
+            'reject_reason__reason',
+            'reject_reason__category__name',
+            'reject_reason__severity_level'
+        ).annotate(
+            incident_count=Count('id')
+        ).order_by('-incident_count')[:10]
+        
+        return Response({
+            'year': year,
+            'annual_summary': {
+                'avg_reject_rate': round(annual_stats['avg_reject_rate'] or 0, 2),
+                'max_reject_rate': round(annual_stats['max_reject_rate'] or 0, 2),
+                'min_reject_rate': round(annual_stats['min_reject_rate'] or 0, 2),
+                'total_examinations': annual_stats['total_examinations'] or 0,
+                'total_images': annual_stats['total_images'] or 0,
+                'total_retakes': annual_stats['total_retakes'] or 0,
+                'analyses_count': annual_stats['analyses_count'],
+                'overall_reject_rate': round(
+                    (annual_stats['total_retakes'] / annual_stats['total_images'] * 100) 
+                    if annual_stats['total_images'] else 0, 2
+                )
+            },
+            'monthly_breakdown': monthly_data,
+            'modality_breakdown': list(modality_stats),
+            'trends': trends,
+            'drl_compliance': {
+                'compliance_rate': round(compliance_rate, 2),
+                'total_analyses': compliance_stats['total_analyses'],
+                'compliant_analyses': compliance_stats['compliant_analyses'],
+                'non_compliant_analyses': compliance_stats['non_compliant_analyses']
+            },
+            'top_reject_reasons': list(top_reasons)
+        })
+
+
+class RejectAnalysisTrendsView(APIView):
+    """
+    API endpoint for reject analysis trends data specifically for charts
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        """Get reject analysis trends data for chart visualization"""
+        from django.db.models import Avg, Count
+        from datetime import datetime
+        import calendar
+        
+        # Get query parameters
+        year = request.query_params.get('year', timezone.now().year)
+        modality_id = request.query_params.get('modality')
+        months = request.query_params.get('months', 12)  # Default to 12 months
+        
+        try:
+            year = int(year)
+            months = int(months)
+        except (ValueError, TypeError):
+            year = timezone.now().year
+            months = 12
+        
+        # Base queryset
+        analyses = RejectAnalysis.objects.filter(analysis_date__year=year)
+        
+        if modality_id:
+            analyses = analyses.filter(modality_id=modality_id)
+        
+        # Monthly trend data
+        trend_data = []
+        for month in range(1, min(months + 1, 13)):
+            month_analyses = analyses.filter(analysis_date__month=month)
+            month_stats = month_analyses.aggregate(
+                avg_reject_rate=Avg('reject_rate'),
+                total_examinations=models.Sum('total_examinations'),
+                total_images=models.Sum('total_images'),
+                total_retakes=models.Sum('total_retakes'),
+                analyses_count=Count('id')
+            )
+            
+            # Calculate actual reject rate from totals if available
+            actual_reject_rate = 0
+            if month_stats['total_images'] and month_stats['total_retakes']:
+                actual_reject_rate = (month_stats['total_retakes'] / month_stats['total_images']) * 100
+            elif month_stats['avg_reject_rate']:
+                actual_reject_rate = month_stats['avg_reject_rate']
+            
+            # Calculate target rate and compliance (assuming 2% target rate)
+            target_rate = 2.0  # Standard 2% reject rate target
+            meets_target = actual_reject_rate <= target_rate
+            
+            trend_data.append({
+                'month': calendar.month_name[month],
+                'year': year,
+                'month_num': month,
+                'total_examinations': month_stats['total_examinations'] or 0,
+                'total_rejects': month_stats['total_retakes'] or 0,
+                'reject_rate': round(actual_reject_rate, 2),
+                'target_rate': target_rate,
+                'meets_target': meets_target
+            })
+        
+        return Response(trend_data)
