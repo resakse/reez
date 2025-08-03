@@ -25,7 +25,7 @@ export function usePacsConfig() {
       setError(null);
       
       const serversList = await rejectAnalysisApi.pacs.getPacsServers();
-      setServers(serversList);
+      setServers(Array.isArray(serversList) ? serversList : []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch PACS servers');
       setServers([]);

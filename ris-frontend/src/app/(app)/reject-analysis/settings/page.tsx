@@ -3,29 +3,39 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, AlertTriangle, Server, Plus } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { ArrowLeft, AlertTriangle, Server, CheckCircle, XCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePacsConfig } from '@/hooks/usePacsConfig';
-import PacsConfigManager from '@/components/reject-analysis/PacsConfigManager';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useState } from 'react';
+import { toast } from '@/lib/toast';
 
 export default function RejectAnalysisSettingsPage() {
   const { user } = useAuth();
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [savingServerId, setSavingServerId] = useState<number | null>(null);
   
   const {
-    pacsServers,
+    servers: pacsServers,
     loading,
     error,
-    createPacsServer,
-    updatePacsServer,
-    deletePacsServer,
+    updateServer: updatePacsServer,
     testConnection,
   } = usePacsConfig();
 
   const isSuperuser = user?.is_superuser || false;
+
+  // Handle updating reject analysis configuration for a PACS server
+  const updateRejectAnalysisConfig = async (serverId: number, includeInAnalysis: boolean) => {
+    try {
+      setSavingServerId(serverId);
+      await updatePacsServer(serverId, { include_in_reject_analysis: includeInAnalysis });
+    } catch (error) {
+      console.error('Failed to update reject analysis config:', error);
+    } finally {
+      setSavingServerId(null);
+    }
+  };
 
   // Redirect if not superuser
   if (!isSuperuser) {
@@ -77,44 +87,16 @@ export default function RejectAnalysisSettingsPage() {
         </div>
       </div>
 
-      {/* PACS Configuration */}
+      {/* PACS Reject Analysis Configuration */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Server className="h-5 w-5" />
-                PACS Server Configuration
-              </CardTitle>
-              <CardDescription>
-                Configure PACS servers for reject analysis data integration
-              </CardDescription>
-            </div>
-            
-            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add PACS Server
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Add New PACS Server</DialogTitle>
-                  <DialogDescription>
-                    Configure a new PACS server for reject analysis integration
-                  </DialogDescription>
-                </DialogHeader>
-                <PacsConfigManager
-                  onSubmit={async (data) => {
-                    await createPacsServer(data);
-                    setIsCreateDialogOpen(false);
-                  }}
-                  onCancel={() => setIsCreateDialogOpen(false)}
-                />
-              </DialogContent>
-            </Dialog>
-          </div>
+          <CardTitle className="flex items-center gap-2">
+            <Server className="h-5 w-5" />
+            PACS Reject Analysis Configuration
+          </CardTitle>
+          <CardDescription>
+            Configure which PACS servers to include in reject analysis data collection
+          </CardDescription>
         </CardHeader>
         
         <CardContent>
@@ -122,89 +104,100 @@ export default function RejectAnalysisSettingsPage() {
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
             </div>
-          ) : pacsServers.length === 0 ? (
+          ) : error ? (
+            <div className="text-center py-8">
+              <AlertTriangle className="h-8 w-8 text-red-500 mx-auto mb-2" />
+              <p className="text-red-600 mb-4">{error}</p>
+              <Button variant="outline" onClick={() => window.location.reload()}>
+                Try Again
+              </Button>
+            </div>
+          ) : !pacsServers || pacsServers.length === 0 ? (
             <div className="text-center py-8">
               <Server className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-medium mb-2">No PACS servers configured</h3>
               <p className="text-muted-foreground mb-4">
-                Add your first PACS server to enable reject analysis data integration
+                PACS servers need to be configured before enabling reject analysis integration.
               </p>
-              <Button onClick={() => setIsCreateDialogOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add First PACS Server
-              </Button>
+              <p className="text-sm text-muted-foreground">
+                Contact your system administrator to configure PACS servers.
+              </p>
             </div>
           ) : (
             <div className="space-y-4">
               {pacsServers.map((server) => (
                 <div key={server.id} className="border rounded-lg p-4">
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <h3 className="font-medium text-lg">{server.name}</h3>
-                      <p className="text-muted-foreground text-sm">{server.description}</p>
-                      <div className="flex items-center gap-4 mt-2 text-sm">
-                        <span>Host: <code className="bg-muted px-1 rounded">{server.host}:{server.port}</code></span>
-                        <span>AET: <code className="bg-muted px-1 rounded">{server.ae_title}</code></span>
-                        {server.is_default && (
-                          <Badge variant="default">Default</Badge>
-                        )}
-                        <Badge variant={server.is_active ? 'default' : 'secondary'}>
-                          {server.is_active ? 'Active' : 'Inactive'}
-                        </Badge>
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h3 className="font-medium text-lg">{server.name}</h3>
+                        <div className="flex gap-2">
+                          {server.is_primary && (
+                            <Badge variant="default" className="text-xs">
+                              Primary
+                            </Badge>
+                          )}
+                          <Badge 
+                            variant={server.is_active ? "default" : "secondary"} 
+                            className={`text-xs ${server.is_active ? 'bg-green-500 text-white' : 'bg-yellow-500 text-black'}`}
+                          >
+                            {server.is_active ? 'Active' : 'Inactive'}
+                          </Badge>
+                        </div>
+                      </div>
+                      
+                      <div className="text-sm text-muted-foreground mb-2">
+                        <div>Orthanc: <code className="bg-muted px-1 rounded">{server.orthancurl}</code></div>
+                        <div>Viewer: <code className="bg-muted px-1 rounded">{server.viewrurl}</code></div>
+                        {server.comments && <div>Notes: {server.comments}</div>}
                       </div>
                     </div>
                     
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => testConnection(server.id)}
-                      >
-                        Test Connection
-                      </Button>
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">Include in Reject Analysis:</span>
+                        <Switch
+                          checked={server.include_in_reject_analysis}
+                          onCheckedChange={(checked) => updateRejectAnalysisConfig(server.id, checked)}
+                          disabled={savingServerId === server.id || !server.is_active}
+                        />
+                        {server.include_in_reject_analysis ? (
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                        ) : (
+                          <XCircle className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </div>
                       
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button variant="outline" size="sm">
-                            Edit
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-2xl">
-                          <DialogHeader>
-                            <DialogTitle>Edit PACS Server</DialogTitle>
-                            <DialogDescription>
-                              Update PACS server configuration
-                            </DialogDescription>
-                          </DialogHeader>
-                          <PacsConfigManager
-                            pacsServer={server}
-                            onSubmit={async (data) => {
-                              await updatePacsServer(server.id, data);
-                            }}
-                          />
-                        </DialogContent>
-                      </Dialog>
-                      
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={async () => {
-                          if (confirm(`Are you sure you want to delete "${server.name}"? This action cannot be undone.`)) {
-                            await deletePacsServer(server.id);
-                          }
-                        }}
-                      >
-                        Delete
-                      </Button>
+                      {savingServerId === server.id && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                          Saving...
+                        </div>
+                      )}
                     </div>
                   </div>
                   
-                  <div className="text-xs text-muted-foreground border-t pt-2">
-                    <div>Created: {new Date(server.created_at).toLocaleString()}</div>
-                    <div>Last modified: {new Date(server.updated_at).toLocaleString()}</div>
-                  </div>
+                  {!server.is_active && (
+                    <div className="mt-3 p-2 bg-yellow-500/10 border border-yellow-500/20 rounded text-sm text-yellow-800 dark:text-yellow-200">
+                      This server is inactive and cannot be included in reject analysis.
+                    </div>
+                  )}
                 </div>
               ))}
+              
+              {pacsServers.some(server => server.include_in_reject_analysis) && (
+                <div className="mt-4 p-3 bg-green-500/10 border border-green-500/20 rounded">
+                  <div className="flex items-center gap-2 text-sm text-green-800 dark:text-green-200">
+                    <CheckCircle className="h-4 w-4" />
+                    <span className="font-medium">
+                      {pacsServers.filter(server => server.include_in_reject_analysis).length} PACS server(s) enabled for reject analysis
+                    </span>
+                  </div>
+                  <p className="text-xs text-green-700 dark:text-green-300 mt-1">
+                    Reject analysis data will be collected from enabled servers during system integration.
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </CardContent>

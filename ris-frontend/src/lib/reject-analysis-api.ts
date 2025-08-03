@@ -756,7 +756,9 @@ export const pacsConfigApi = {
         throw new Error(`Failed to fetch PACS servers: ${response.statusText}`);
       }
       
-      return await response.json();
+      const data = await response.json();
+      // Handle paginated response - return results array or the data itself if not paginated
+      return data.results || data;
     } catch (error) {
       console.error('Error fetching PACS servers:', error);
       toast.error('Failed to load PACS servers');

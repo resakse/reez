@@ -96,6 +96,51 @@ class PacsServerViewSet(viewsets.ModelViewSet):
         
         return Response({'message': 'Server restored successfully'})
     
+    @action(detail=True, methods=['post'], url_path='test-connection')
+    def test_connection(self, request, pk=None):
+        """Test connection to a PACS server"""
+        pacs_server = self.get_object()
+        
+        try:
+            import requests
+            from urllib.parse import urljoin
+            
+            # Test basic connectivity to Orthanc
+            orthanc_url = pacs_server.orthancurl.rstrip('/')
+            test_url = urljoin(orthanc_url, '/system')
+            
+            response = requests.get(test_url, timeout=10)
+            
+            if response.status_code == 200:
+                system_info = response.json()
+                message = f"Connection successful! Orthanc version: {system_info.get('Version', 'Unknown')}"
+                return Response({
+                    'success': True,
+                    'message': message,
+                    'system_info': system_info
+                })
+            else:
+                return Response({
+                    'success': False,
+                    'message': f"HTTP {response.status_code}: {response.reason}"
+                })
+                
+        except requests.exceptions.ConnectionError:
+            return Response({
+                'success': False,
+                'message': 'Connection failed: Unable to connect to server'
+            })
+        except requests.exceptions.Timeout:
+            return Response({
+                'success': False,
+                'message': 'Connection failed: Request timed out'
+            })
+        except Exception as e:
+            return Response({
+                'success': False,
+                'message': f'Connection failed: {str(e)}'
+            })
+    
     @action(detail=False, methods=['get'])
     def active(self, request):
         """Get all active PACS servers"""
