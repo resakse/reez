@@ -18,6 +18,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Badge } from '@/components/ui/badge';
 import { Search, Filter, Calendar, User, Building2, Stethoscope, Eye, Edit, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import AuthService from '@/lib/auth';
 import Link from 'next/link';
 import flatpickr from 'flatpickr';
@@ -451,7 +457,8 @@ export default function ExaminationsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <TooltipProvider>
+      <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -691,9 +698,18 @@ export default function ExaminationsPage() {
                       <TableCell className="font-medium">
                         <Badge variant="outline">{exam.no_xray}</Badge>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="max-w-[200px]">
                         <div>
-                          <div className="font-medium">{exam.daftar_info.pesakit.nama}</div>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="font-medium truncate cursor-help">
+                                {exam.daftar_info.pesakit.nama}
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>{exam.daftar_info.pesakit.nama}</p>
+                            </TooltipContent>
+                          </Tooltip>
                           <div className="text-sm text-gray-500">{exam.daftar_info.pesakit.nric}</div>
                         </div>
                       </TableCell>
@@ -879,6 +895,7 @@ export default function ExaminationsPage() {
           )}
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </TooltipProvider>
   );
 }
