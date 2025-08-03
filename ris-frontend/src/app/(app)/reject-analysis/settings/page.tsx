@@ -13,6 +13,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { usePacsConfig } from '@/hooks/usePacsConfig';
 import { useState, useEffect } from 'react';
 import { toast } from '@/lib/toast';
+import { rejectAnalysisApi } from '@/lib/reject-analysis-api';
 
 // Default target reject rates
 const DEFAULT_TARGETS = {
@@ -41,17 +42,27 @@ export default function RejectAnalysisSettingsPage() {
 
   const isSuperuser = user?.is_superuser || false;
 
-  // Load custom targets from localStorage on component mount
+  // Load custom targets from backend API on component mount
   useEffect(() => {
-    const savedTargets = localStorage.getItem('rejectAnalysisTargets');
-    if (savedTargets) {
-      try {
-        setCustomTargets(JSON.parse(savedTargets));
-      } catch (error) {
-        console.error('Failed to parse saved targets:', error);
-      }
-    }
+    loadTargetSettings();
   }, []);
+
+  const loadTargetSettings = async () => {
+    try {
+      const settings = await rejectAnalysisApi.targets.getTargetSettings();
+      setCustomTargets({
+        xray: Number(settings.xray_target),
+        ct: Number(settings.ct_target),
+        mri: Number(settings.mri_target),
+        ultrasound: Number(settings.ultrasound_target),
+        mammography: Number(settings.mammography_target),
+        overall: Number(settings.overall_target)
+      });
+    } catch (error) {
+      console.error('Failed to load target settings:', error);
+      // Keep default values on error
+    }
+  };
 
   // Handle updating reject analysis configuration for a PACS server
   const updateRejectAnalysisConfig = async (serverId: number, includeInAnalysis: boolean) => {
@@ -76,29 +87,50 @@ export default function RejectAnalysisSettingsPage() {
     }
   };
 
-  // Save custom targets
+  // Save custom targets to backend API
   const saveCustomTargets = async () => {
     try {
       setTargetsSaving(true);
       
-      // Save to localStorage for now (later this could be an API call)
-      localStorage.setItem('rejectAnalysisTargets', JSON.stringify(customTargets));
+      // Save to backend API
+      await rejectAnalysisApi.targets.updateTargetSettings({
+        xray_target: customTargets.xray,
+        ct_target: customTargets.ct,
+        mri_target: customTargets.mri,
+        ultrasound_target: customTargets.ultrasound,
+        mammography_target: customTargets.mammography,
+        overall_target: customTargets.overall
+      });
       
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      toast.success('Target reject rates updated successfully');
       setIsTargetDialogOpen(false);
     } catch (error) {
-      toast.error('Failed to save target reject rates');
+      console.error('Failed to save target settings:', error);
+      // Error toast is already handled in the API
     } finally {
       setTargetsSaving(false);
     }
   };
 
-  // Reset to default targets
-  const resetToDefaults = () => {
-    setCustomTargets(DEFAULT_TARGETS);
+  // Reset to default targets using backend API
+  const resetToDefaults = async () => {
+    try {
+      setTargetsSaving(true);
+      const settings = await rejectAnalysisApi.targets.resetToDefaults();
+      setCustomTargets({
+        xray: Number(settings.xray_target),
+        ct: Number(settings.ct_target),
+        mri: Number(settings.mri_target),
+        ultrasound: Number(settings.ultrasound_target),
+        mammography: Number(settings.mammography_target),
+        overall: Number(settings.overall_target)
+      });
+    } catch (error) {
+      console.error('Failed to reset target settings:', error);
+      // Fallback to local defaults if API fails
+      setCustomTargets(DEFAULT_TARGETS);
+    } finally {
+      setTargetsSaving(false);
+    }
   };
 
   // Redirect if not superuser

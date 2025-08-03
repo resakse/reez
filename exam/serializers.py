@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from .models import (
     Modaliti, Part, Exam, Daftar, Pemeriksaan, PacsConfig, PacsServer, MediaDistribution,
-    RejectCategory, RejectReason, RejectAnalysis, RejectIncident
+    RejectCategory, RejectReason, RejectAnalysis, RejectIncident, RejectAnalysisTargetSettings
 )
 from pesakit.models import Pesakit
 from wad.models import Ward
@@ -768,13 +768,13 @@ class RejectCategorySerializer(serializers.ModelSerializer):
 
 class RejectIncidentSerializer(serializers.ModelSerializer):
     """Serializer for reject incidents with related field names"""
-    # Related field displays
-    examination_number = serializers.CharField(source='examination.no_xray', read_only=True)
-    examination_accession = serializers.CharField(source='examination.accession_number', read_only=True)
-    patient_name = serializers.CharField(source='examination.daftar.pesakit.nama', read_only=True)
-    patient_mrn = serializers.CharField(source='examination.daftar.pesakit.mrn', read_only=True)
-    modality_name = serializers.CharField(source='examination.exam.modaliti.nama', read_only=True)
-    exam_name = serializers.CharField(source='examination.exam.exam', read_only=True)
+    # Related field displays (all optional for daily tracking)
+    examination_number = serializers.CharField(source='examination.no_xray', read_only=True, allow_null=True)
+    examination_accession = serializers.CharField(source='examination.accession_number', read_only=True, allow_null=True)
+    patient_name = serializers.CharField(source='examination.daftar.pesakit.nama', read_only=True, allow_null=True)
+    patient_mrn = serializers.CharField(source='examination.daftar.pesakit.mrn', read_only=True, allow_null=True)
+    modality_name = serializers.CharField(source='examination.exam.modaliti.nama', read_only=True, allow_null=True)
+    exam_name = serializers.CharField(source='examination.exam.exam', read_only=True, allow_null=True)
     
     # Reject reason details
     reject_reason_name = serializers.CharField(source='reject_reason.reason', read_only=True)
@@ -789,13 +789,16 @@ class RejectIncidentSerializer(serializers.ModelSerializer):
     # Analysis details
     analysis_month_year = serializers.CharField(source='analysis.month_year_display', read_only=True)
     
+    # Daily tracking support - count field for batch creation
+    count = serializers.IntegerField(write_only=True, required=False, min_value=1, max_value=100)
+    
     class Meta:
         model = RejectIncident
         fields = [
             'id', 'examination', 'analysis', 'reject_reason', 'reject_date',
             'retake_count', 'original_technique', 'corrected_technique',
             'technologist', 'reported_by', 'patient_factors', 'equipment_factors',
-            'notes', 'immediate_action_taken', 'follow_up_required',
+            'notes', 'immediate_action_taken', 'follow_up_required', 'count',
             # Related field displays
             'examination_number', 'examination_accession', 'patient_name', 'patient_mrn',
             'modality_name', 'exam_name', 'reject_reason_name', 'reject_category_name',
@@ -832,6 +835,29 @@ class RejectIncidentSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Retake count must be at least 1.")
         
         return data
+    
+    def create(self, validated_data):
+        """Create incidents with batch support for daily tracking"""
+        count = validated_data.pop('count', 1)
+        
+        # Set reported_by from request user if not provided
+        request = self.context.get('request')
+        if request and hasattr(request, 'user') and not validated_data.get('reported_by'):
+            validated_data['reported_by'] = request.user
+        
+        # For daily tracking, ensure reject_date is set
+        if not validated_data.get('reject_date'):
+            from django.utils import timezone
+            validated_data['reject_date'] = timezone.now()
+        
+        # Create multiple incidents if count > 1
+        incidents = []
+        for i in range(count):
+            incident = RejectIncident.objects.create(**validated_data)
+            incidents.append(incident)
+        
+        # Return the first incident for API response, but all are created
+        return incidents[0] if incidents else None
 
 
 class RejectAnalysisSerializer(serializers.ModelSerializer):
@@ -879,6 +905,198 @@ class RejectAnalysisSerializer(serializers.ModelSerializer):
     
     def get_incidents_count(self, obj):
         return obj.incidents.count()
+
+
+class RejectAnalysisTargetSettingsSerializer(serializers.ModelSerializer):
+    """Serializer for reject analysis target settings with validation"""
+    # Add display fields for created/modified by users
+    created_by_name = serializers.SerializerMethodField()
+    modified_by_name = serializers.SerializerMethodField()
+    
+    # Display fields for calculated thresholds
+    calculated_thresholds = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = RejectAnalysisTargetSettings
+        fields = [
+            'id', 'xray_target', 'ct_target', 'mri_target', 'ultrasound_target',
+            'mammography_target', 'overall_target', 'drl_compliance_enabled',
+            'warning_threshold_multiplier', 'critical_threshold_multiplier',
+            'enable_notifications', 'notification_emails', 'created', 'modified',
+            'created_by', 'modified_by', 'created_by_name', 'modified_by_name',
+            'calculated_thresholds'
+        ]
+        read_only_fields = ['created', 'modified', 'created_by_name', 'modified_by_name', 'calculated_thresholds']
+    
+    def get_created_by_name(self, obj):
+        if obj.created_by:
+            return f"{obj.created_by.first_name} {obj.created_by.last_name}".strip()
+        return None
+    
+    def get_modified_by_name(self, obj):
+        if obj.modified_by:
+            return f"{obj.modified_by.first_name} {obj.modified_by.last_name}".strip()
+        return None
+    
+    def get_calculated_thresholds(self, obj):
+        """Get calculated warning and critical thresholds for all modalities"""
+        modalities = ['xray', 'ct', 'mri', 'ultrasound', 'mammography', 'overall']
+        thresholds = {}
+        
+        for modality in modalities:
+            modality_name = modality.replace('_', ' ').title()
+            if modality == 'xray':
+                modality_name = 'X-Ray'
+            elif modality == 'overall':
+                modality_name = 'Overall'
+            
+            target = obj.get_target_for_modality(modality_name)
+            warning = obj.get_warning_threshold(modality_name)
+            critical = obj.get_critical_threshold(modality_name)
+            
+            thresholds[modality] = {
+                'target': float(target),
+                'warning': float(warning),
+                'critical': float(critical)
+            }
+        
+        return thresholds
+    
+    def validate(self, data):
+        """Validate target settings data"""
+        # Validate that all target rates are positive
+        target_fields = ['xray_target', 'ct_target', 'mri_target', 'ultrasound_target', 
+                        'mammography_target', 'overall_target']
+        
+        for field in target_fields:
+            value = data.get(field)
+            if value is not None and value <= 0:
+                raise serializers.ValidationError(f"{field.replace('_', ' ').title()} must be greater than 0")
+            if value is not None and value > 100:
+                raise serializers.ValidationError(f"{field.replace('_', ' ').title()} cannot exceed 100%")
+        
+        # Validate threshold multipliers
+        warning_multiplier = data.get('warning_threshold_multiplier')
+        critical_multiplier = data.get('critical_threshold_multiplier')
+        
+        if warning_multiplier is not None and warning_multiplier <= 0:
+            raise serializers.ValidationError("Warning threshold multiplier must be greater than 0")
+        
+        if critical_multiplier is not None and critical_multiplier <= 0:
+            raise serializers.ValidationError("Critical threshold multiplier must be greater than 0")
+        
+        if (warning_multiplier is not None and critical_multiplier is not None 
+            and warning_multiplier >= critical_multiplier):
+            raise serializers.ValidationError(
+                "Warning threshold multiplier must be less than critical threshold multiplier"
+            )
+        
+        # Validate notification emails format
+        notification_emails = data.get('notification_emails', [])
+        if notification_emails:
+            from django.core.validators import validate_email
+            from django.core.exceptions import ValidationError as DjangoValidationError
+            
+            for email in notification_emails:
+                if email:  # Skip empty strings
+                    try:
+                        validate_email(email)
+                    except DjangoValidationError:
+                        raise serializers.ValidationError(f"Invalid email address: {email}")
+        
+        return data
+    
+    def create(self, validated_data):
+        """Create target settings with audit information"""
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            validated_data['created_by'] = request.user
+            validated_data['modified_by'] = request.user
+        
+        return super().create(validated_data)
+    
+    def update(self, instance, validated_data):
+        """Update target settings with audit information"""
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            validated_data['modified_by'] = request.user
+        
+        return super().update(instance, validated_data)
+
+
+class RejectAnalysisTargetSettingsDetailSerializer(serializers.ModelSerializer):
+    """Detailed serializer for target settings with all calculated values"""
+    created_by_name = serializers.SerializerMethodField()
+    modified_by_name = serializers.SerializerMethodField()
+    modality_targets = serializers.SerializerMethodField()
+    threshold_matrix = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = RejectAnalysisTargetSettings
+        fields = [
+            'id', 'xray_target', 'ct_target', 'mri_target', 'ultrasound_target',
+            'mammography_target', 'overall_target', 'drl_compliance_enabled',
+            'warning_threshold_multiplier', 'critical_threshold_multiplier',
+            'enable_notifications', 'notification_emails', 'created', 'modified',
+            'created_by_name', 'modified_by_name', 'modality_targets', 'threshold_matrix'
+        ]
+    
+    def get_created_by_name(self, obj):
+        if obj.created_by:
+            return f"{obj.created_by.first_name} {obj.created_by.last_name}".strip()
+        return None
+    
+    def get_modified_by_name(self, obj):
+        if obj.modified_by:
+            return f"{obj.modified_by.first_name} {obj.modified_by.last_name}".strip()
+        return None
+    
+    def get_modality_targets(self, obj):
+        """Get target rates mapped by modality names"""
+        return {
+            'xray': float(obj.xray_target),
+            'ct': float(obj.ct_target),
+            'mri': float(obj.mri_target),
+            'ultrasound': float(obj.ultrasound_target),
+            'mammography': float(obj.mammography_target),
+            'overall': float(obj.overall_target)
+        }
+    
+    def get_threshold_matrix(self, obj):
+        """Get complete threshold matrix for frontend calendar component"""
+        modalities = ['xray', 'ct', 'mri', 'ultrasound', 'mammography', 'overall']
+        matrix = {}
+        
+        for modality in modalities:
+            # Map to proper modality names for get_target_for_modality method
+            modality_name_map = {
+                'xray': 'X-RAY',
+                'ct': 'CT',
+                'mri': 'MRI',
+                'ultrasound': 'ULTRASOUND',
+                'mammography': 'MAMMOGRAPHY',
+                'overall': 'OVERALL'
+            }
+            
+            modality_name = modality_name_map.get(modality, modality.upper())
+            target = obj.get_target_for_modality(modality_name)
+            warning = obj.get_warning_threshold(modality_name)
+            critical = obj.get_critical_threshold(modality_name)
+            
+            matrix[modality] = {
+                'target': float(target),
+                'warning': float(warning),
+                'critical': float(critical),
+                'display_name': modality.replace('_', ' ').title()
+            }
+            
+            # Fix display names
+            if modality == 'xray':
+                matrix[modality]['display_name'] = 'X-Ray'
+            elif modality == 'overall':
+                matrix[modality]['display_name'] = 'Overall'
+        
+        return matrix
     
     def get_qap_target_rate_display(self, obj):
         return f"{obj.qap_target_rate}%"
@@ -951,3 +1169,195 @@ class RejectAnalysisListSerializer(serializers.ModelSerializer):
     
     def get_incidents_count(self, obj):
         return obj.incidents.count()
+
+
+class RejectAnalysisTargetSettingsSerializer(serializers.ModelSerializer):
+    """Serializer for reject analysis target settings with validation"""
+    # Add display fields for created/modified by users
+    created_by_name = serializers.SerializerMethodField()
+    modified_by_name = serializers.SerializerMethodField()
+    
+    # Display fields for calculated thresholds
+    calculated_thresholds = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = RejectAnalysisTargetSettings
+        fields = [
+            'id', 'xray_target', 'ct_target', 'mri_target', 'ultrasound_target',
+            'mammography_target', 'overall_target', 'drl_compliance_enabled',
+            'warning_threshold_multiplier', 'critical_threshold_multiplier',
+            'enable_notifications', 'notification_emails', 'created', 'modified',
+            'created_by', 'modified_by', 'created_by_name', 'modified_by_name',
+            'calculated_thresholds'
+        ]
+        read_only_fields = ['created', 'modified', 'created_by_name', 'modified_by_name', 'calculated_thresholds']
+    
+    def get_created_by_name(self, obj):
+        if obj.created_by:
+            return f"{obj.created_by.first_name} {obj.created_by.last_name}".strip()
+        return None
+    
+    def get_modified_by_name(self, obj):
+        if obj.modified_by:
+            return f"{obj.modified_by.first_name} {obj.modified_by.last_name}".strip()
+        return None
+    
+    def get_calculated_thresholds(self, obj):
+        """Get calculated warning and critical thresholds for all modalities"""
+        modalities = ['xray', 'ct', 'mri', 'ultrasound', 'mammography', 'overall']
+        thresholds = {}
+        
+        for modality in modalities:
+            modality_name = modality.replace('_', ' ').title()
+            if modality == 'xray':
+                modality_name = 'X-Ray'
+            elif modality == 'overall':
+                modality_name = 'Overall'
+            
+            target = obj.get_target_for_modality(modality_name)
+            warning = obj.get_warning_threshold(modality_name)
+            critical = obj.get_critical_threshold(modality_name)
+            
+            thresholds[modality] = {
+                'target': float(target),
+                'warning': float(warning),
+                'critical': float(critical)
+            }
+        
+        return thresholds
+    
+    def validate(self, data):
+        """Validate target settings data"""
+        # Validate that all target rates are positive
+        target_fields = ['xray_target', 'ct_target', 'mri_target', 'ultrasound_target', 
+                        'mammography_target', 'overall_target']
+        
+        for field in target_fields:
+            value = data.get(field)
+            if value is not None and value <= 0:
+                raise serializers.ValidationError(f"{field.replace('_', ' ').title()} must be greater than 0")
+            if value is not None and value > 100:
+                raise serializers.ValidationError(f"{field.replace('_', ' ').title()} cannot exceed 100%")
+        
+        # Validate threshold multipliers
+        warning_multiplier = data.get('warning_threshold_multiplier')
+        critical_multiplier = data.get('critical_threshold_multiplier')
+        
+        if warning_multiplier is not None and warning_multiplier <= 0:
+            raise serializers.ValidationError("Warning threshold multiplier must be greater than 0")
+        
+        if critical_multiplier is not None and critical_multiplier <= 0:
+            raise serializers.ValidationError("Critical threshold multiplier must be greater than 0")
+        
+        if (warning_multiplier is not None and critical_multiplier is not None 
+            and warning_multiplier >= critical_multiplier):
+            raise serializers.ValidationError(
+                "Warning threshold multiplier must be less than critical threshold multiplier"
+            )
+        
+        # Validate notification emails format
+        notification_emails = data.get('notification_emails', [])
+        if notification_emails:
+            from django.core.validators import validate_email
+            from django.core.exceptions import ValidationError as DjangoValidationError
+            
+            for email in notification_emails:
+                if email:  # Skip empty strings
+                    try:
+                        validate_email(email)
+                    except DjangoValidationError:
+                        raise serializers.ValidationError(f"Invalid email address: {email}")
+        
+        return data
+    
+    def create(self, validated_data):
+        """Create target settings with audit information"""
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            validated_data['created_by'] = request.user
+            validated_data['modified_by'] = request.user
+        
+        return super().create(validated_data)
+    
+    def update(self, instance, validated_data):
+        """Update target settings with audit information"""
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            validated_data['modified_by'] = request.user
+        
+        return super().update(instance, validated_data)
+
+
+class RejectAnalysisTargetSettingsDetailSerializer(serializers.ModelSerializer):
+    """Detailed serializer for target settings with all calculated values"""
+    created_by_name = serializers.SerializerMethodField()
+    modified_by_name = serializers.SerializerMethodField()
+    modality_targets = serializers.SerializerMethodField()
+    threshold_matrix = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = RejectAnalysisTargetSettings
+        fields = [
+            'id', 'xray_target', 'ct_target', 'mri_target', 'ultrasound_target',
+            'mammography_target', 'overall_target', 'drl_compliance_enabled',
+            'warning_threshold_multiplier', 'critical_threshold_multiplier',
+            'enable_notifications', 'notification_emails', 'created', 'modified',
+            'created_by_name', 'modified_by_name', 'modality_targets', 'threshold_matrix'
+        ]
+    
+    def get_created_by_name(self, obj):
+        if obj.created_by:
+            return f"{obj.created_by.first_name} {obj.created_by.last_name}".strip()
+        return None
+    
+    def get_modified_by_name(self, obj):
+        if obj.modified_by:
+            return f"{obj.modified_by.first_name} {obj.modified_by.last_name}".strip()
+        return None
+    
+    def get_modality_targets(self, obj):
+        """Get target rates mapped by modality names"""
+        return {
+            'xray': float(obj.xray_target),
+            'ct': float(obj.ct_target),
+            'mri': float(obj.mri_target),
+            'ultrasound': float(obj.ultrasound_target),
+            'mammography': float(obj.mammography_target),
+            'overall': float(obj.overall_target)
+        }
+    
+    def get_threshold_matrix(self, obj):
+        """Get complete threshold matrix for frontend calendar component"""
+        modalities = ['xray', 'ct', 'mri', 'ultrasound', 'mammography', 'overall']
+        matrix = {}
+        
+        for modality in modalities:
+            # Map to proper modality names for get_target_for_modality method
+            modality_name_map = {
+                'xray': 'X-RAY',
+                'ct': 'CT',
+                'mri': 'MRI',
+                'ultrasound': 'ULTRASOUND',
+                'mammography': 'MAMMOGRAPHY',
+                'overall': 'OVERALL'
+            }
+            
+            modality_name = modality_name_map.get(modality, modality.upper())
+            target = obj.get_target_for_modality(modality_name)
+            warning = obj.get_warning_threshold(modality_name)
+            critical = obj.get_critical_threshold(modality_name)
+            
+            matrix[modality] = {
+                'target': float(target),
+                'warning': float(warning),
+                'critical': float(critical),
+                'display_name': modality.replace('_', ' ').title()
+            }
+            
+            # Fix display names
+            if modality == 'xray':
+                matrix[modality]['display_name'] = 'X-Ray'
+            elif modality == 'overall':
+                matrix[modality]['display_name'] = 'Overall'
+        
+        return matrix

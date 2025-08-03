@@ -33,6 +33,7 @@ const REJECT_ANALYSIS_ENDPOINTS = {
   TRENDS: '/api/reject-analysis/trends/',
   CATEGORY_REORDER: '/api/reject-categories/reorder/',
   REASON_REORDER: '/api/reject-reasons/reorder/',
+  TARGET_SETTINGS: '/api/reject-analysis-target-settings/',
   // Export endpoints would be added here when implemented
 } as const;
 
@@ -391,6 +392,45 @@ export const rejectIncidentsApi = {
   },
 
   /**
+   * Create multiple reject incidents for a single date (bulk creation)
+   */
+  async createBulkDailyIncidents(data: {
+    date: string;
+    rejects: Record<string, number>; // reason_id -> count
+  }): Promise<{
+    success: boolean;
+    message: string;
+    incidents_created: number;
+    date: string;
+  }> {
+    try {
+      const response = await AuthService.authenticatedFetch(
+        `${API_BASE}${REJECT_ANALYSIS_ENDPOINTS.INCIDENTS}bulk-daily-create/`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data),
+        }
+      );
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Failed to create bulk incidents: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      // Don't show toast here since the calling component will handle it
+      return result;
+    } catch (error) {
+      console.error('Error creating bulk incidents:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to log daily rejects');
+      throw error;
+    }
+  },
+
+  /**
    * Create a new reject incident
    */
   async createIncident(data: RejectIncidentFormData): Promise<RejectIncident> {
@@ -474,6 +514,40 @@ export const rejectIncidentsApi = {
       console.error('Error deleting reject incident:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to delete reject incident');
       throw error;
+    }
+  },
+
+  /**
+   * Get daily reject summaries for calendar display
+   */
+  async getDailySummaries(filters?: { 
+    start_date?: string; 
+    end_date?: string; 
+    month?: string;
+    year?: number;
+  }): Promise<Array<{
+    date: string;
+    total_rejects: number;
+    categories: Array<{
+      category_name: string;
+      count: number;
+    }>;
+  }>> {
+    try {
+      const params = buildQueryParams(filters || {});
+      const url = `${API_BASE}${REJECT_ANALYSIS_ENDPOINTS.INCIDENTS}daily-summary/${params ? `?${params}` : ''}`;
+      
+      const response = await AuthService.authenticatedFetch(url);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch daily summaries: ${response.statusText}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching daily summaries:', error);
+      // Don't show toast error for this since it might not exist yet
+      return [];
     }
   },
 
@@ -914,6 +988,153 @@ export const downloadUtils = {
   },
 };
 
+/**
+ * Target Settings API
+ */
+export const targetSettingsApi = {
+  /**
+   * Get current target settings
+   */
+  async getTargetSettings(): Promise<{
+    id: number;
+    xray_target: number;
+    ct_target: number;
+    mri_target: number;
+    ultrasound_target: number;
+    mammography_target: number;
+    overall_target: number;
+    drl_compliance_enabled: boolean;
+    warning_threshold_multiplier: number;
+    critical_threshold_multiplier: number;
+    enable_notifications: boolean;
+    notification_emails: string[];
+    created: string;
+    modified: string;
+  }> {
+    try {
+      const response = await AuthService.authenticatedFetch(
+        `${API_BASE}${REJECT_ANALYSIS_ENDPOINTS.TARGET_SETTINGS}current/`
+      );
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch target settings: ${response.statusText}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching target settings:', error);
+      toast.error('Failed to load target settings');
+      throw error;
+    }
+  },
+
+  /**
+   * Update target settings
+   */
+  async updateTargetSettings(data: {
+    xray_target?: number;
+    ct_target?: number;
+    mri_target?: number;
+    ultrasound_target?: number;
+    mammography_target?: number;
+    overall_target?: number;
+    drl_compliance_enabled?: boolean;
+    warning_threshold_multiplier?: number;
+    critical_threshold_multiplier?: number;
+    enable_notifications?: boolean;
+    notification_emails?: string[];
+  }): Promise<any> {
+    try {
+      // Use POST to create/update since it's a singleton resource
+      const response = await AuthService.authenticatedFetch(
+        `${API_BASE}${REJECT_ANALYSIS_ENDPOINTS.TARGET_SETTINGS}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data),
+        }
+      );
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Failed to update target settings: ${response.statusText}`);
+      }
+      
+      const settings = await response.json();
+      toast.success('Target reject rates updated successfully');
+      return settings;
+    } catch (error) {
+      console.error('Error updating target settings:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to update target settings');
+      throw error;
+    }
+  },
+
+  /**
+   * Get modality targets in simple format
+   */
+  async getModalityTargets(): Promise<{
+    xray: number;
+    ct: number;
+    mri: number;
+    ultrasound: number;
+    mammography: number;
+    overall: number;
+  }> {
+    try {
+      const response = await AuthService.authenticatedFetch(
+        `${API_BASE}${REJECT_ANALYSIS_ENDPOINTS.TARGET_SETTINGS}modality_targets/`
+      );
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch modality targets: ${response.statusText}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching modality targets:', error);
+      // Return defaults on error instead of showing toast
+      return {
+        xray: 2.0,
+        ct: 1.5,
+        mri: 1.0,
+        ultrasound: 1.5,
+        mammography: 3.0,
+        overall: 2.0
+      };
+    }
+  },
+
+  /**
+   * Reset settings to defaults
+   */
+  async resetToDefaults(): Promise<any> {
+    try {
+      const response = await AuthService.authenticatedFetch(
+        `${API_BASE}${REJECT_ANALYSIS_ENDPOINTS.TARGET_SETTINGS}reset_to_defaults/`,
+        {
+          method: 'POST',
+        }
+      );
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Failed to reset target settings: ${response.statusText}`);
+      }
+      
+      const settings = await response.json();
+      toast.success('Target settings reset to defaults');
+      return settings;
+    } catch (error) {
+      console.error('Error resetting target settings:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to reset target settings');
+      throw error;
+    }
+  },
+};
+
 // Export all APIs as a single object for convenience
 export const rejectAnalysisApi = {
   categories: rejectCategoriesApi,
@@ -922,6 +1143,7 @@ export const rejectAnalysisApi = {
   monthly: monthlyAnalysisApi,
   statistics: statisticsApi,
   pacs: pacsConfigApi,
+  targets: targetSettingsApi,
   utils: downloadUtils,
 };
 

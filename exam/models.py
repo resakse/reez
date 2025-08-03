@@ -947,7 +947,8 @@ class RejectIncident(auto_prefetch.Model):
     examination = auto_prefetch.ForeignKey(
         Pemeriksaan, on_delete=models.CASCADE, 
         related_name='reject_incidents',
-        help_text="The examination that had a reject/retake"
+        help_text="The examination that had a reject/retake",
+        null=True, blank=True
     )
     analysis = auto_prefetch.ForeignKey(
         RejectAnalysis, on_delete=models.CASCADE,
@@ -1047,3 +1048,161 @@ class RejectIncident(auto_prefetch.Model):
                 pass
         
         super().save(*args, **kwargs)
+
+
+class RejectAnalysisTargetSettings(models.Model):
+    """
+    System-wide target reject rate settings for different modalities.
+    This replaces localStorage usage with proper database storage.
+    """
+    # Target reject rates by modality (as percentages)
+    xray_target = models.DecimalField(
+        max_digits=5, decimal_places=2, default=8.00,
+        verbose_name="X-Ray Target Rate (%)",
+        help_text="Target reject rate for X-Ray examinations (default 8%)"
+    )
+    ct_target = models.DecimalField(
+        max_digits=5, decimal_places=2, default=5.00,
+        verbose_name="CT Target Rate (%)",
+        help_text="Target reject rate for CT examinations (default 5%)"
+    )
+    mri_target = models.DecimalField(
+        max_digits=5, decimal_places=2, default=3.00,
+        verbose_name="MRI Target Rate (%)",
+        help_text="Target reject rate for MRI examinations (default 3%)"
+    )
+    ultrasound_target = models.DecimalField(
+        max_digits=5, decimal_places=2, default=6.00,
+        verbose_name="Ultrasound Target Rate (%)",
+        help_text="Target reject rate for Ultrasound examinations (default 6%)"
+    )
+    mammography_target = models.DecimalField(
+        max_digits=5, decimal_places=2, default=4.00,
+        verbose_name="Mammography Target Rate (%)",
+        help_text="Target reject rate for Mammography examinations (default 4%)"
+    )
+    overall_target = models.DecimalField(
+        max_digits=5, decimal_places=2, default=8.00,
+        verbose_name="Overall Target Rate (%)",
+        help_text="Overall facility target reject rate (default 8%)"
+    )
+    
+    # Malaysian QAP compliance settings
+    drl_compliance_enabled = models.BooleanField(
+        default=True,
+        verbose_name="DRL Compliance Enabled",
+        help_text="Enable Malaysian Diagnostic Reference Level compliance monitoring"
+    )
+    warning_threshold_multiplier = models.DecimalField(
+        max_digits=3, decimal_places=2, default=1.25,
+        verbose_name="Warning Threshold Multiplier",
+        help_text="Multiplier for warning threshold (e.g., 1.25 = warning at 125% of target)"
+    )
+    critical_threshold_multiplier = models.DecimalField(
+        max_digits=3, decimal_places=2, default=1.50,
+        verbose_name="Critical Threshold Multiplier",
+        help_text="Multiplier for critical threshold (e.g., 1.50 = critical at 150% of target)"
+    )
+    
+    # Notification settings
+    enable_notifications = models.BooleanField(
+        default=True,
+        verbose_name="Enable Notifications",
+        help_text="Enable email notifications when targets are exceeded"
+    )
+    notification_emails = models.JSONField(
+        default=list,
+        verbose_name="Notification Email Addresses",
+        help_text="List of email addresses to notify when targets are exceeded"
+    )
+    
+    # Audit fields
+    created = models.DateTimeField(auto_now_add=True)
+    modified = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='created_target_settings',
+        help_text="User who created these settings"
+    )
+    modified_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='modified_target_settings',
+        help_text="User who last modified these settings"
+    )
+    
+    class Meta:
+        verbose_name = "Reject Analysis Target Settings"
+        verbose_name_plural = "Reject Analysis Target Settings"
+        
+    def __str__(self):
+        return f"Target Settings - Overall: {self.overall_target}%"
+    
+    def save(self, *args, **kwargs):
+        # Ensure default notification emails if empty
+        if not self.notification_emails:
+            self.notification_emails = []
+        super().save(*args, **kwargs)
+    
+    def get_target_for_modality(self, modality_name):
+        """
+        Get target reject rate for a specific modality.
+        Returns the overall target if specific modality target not found.
+        """
+        modality_name = modality_name.upper() if modality_name else ""
+        
+        # Map modality names to target fields
+        modality_mapping = {
+            'X-RAY': self.xray_target,
+            'XRAY': self.xray_target,
+            'XR': self.xray_target,
+            'CR': self.xray_target,
+            'DX': self.xray_target,
+            'CT': self.ct_target,
+            'CT SCAN': self.ct_target,
+            'MRI': self.mri_target,
+            'MR': self.mri_target,
+            'US': self.ultrasound_target,
+            'ULTRASOUND': self.ultrasound_target,
+            'MG': self.mammography_target,
+            'MAMMOGRAPHY': self.mammography_target,
+            'MAMMO': self.mammography_target,
+        }
+        
+        return modality_mapping.get(modality_name, self.overall_target)
+    
+    def get_warning_threshold(self, modality_name):
+        """Get warning threshold for a specific modality"""
+        target = self.get_target_for_modality(modality_name)
+        return target * self.warning_threshold_multiplier
+    
+    def get_critical_threshold(self, modality_name):
+        """Get critical threshold for a specific modality"""
+        target = self.get_target_for_modality(modality_name)
+        return target * self.critical_threshold_multiplier
+    
+    def assess_reject_rate(self, modality_name, reject_rate):
+        """
+        Assess reject rate status for a given modality and rate.
+        Returns: 'GOOD', 'WARNING', 'CRITICAL'
+        """
+        target = self.get_target_for_modality(modality_name)
+        warning_threshold = self.get_warning_threshold(modality_name)
+        critical_threshold = self.get_critical_threshold(modality_name)
+        
+        if reject_rate <= target:
+            return 'GOOD'
+        elif reject_rate <= warning_threshold:
+            return 'WARNING'
+        else:
+            return 'CRITICAL'
+    
+    @classmethod
+    def get_current_settings(cls):
+        """
+        Get the current target settings instance.
+        Creates default settings if none exist.
+        """
+        settings = cls.objects.first()
+        if not settings:
+            settings = cls.objects.create()
+        return settings

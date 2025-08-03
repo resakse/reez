@@ -18,7 +18,8 @@ from django_htmx.http import trigger_client_event, push_url
 
 from exam.models import (
     Pemeriksaan, Daftar, Exam, Modaliti, Part, Region, generate_exam_accession, 
-    MediaDistribution, RejectCategory, RejectReason, RejectAnalysis, RejectIncident
+    MediaDistribution, RejectCategory, RejectReason, RejectAnalysis, RejectIncident,
+    RejectAnalysisTargetSettings
 )
 from pesakit.models import Pesakit
 from exam.models import PacsConfig, DashboardConfig
@@ -51,7 +52,8 @@ from .serializers import (
     MediaDistributionSerializer, MediaDistributionListSerializer,
     MediaDistributionCollectionSerializer, RejectCategorySerializer,
     RejectReasonSerializer, RejectAnalysisSerializer, RejectAnalysisListSerializer,
-    RejectIncidentSerializer
+    RejectIncidentSerializer, RejectAnalysisTargetSettingsSerializer,
+    RejectAnalysisTargetSettingsDetailSerializer
 )
 import os
 import tempfile
@@ -3030,6 +3032,258 @@ class RejectIncidentViewSet(viewsets.ModelViewSet):
         
         return queryset
     
+    @action(detail=False, methods=['get'], url_path='daily-summary')
+    def daily_summary(self, request):
+        """
+        Get daily reject summaries for calendar display
+        Returns aggregated reject counts by date and category
+        """
+        from django.db.models import Count, Q
+        from datetime import datetime, timedelta
+        from collections import defaultdict
+        
+        # Parse date filters
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        month = request.query_params.get('month')
+        year = request.query_params.get('year')
+        
+        queryset = self.get_queryset()
+        
+        # Apply date filters
+        if start_date and end_date:
+            queryset = queryset.filter(
+                reject_date__date__gte=start_date,
+                reject_date__date__lte=end_date
+            )
+        elif month and year:
+            queryset = queryset.filter(
+                reject_date__year=year,
+                reject_date__month=month
+            )
+        elif year:
+            queryset = queryset.filter(reject_date__year=year)
+        else:
+            # Default to current month if no filters provided
+            now = datetime.now()
+            queryset = queryset.filter(
+                reject_date__year=now.year,
+                reject_date__month=now.month
+            )
+        
+        # Group by date, category, and reason to get detailed breakdown
+        # Sum the retake_count field instead of counting records
+        from django.db.models import Sum
+        incidents = queryset.select_related('reject_reason__category').values(
+            'reject_date__date',
+            'reject_reason__category__name',
+            'reject_reason__id',
+            'reject_reason__reason'
+        ).annotate(count=Sum('retake_count')).order_by('reject_date__date')
+        
+        # Organize data by date with detailed reason breakdown
+        daily_data = defaultdict(lambda: {
+            'total_rejects': 0, 
+            'categories': defaultdict(int),
+            'reasons': {}  # reason_id -> count
+        })
+        
+        for incident in incidents:
+            date_str = incident['reject_date__date'].strftime('%Y-%m-%d')
+            category_name = incident['reject_reason__category__name']
+            reason_id = incident['reject_reason__id']
+            count = incident['count']
+            
+            daily_data[date_str]['total_rejects'] += count
+            daily_data[date_str]['categories'][category_name] += count
+            daily_data[date_str]['reasons'][reason_id] = count
+        
+        # Get real image counts from PACS for each date
+        result = []
+        for date_str, data in daily_data.items():
+            categories = [
+                {'category_name': name, 'count': count}
+                for name, count in data['categories'].items()
+            ]
+            
+            total_rejects = data['total_rejects']
+            
+            # Get real image count from PACS for this date
+            total_images = self.get_daily_image_count_from_pacs(date_str)
+            
+            reject_percentage = (total_rejects / total_images * 100) if total_images > 0 else 0
+            
+            result.append({
+                'date': date_str,
+                'total_rejects': total_rejects,
+                'total_images': total_images,
+                'reject_percentage': round(reject_percentage, 2),
+                'categories': categories,
+                'reasons': data['reasons']  # Include detailed reason breakdown
+            })
+        
+        return Response(result)
+    
+    def get_daily_image_count_from_pacs(self, date_str):
+        """
+        Get total image count for a specific date from PACS/Orthanc
+        """
+        try:
+            import requests
+            from .models import PacsServer
+            
+            # Get primary PACS server
+            pacs_server = PacsServer.objects.filter(is_active=True, is_primary=True).first()
+            if not pacs_server:
+                # Fallback to any active server
+                pacs_server = PacsServer.objects.filter(is_active=True).first()
+            
+            if not pacs_server:
+                print(f"No active PACS server found for date {date_str}")
+                return 0
+            
+            orthanc_url = pacs_server.orthancurl.rstrip('/')
+            
+            # Query Orthanc for studies on this date
+            query = {
+                'StudyDate': date_str.replace('-', '')  # DICOM format: YYYYMMDD
+            }
+            
+            orthanc_request = {
+                'Level': 'Study',
+                'Query': query,
+                'Expand': True
+            }
+            
+            response = requests.post(
+                f"{orthanc_url}/tools/find",
+                headers={'Content-Type': 'application/json'},
+                json=orthanc_request,
+                timeout=10
+            )
+            
+            if not response.ok:
+                print(f"Orthanc query failed for {date_str}: {response.status_code}")
+                return 0
+            
+            studies = response.json()
+            total_instances = 0
+            
+            # Count instances (images) in each study
+            for study in studies:
+                study_id = study.get('ID', '')
+                if study_id:
+                    # Get instance count for this study
+                    instances_response = requests.get(
+                        f"{orthanc_url}/studies/{study_id}/instances",
+                        timeout=10
+                    )
+                    if instances_response.ok:
+                        instances = instances_response.json()
+                        total_instances += len(instances)
+            
+            print(f"Found {total_instances} images for date {date_str}")
+            return total_instances
+            
+        except Exception as e:
+            print(f"Error getting PACS image count for {date_str}: {e}")
+            return 0
+    
+    @action(detail=False, methods=['post'], url_path='bulk-daily-create')
+    def bulk_daily_create(self, request):
+        """
+        Create multiple reject incidents for a single date
+        Expected payload: {
+            "date": "2025-08-03",
+            "rejects": {
+                "reason_id_1": count1,
+                "reason_id_2": count2,
+                ...
+            }
+        }
+        """
+        from django.utils.dateparse import parse_date
+        
+        date_str = request.data.get('date')
+        rejects = request.data.get('rejects', {})
+        
+        if not date_str or not rejects:
+            return Response(
+                {'error': 'Both date and rejects are required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Parse the date
+            reject_date = parse_date(date_str)
+            if not reject_date:
+                return Response(
+                    {'error': 'Invalid date format. Use YYYY-MM-DD'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Convert to datetime for the reject_date field
+            from django.utils import timezone
+            from datetime import datetime, time
+            reject_datetime = timezone.make_aware(
+                datetime.combine(reject_date, time(12, 0, 0))
+            )
+            
+            total_count = 0
+            
+            # SIMPLE CRUD: Just update_or_create for each reason
+            for reason_id_str, count in rejects.items():
+                try:
+                    reason_id = int(reason_id_str)
+                    count = int(count)
+                    
+                    # Verify the reason exists
+                    try:
+                        reason = RejectReason.objects.get(id=reason_id)
+                    except RejectReason.DoesNotExist:
+                        return Response(
+                            {'error': f'Reject reason {reason_id} not found'}, 
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                    
+                    # SIMPLE: update_or_create - no conditional logic!
+                    incident, created = RejectIncident.objects.update_or_create(
+                        reject_date__date=reject_date,
+                        reject_reason=reason,
+                        reported_by=request.user,
+                        examination__isnull=True,
+                        defaults={
+                            'reject_date': reject_datetime,
+                            'retake_count': count,
+                            'notes': f'Daily reject entry - {reason.reason} (count: {count})'
+                        }
+                    )
+                    
+                    action = "Created" if created else "Updated"
+                    print(f"{action} {reason.reason}: count = {count}")
+                    total_count += count
+                
+                except (ValueError, TypeError):
+                    return Response(
+                        {'error': f'Invalid reason_id or count: {reason_id_str}={count}'}, 
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
+            message = f'Successfully saved daily rejects (total: {total_count})'
+                
+            return Response({
+                'success': True,
+                'message': message,
+                'incidents_created': total_count,
+                'date': date_str
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to create incidents: {str(e)}'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
     @action(detail=False, methods=['get'], url_path='by-examination/(?P<examination_id>[^/.]+)')
     def by_examination(self, request, examination_id=None):
         """Get all incidents for a specific examination"""
@@ -3325,3 +3579,186 @@ class RejectAnalysisTrendsView(APIView):
             })
         
         return Response(trend_data)
+
+
+class RejectAnalysisTargetSettingsViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for reject analysis target settings management.
+    Replaces localStorage usage with proper database storage.
+    """
+    queryset = RejectAnalysisTargetSettings.objects.all()
+    permission_classes = [IsAuthenticated]
+    pagination_class = None  # Singleton settings, no pagination needed
+    
+    def get_serializer_class(self):
+        """Use detailed serializer for retrieve action"""
+        if self.action == 'retrieve':
+            return RejectAnalysisTargetSettingsDetailSerializer
+        return RejectAnalysisTargetSettingsSerializer
+    
+    def get_object(self):
+        """
+        Get or create the singleton target settings instance.
+        Override to ensure only one settings instance exists.
+        """
+        return RejectAnalysisTargetSettings.get_current_settings()
+    
+    def list(self, request, *args, **kwargs):
+        """Return the singleton settings instance as a list with one item"""
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response([serializer.data])
+    
+    def retrieve(self, request, *args, **kwargs):
+        """Get the current target settings"""
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+    
+    def create(self, request, *args, **kwargs):
+        """
+        Create is not allowed since settings should be singleton.
+        Instead, this will update the existing settings.
+        """
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    def update(self, request, *args, **kwargs):
+        """Update the target settings"""
+        instance = self.get_object()
+        partial = kwargs.pop('partial', False)
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        
+        return Response(serializer.data)
+    
+    def partial_update(self, request, *args, **kwargs):
+        """Partial update of target settings"""
+        kwargs['partial'] = True
+        return self.update(request, *args, **kwargs)
+    
+    def destroy(self, request, *args, **kwargs):
+        """
+        Destroy is not allowed for target settings.
+        Return method not allowed.
+        """
+        return Response(
+            {"detail": "Target settings cannot be deleted. Use update to modify values."},
+            status=status.HTTP_405_METHOD_NOT_ALLOWED
+        )
+    
+    @action(detail=False, methods=['get'])
+    def current(self, request):
+        """
+        Get current target settings.
+        Convenient endpoint: /api/reject-analysis-target-settings/current/
+        """
+        instance = self.get_object()
+        serializer = RejectAnalysisTargetSettingsDetailSerializer(instance, context={'request': request})
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['post'])
+    def reset_to_defaults(self, request):
+        """
+        Reset target settings to default values.
+        Endpoint: /api/reject-analysis-target-settings/reset_to_defaults/
+        """
+        instance = self.get_object()
+        
+        # Reset to default values
+        instance.xray_target = 8.00
+        instance.ct_target = 5.00
+        instance.mri_target = 3.00
+        instance.ultrasound_target = 6.00
+        instance.mammography_target = 4.00
+        instance.overall_target = 8.00
+        instance.warning_threshold_multiplier = 1.25
+        instance.critical_threshold_multiplier = 1.50
+        instance.drl_compliance_enabled = True
+        instance.enable_notifications = True
+        instance.notification_emails = []
+        
+        # Set modified_by from request user
+        if hasattr(request, 'user'):
+            instance.modified_by = request.user
+        
+        instance.save()
+        
+        serializer = RejectAnalysisTargetSettingsDetailSerializer(instance, context={'request': request})
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def modality_targets(self, request):
+        """
+        Get target rates for all modalities in a simple format.
+        Useful for frontend components that need just the target values.
+        Endpoint: /api/reject-analysis-target-settings/modality_targets/
+        """
+        instance = self.get_object()
+        
+        targets = {
+            'xray': float(instance.xray_target),
+            'ct': float(instance.ct_target),
+            'mri': float(instance.mri_target),
+            'ultrasound': float(instance.ultrasound_target),
+            'mammography': float(instance.mammography_target),
+            'overall': float(instance.overall_target)
+        }
+        
+        return Response(targets)
+    
+    @action(detail=False, methods=['get'])
+    def assessment_thresholds(self, request):
+        """
+        Get assessment thresholds for all modalities.
+        Returns target, warning, and critical thresholds.
+        Endpoint: /api/reject-analysis-target-settings/assessment_thresholds/
+        """
+        instance = self.get_object()
+        modality = request.query_params.get('modality', None)
+        
+        if modality:
+            # Return thresholds for specific modality
+            target = instance.get_target_for_modality(modality)
+            warning = instance.get_warning_threshold(modality)
+            critical = instance.get_critical_threshold(modality)
+            
+            return Response({
+                'modality': modality,
+                'target': float(target),
+                'warning': float(warning),
+                'critical': float(critical)
+            })
+        else:
+            # Return thresholds for all modalities
+            modalities = ['X-RAY', 'CT', 'MRI', 'ULTRASOUND', 'MAMMOGRAPHY']
+            thresholds = {}
+            
+            for mod in modalities:
+                target = instance.get_target_for_modality(mod)
+                warning = instance.get_warning_threshold(mod)
+                critical = instance.get_critical_threshold(mod)
+                
+                thresholds[mod.lower()] = {
+                    'target': float(target),
+                    'warning': float(warning),
+                    'critical': float(critical)
+                }
+            
+            # Add overall threshold
+            target = instance.get_target_for_modality('OVERALL')
+            warning = instance.get_warning_threshold('OVERALL')
+            critical = instance.get_critical_threshold('OVERALL')
+            
+            thresholds['overall'] = {
+                'target': float(target),
+                'warning': float(warning),
+                'critical': float(critical)
+            }
+            
+            return Response(thresholds)

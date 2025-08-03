@@ -11,7 +11,8 @@ from .views import (
     DashboardModalityStatsAPIView, DashboardStorageAPIView,
     DashboardConfigAPIView, DashboardBodypartsExamTypesAPIView,
     RejectCategoryViewSet, RejectReasonViewSet, RejectAnalysisViewSet,
-    RejectIncidentViewSet, RejectAnalysisStatisticsView, RejectAnalysisTrendsView
+    RejectIncidentViewSet, RejectAnalysisStatisticsView, RejectAnalysisTrendsView,
+    RejectAnalysisTargetSettingsViewSet
 )
 from .settings_views import PacsConfigListCreateAPIView, PacsConfigDetailAPIView, get_current_pacs_config, get_pacs_orthanc_url
 from .pacs_management_views import PacsServerViewSet, MultiplePacsSearchView, PacsUploadDestinationsView
@@ -38,6 +39,7 @@ router.register(r'reject-categories', RejectCategoryViewSet, basename='reject-ca
 router.register(r'reject-reasons', RejectReasonViewSet, basename='reject-reason')
 router.register(r'reject-analyses', RejectAnalysisViewSet, basename='reject-analysis')
 router.register(r'reject-incidents', RejectIncidentViewSet, basename='reject-incident')
+router.register(r'reject-analysis-target-settings', RejectAnalysisTargetSettingsViewSet, basename='reject-analysis-target-settings')
 
 urlpatterns = [
     path("", views.orthanc_study, name="orthanc-study"),

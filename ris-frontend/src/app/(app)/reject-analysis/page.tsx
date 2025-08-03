@@ -206,21 +206,21 @@ export default function RejectAnalysisDashboard() {
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Reject Incidents</CardTitle>
+            <CardTitle className="text-lg">Daily Reject Tracking</CardTitle>
             <CardDescription>
-              Log and manage individual reject incidents
+              Log daily reject counts using calendar interface
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex gap-2">
-              <Link href="/reject-analysis/incidents" className="flex-1">
+              <Link href="/reject-analysis/daily" className="flex-1">
                 <Button variant="outline" className="w-full">
-                  View All Incidents
+                  Open Calendar
                 </Button>
               </Link>
-              <Link href="/reject-analysis/incidents/new">
-                <Button>
-                  <Plus className="h-4 w-4" />
+              <Link href="/reject-analysis/incidents" className="flex-1">
+                <Button variant="outline" className="w-full">
+                  View Incidents
                 </Button>
               </Link>
             </div>

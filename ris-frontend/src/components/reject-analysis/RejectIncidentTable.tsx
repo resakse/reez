@@ -656,10 +656,13 @@ export default function RejectIncidentTable({
                       <div className="flex items-center gap-2">
                         <div 
                           className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: incident.category.color_code || '#3b82f6' }}
+                          style={{ backgroundColor: incident.category?.color_code || '#3b82f6' }}
                         />
                         <span className="text-sm">
-                          {language === 'ms' ? incident.category.nama : incident.category.nama_english}
+                          {incident.category 
+                            ? (language === 'ms' ? incident.category.nama : incident.category.nama_english)
+                            : 'Unknown Category'
+                          }
                         </span>
                       </div>
                     </TableCell>
