@@ -2,6 +2,7 @@
 
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { RejectTrendData, Language } from '@/types/reject-analysis';
+import { useTargetRates } from '@/contexts/TargetRatesContext';
 
 interface RejectTrendsChartProps {
   data: RejectTrendData[];
@@ -34,6 +35,7 @@ export default function RejectTrendsChart({
   height = 300 
 }: RejectTrendsChartProps) {
   const t = translations[language];
+  const { targetRates } = useTargetRates();
 
   if (!data || data.length === 0) {
     return (
@@ -48,7 +50,7 @@ export default function RejectTrendsChart({
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
-        <div className="bg-white border rounded-lg shadow-md p-4 border-gray-200">
+        <div className="bg-popover text-popover-foreground border rounded-lg shadow-md p-4">
           <p className="font-medium mb-2">{`${label} ${data.year}`}</p>
           <div className="space-y-1">
             <p className="flex items-center gap-2">
@@ -57,11 +59,11 @@ export default function RejectTrendsChart({
             </p>
             <p className="flex items-center gap-2">
               <span className="w-3 h-3 bg-red-500 rounded-full"></span>
-              <span className="text-sm">{t.targetRate}: {data.target_rate.toFixed(2)}%</span>
+              <span className="text-sm">{t.targetRate}: {targetRates.overall.toFixed(2)}%</span>
             </p>
-            <hr className="my-2" />
-            <p className="text-sm text-gray-600">{t.examinations}: {data.total_examinations.toLocaleString()}</p>
-            <p className="text-sm text-gray-600">{t.rejects}: {data.total_rejects.toLocaleString()}</p>
+            <hr className="my-2 border-border" />
+            <p className="text-sm text-muted-foreground">{t.examinations}: {data.total_examinations.toLocaleString()}</p>
+            <p className="text-sm text-muted-foreground">{t.rejects}: {data.total_rejects.toLocaleString()}</p>
           </div>
         </div>
       );
@@ -124,7 +126,7 @@ export default function RejectTrendsChart({
           
           {/* Target rate reference line */}
           <ReferenceLine 
-            y={data[0]?.target_rate || 2} 
+            y={targetRates.overall} 
             stroke="#ef4444" 
             strokeDasharray="5 5" 
             strokeOpacity={0.7}

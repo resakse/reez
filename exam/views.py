@@ -3563,8 +3563,12 @@ class RejectAnalysisTrendsView(APIView):
             elif month_stats['avg_reject_rate']:
                 actual_reject_rate = month_stats['avg_reject_rate']
             
-            # Calculate target rate and compliance (assuming 2% target rate)
-            target_rate = 2.0  # Standard 2% reject rate target
+            # Get dynamic target rate from settings
+            try:
+                target_settings = RejectAnalysisTargetSettings.objects.first()
+                target_rate = target_settings.overall_target if target_settings else 5.0  # Default to 5.0% if no settings found
+            except Exception:
+                target_rate = 5.0  # Fallback to 5.0% if any error occurs
             meets_target = actual_reject_rate <= target_rate
             
             trend_data.append({

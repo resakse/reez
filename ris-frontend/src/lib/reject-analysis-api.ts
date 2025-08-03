@@ -1097,12 +1097,12 @@ export const targetSettingsApi = {
       console.error('Error fetching modality targets:', error);
       // Return defaults on error instead of showing toast
       return {
-        xray: 2.0,
+        xray: 5.0,
         ct: 1.5,
         mri: 1.0,
         ultrasound: 1.5,
         mammography: 3.0,
-        overall: 2.0
+        overall: 5.0
       };
     }
   },

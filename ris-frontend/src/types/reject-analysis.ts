@@ -328,10 +328,10 @@ export const STATUS_CONFIG = {
 
 // Default reject rate targets
 export const DEFAULT_TARGET_RATES = {
-  XRAY: 2.0, // 2% for X-Ray
+  XRAY: 5.0, // 5% for X-Ray
   CT: 1.5,   // 1.5% for CT
   MRI: 1.0,  // 1% for MRI
   ULTRASOUND: 1.5, // 1.5% for Ultrasound
   MAMMOGRAPHY: 3.0, // 3% for Mammography
-  OVERALL: 2.0, // 2% overall target
+  OVERALL: 5.0, // 5% overall target
 } as const;

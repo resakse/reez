@@ -6,6 +6,7 @@ import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useRejectAnalysis } from '@/hooks/useRejectAnalysis';
+import { useTargetRates } from '@/contexts/TargetRatesContext';
 import { toast } from '@/lib/toast';
 import RejectAnalysisForm from '@/components/reject-analysis/RejectAnalysisForm';
 import type { MonthlyAnalysisFormData } from '@/types/reject-analysis';
@@ -13,6 +14,7 @@ import type { MonthlyAnalysisFormData } from '@/types/reject-analysis';
 export default function NewMonthlyAnalysisPage() {
   const router = useRouter();
   const { createAnalysis, loading } = useRejectAnalysis();
+  const { targetRates } = useTargetRates();
 
   const handleSubmit = async (data: MonthlyAnalysisFormData) => {
     try {
@@ -98,12 +100,12 @@ export default function NewMonthlyAnalysisPage() {
           <div>
             <h4 className="font-medium mb-2">Target Reject Rates:</h4>
             <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-              <li>X-Ray: 2.0% or below</li>
-              <li>CT Scan: 1.5% or below</li>
-              <li>MRI: 1.0% or below</li>
-              <li>Ultrasound: 1.5% or below</li>
-              <li>Mammography: 3.0% or below</li>
-              <li>Overall Department: 2.0% or below</li>
+              <li>X-Ray: {targetRates.xray}% or below</li>
+              <li>CT Scan: {targetRates.ct}% or below</li>
+              <li>MRI: {targetRates.mri}% or below</li>
+              <li>Ultrasound: {targetRates.ultrasound}% or below</li>
+              <li>Mammography: {targetRates.mammography}% or below</li>
+              <li>Overall Department: {targetRates.overall}% or below</li>
             </ul>
           </div>
           

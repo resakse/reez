@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar as CalendarIcon, Save, Plus, ChevronLeft, ChevronRight, X, Image } from 'lucide-react';
 import { toast } from '@/lib/toast';
 import { rejectAnalysisApi } from '@/lib/reject-analysis-api';
+import { useTargetRates } from '@/contexts/TargetRatesContext';
 import type { RejectCategory } from '@/types/reject-analysis';
 
 interface DailyRejectEntry {
@@ -78,17 +79,16 @@ function SimpleCalendar({
   onDateClick, 
   onMonthChange, 
   dailySummaries,
-  targetRates,
   t 
 }: {
   currentDate: Date;
   onDateClick: (date: Date) => void;
   onMonthChange: (direction: 'prev' | 'next') => void;
   dailySummaries: DailyRejectSummary[];
-  targetRates: Record<string, number>;
   t: any;
 }) {
   const [hoveredDay, setHoveredDay] = useState<Date | null>(null);
+  const { targetRates } = useTargetRates();
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
@@ -105,12 +105,10 @@ function SimpleCalendar({
   const getTargetComparison = (rejectPercentage: number) => {
     // Don't show comparison if target rates haven't been loaded yet
     if (!targetRates.overall) {
-      console.log('SIMPLE CALENDAR: Target rates not loaded yet, skipping comparison');
       return null;
     }
     
     const overallTarget = targetRates.overall;
-    console.log(`SIMPLE CALENDAR: Target comparison - reject=${rejectPercentage}%, target=${overallTarget}%, targetRates=`, targetRates);
     
     if (rejectPercentage <= overallTarget) {
       return {
@@ -286,57 +284,16 @@ export default function DailyRejectCalendar({ language = 'en' }: DailyRejectCale
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
-  const [targetRates, setTargetRates] = useState<Record<string, number>>({});
 
-  // Load target rates from backend API
-  const loadTargetRates = async () => {
-    try {
-      const targets = await rejectAnalysisApi.targets.getModalityTargets();
-      setTargetRates(targets);
-    } catch (error) {
-      console.error('Failed to load target rates:', error);
-      // Use default targets if API fails
-      const defaultTargets = {
-        overall: 2.0,
-        xray: 2.0,
-        ct: 1.5,
-        mri: 1.0,
-        ultrasound: 1.5,
-        mammography: 3.0
-      };
-      setTargetRates(defaultTargets);
-    }
-  };
-
-  // Add function to refresh target rates (can be called from parent components)
-  const refreshTargetRates = useCallback(async () => {
-    console.log('Refreshing target rates...');
-    await loadTargetRates();
-  }, []);
-
-  // Load reject categories and target rates
+  // Load reject categories
   useEffect(() => {
     loadCategories();
-    loadTargetRates();
   }, []);
 
   // Load daily reject data for current month
   useEffect(() => {
     loadDailyRejects();
   }, [currentDate]);
-
-  // Refresh target rates when page becomes visible (in case settings were changed)
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        console.log('Page became visible, refreshing target rates...');
-        loadTargetRates();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, []);
 
   const loadCategories = async () => {
     try {
@@ -365,7 +322,6 @@ export default function DailyRejectCalendar({ language = 'en' }: DailyRejectCale
         month: month.toString()
       });
       
-      console.log('=== DAILY SUMMARIES RECEIVED ===', summaries);
       setDailySummaries(summaries);
     } catch (error) {
       console.error('Failed to load daily rejects:', error);
@@ -396,8 +352,6 @@ export default function DailyRejectCalendar({ language = 'en' }: DailyRejectCale
     
     // Find existing data for this date
     const existingData = dailySummaries.find(summary => summary.date === dateStr);
-    console.log('=== INITIALIZING ENTRIES FOR', dateStr, '===');
-    console.log('Existing data:', existingData);
     
     categories.forEach(category => {
       category.reasons?.forEach(reason => {
@@ -406,8 +360,6 @@ export default function DailyRejectCalendar({ language = 'en' }: DailyRejectCale
         if (existingData && existingData.reasons) {
           existingCount = existingData.reasons[reason.id] || 0;
         }
-        
-        console.log(`Reason ${reason.name} (ID: ${reason.id}): existing count = ${existingCount}`);
         
         entries.push({
           date: dateStr,
@@ -459,8 +411,6 @@ export default function DailyRejectCalendar({ language = 'en' }: DailyRejectCale
         rejects[entry.reason_id.toString()] = entry.count;
       }
       
-      console.log('Creating bulk daily rejects:', { date: allEntries[0].date, rejects });
-      
       // Single API call for all rejects on this date
       const result = await rejectAnalysisApi.incidents.createBulkDailyIncidents({
         date: allEntries[0].date,
@@ -469,8 +419,6 @@ export default function DailyRejectCalendar({ language = 'en' }: DailyRejectCale
       
       const totalIncidents = result.incidents_created;
       const replacedIncidents = result.incidents_replaced || 0;
-      
-      console.log(`Successfully created ${totalIncidents} reject incidents`, result);
       
       let message = `${t.saveSuccess} (${totalIncidents} incidents created`;
       if (replacedIncidents > 0) {
@@ -526,7 +474,6 @@ export default function DailyRejectCalendar({ language = 'en' }: DailyRejectCale
             onDateClick={handleDateClick}
             onMonthChange={handleMonthChange}
             dailySummaries={dailySummaries}
-            targetRates={targetRates}
             t={t}
           />
         </CardContent>

@@ -4,31 +4,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, TrendingUp, Calendar, BarChart3 } from 'lucide-react';
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
-import { rejectAnalysisApi } from '@/lib/reject-analysis-api';
+import { useTargetRates } from '@/contexts/TargetRatesContext';
 import DailyRejectCalendar from '@/components/reject-analysis/DailyRejectCalendar';
 
 export default function DailyRejectTrackingPage() {
-  const [targetRate, setTargetRate] = useState<number>(2.0);
-  const [loading, setLoading] = useState(true);
-
-  // Load target rates from backend API
-  useEffect(() => {
-    const loadTargets = async () => {
-      try {
-        const targets = await rejectAnalysisApi.targets.getModalityTargets();
-        setTargetRate(targets.overall);
-        console.log('DAILY PAGE: Loaded target rate:', targets.overall);
-      } catch (error) {
-        console.error('DAILY PAGE: Failed to load target rates:', error);
-        // Keep default 2.0 if API fails
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadTargets();
-  }, []);
+  const { targetRates, loading } = useTargetRates();
 
   return (
     <div className="space-y-6">
@@ -91,7 +71,7 @@ export default function DailyRejectTrackingPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {loading ? '...' : `${targetRate}%`}
+              {loading ? '...' : `${targetRates.overall}%`}
             </div>
             <p className="text-xs text-green-600">Current target</p>
           </CardContent>

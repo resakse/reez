@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { TargetRatesProvider } from '@/contexts/TargetRatesContext';
 import Header from "@/components/Header";
 import Sidebar from "@/components/Sidebar";
 
@@ -37,12 +38,14 @@ export default function AppLayout({
   }, [user, isLoading, pathname, router]);
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <Header onToggleSidebar={toggleSidebar} />
-      <div className="flex flex-1">
-        <Sidebar isCollapsed={isSidebarCollapsed} />
-        <main className="flex-1 p-4 bg-background">{children}</main>
+    <TargetRatesProvider>
+      <div className="flex flex-col min-h-screen">
+        <Header onToggleSidebar={toggleSidebar} />
+        <div className="flex flex-1">
+          <Sidebar isCollapsed={isSidebarCollapsed} />
+          <main className="flex-1 p-4 bg-background">{children}</main>
+        </div>
       </div>
-    </div>
+    </TargetRatesProvider>
   );
 } 
