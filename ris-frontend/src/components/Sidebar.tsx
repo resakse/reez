@@ -17,10 +17,50 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
   isCollapsed: boolean;
   onToggleCollapse: () => void;
+}
+
+interface NavItemProps {
+  href: string;
+  icon: React.ReactNode;
+  label: string;
+  isCollapsed: boolean;
+  isActive: (href: string) => boolean;
+  getLinkClasses: (href: string) => string;
+  getIconClasses: (href: string) => string;
+}
+
+function NavItem({ href, icon, label, isCollapsed, isActive, getLinkClasses, getIconClasses }: NavItemProps) {
+  const linkContent = (
+    <Link href={href} className={getLinkClasses(href)}>
+      <div className={getIconClasses(href)}>{icon}</div>
+      {!isCollapsed && label}
+    </Link>
+  );
+
+  if (isCollapsed) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          {linkContent}
+        </TooltipTrigger>
+        <TooltipContent side="right">
+          <p>{label}</p>
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return linkContent;
 }
 
 // Custom theme display components
@@ -186,74 +226,110 @@ export default function Sidebar({ className, isCollapsed, onToggleCollapse }: Si
   };
 
   return (
-    <aside className={cn("flex flex-col text-white bg-sidebar", isCollapsed ? "w-20" : "w-64", "transition-all duration-300", className)}>
-      {/* Header Section */}
-      <div className="flex h-14 items-center justify-between px-4 border-b border-white/10">
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={onToggleCollapse} className="hover:bg-white/10 hover:text-white">
-            <Menu className="h-6 w-6" />
-          </Button>
-          {!isCollapsed && (
-            <Link href="/" className="flex items-center space-x-2">
-              <span className="font-bold">Radiology IS</span>
-            </Link>
-          )}
+    <TooltipProvider>
+      <aside className={cn("flex flex-col text-white bg-sidebar", isCollapsed ? "w-20" : "w-64", "transition-all duration-300", className)}>
+        {/* Header Section */}
+        <div className="flex h-14 items-center justify-between px-4 border-b border-white/10">
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={onToggleCollapse} className="hover:bg-white/10 hover:text-white">
+              <Menu className="h-6 w-6" />
+            </Button>
+            {!isCollapsed && (
+              <Link href="/" className="flex items-center space-x-2">
+                <span className="font-bold">Radiology IS</span>
+              </Link>
+            )}
+          </div>
         </div>
-      </div>
 
       {/* Navigation Section */}
       <nav className="flex-1 p-4">
         <ul className="space-y-2">
           {!isNormalUser && (
             <li>
-              <Link href="/" className={getLinkClasses("/")}>
-                <LayoutDashboard className={getIconClasses("/")} />
-                {!isCollapsed && "Dashboard"}
-              </Link>
+              <NavItem 
+                href="/" 
+                icon={<LayoutDashboard className="h-5 w-5" />} 
+                label="Dashboard" 
+                isCollapsed={isCollapsed}
+                isActive={isActive}
+                getLinkClasses={getLinkClasses}
+                getIconClasses={getIconClasses}
+              />
             </li>
           )}
           {!isNormalUser && (
             <li>
-              <Link href="/patients" className={getLinkClasses("/patients")}>
-                <Users className={getIconClasses("/patients")} />
-                {!isCollapsed && "Patients"}
-              </Link>
+              <NavItem 
+                href="/patients" 
+                icon={<Users className="h-5 w-5" />} 
+                label="Patients" 
+                isCollapsed={isCollapsed}
+                isActive={isActive}
+                getLinkClasses={getLinkClasses}
+                getIconClasses={getIconClasses}
+              />
             </li>
           )}
           {!isNormalUser && (
             <li>
-              <Link href="/register" className={getLinkClasses("/register")}>
-                <ClipboardList className={getIconClasses("/register")} />
-                {!isCollapsed && "Registration"}
-              </Link>
+              <NavItem 
+                href="/register" 
+                icon={<ClipboardList className="h-5 w-5" />} 
+                label="Registration" 
+                isCollapsed={isCollapsed}
+                isActive={isActive}
+                getLinkClasses={getLinkClasses}
+                getIconClasses={getIconClasses}
+              />
             </li>
           )}
           <li>
-            <Link href="/examinations" className={getLinkClasses("/examinations")}>
-              <Stethoscope className={getIconClasses("/examinations")} />
-              {!isCollapsed && "Examinations"}
-            </Link>
+            <NavItem 
+              href="/examinations" 
+              icon={<Stethoscope className="h-5 w-5" />} 
+              label="Examinations" 
+              isCollapsed={isCollapsed}
+              isActive={isActive}
+              getLinkClasses={getLinkClasses}
+              getIconClasses={getIconClasses}
+            />
           </li>
           <li>
-            <Link href="/pacs-browser" className={getLinkClasses("/pacs-browser")}>
-              <Archive className={getIconClasses("/pacs-browser")} />
-              {!isCollapsed && "PACS Browser"}
-            </Link>
+            <NavItem 
+              href="/pacs-browser" 
+              icon={<Archive className="h-5 w-5" />} 
+              label="PACS Browser" 
+              isCollapsed={isCollapsed}
+              isActive={isActive}
+              getLinkClasses={getLinkClasses}
+              getIconClasses={getIconClasses}
+            />
           </li>
           {!isNormalUser && (
             <li>
-              <Link href="/upload" className={getLinkClasses("/upload")}>
-                <Upload className={getIconClasses("/upload")} />
-                {!isCollapsed && "Upload DICOM"}
-              </Link>
+              <NavItem 
+                href="/upload" 
+                icon={<Upload className="h-5 w-5" />} 
+                label="Upload DICOM" 
+                isCollapsed={isCollapsed}
+                isActive={isActive}
+                getLinkClasses={getLinkClasses}
+                getIconClasses={getIconClasses}
+              />
             </li>
           )}
           {!isNormalUser && (
             <li>
-              <Link href="/media-distributions" className={getLinkClasses("/media-distributions")}>
-                <Disc3 className={getIconClasses("/media-distributions")} />
-                {!isCollapsed && "CD/Film Distribution"}
-              </Link>
+              <NavItem 
+                href="/media-distributions" 
+                icon={<Disc3 className="h-5 w-5" />} 
+                label="CD/Film Distribution" 
+                isCollapsed={isCollapsed}
+                isActive={isActive}
+                getLinkClasses={getLinkClasses}
+                getIconClasses={getIconClasses}
+              />
             </li>
           )}
           
@@ -266,10 +342,15 @@ export default function Sidebar({ className, isCollapsed, onToggleCollapse }: Si
               </li>
               
               <li>
-                <Link href="/reject-analysis" className={getLinkClasses("/reject-analysis")}>
-                  <AlertTriangle className={getIconClasses("/reject-analysis")} />
-                  {!isCollapsed && "Reject Analysis"}
-                </Link>
+                <NavItem 
+                  href="/reject-analysis" 
+                  icon={<AlertTriangle className="h-5 w-5" />} 
+                  label="Reject Analysis" 
+                  isCollapsed={isCollapsed}
+                  isActive={isActive}
+                  getLinkClasses={getLinkClasses}
+                  getIconClasses={getIconClasses}
+                />
               </li>
               
               <li className="pt-4 pb-2">
@@ -279,34 +360,59 @@ export default function Sidebar({ className, isCollapsed, onToggleCollapse }: Si
               </li>
               
               <li>
-                <Link href="/wards" className={getLinkClasses("/wards")}>
-                  <Home className={getIconClasses("/wards")} />
-                  {!isCollapsed && "Wards"}
-                </Link>
+                <NavItem 
+                  href="/wards" 
+                  icon={<Home className="h-5 w-5" />} 
+                  label="Wards" 
+                  isCollapsed={isCollapsed}
+                  isActive={isActive}
+                  getLinkClasses={getLinkClasses}
+                  getIconClasses={getIconClasses}
+                />
               </li>
               <li>
-                <Link href="/modalities" className={getLinkClasses("/modalities")}>
-                  <X className={getIconClasses("/modalities")} />
-                  {!isCollapsed && "Modalities"}
-                </Link>
+                <NavItem 
+                  href="/modalities" 
+                  icon={<X className="h-5 w-5" />} 
+                  label="Modalities" 
+                  isCollapsed={isCollapsed}
+                  isActive={isActive}
+                  getLinkClasses={getLinkClasses}
+                  getIconClasses={getIconClasses}
+                />
               </li>
               <li>
-                <Link href="/body-parts" className={getLinkClasses("/body-parts")}>
-                  <Bone className={getIconClasses("/body-parts")} />
-                  {!isCollapsed && "Body Parts"}
-                </Link>
+                <NavItem 
+                  href="/body-parts" 
+                  icon={<Bone className="h-5 w-5" />} 
+                  label="Body Parts" 
+                  isCollapsed={isCollapsed}
+                  isActive={isActive}
+                  getLinkClasses={getLinkClasses}
+                  getIconClasses={getIconClasses}
+                />
               </li>
               <li>
-                <Link href="/exams" className={getLinkClasses("/exams")}>
-                  <FileText className={getIconClasses("/exams")} />
-                  {!isCollapsed && "Exam Types"}
-                </Link>
+                <NavItem 
+                  href="/exams" 
+                  icon={<FileText className="h-5 w-5" />} 
+                  label="Exam Types" 
+                  isCollapsed={isCollapsed}
+                  isActive={isActive}
+                  getLinkClasses={getLinkClasses}
+                  getIconClasses={getIconClasses}
+                />
               </li>
               <li>
-                <Link href="/mwl" className={getLinkClasses("/mwl")}>
-                  <ListChecks className={getIconClasses("/mwl")} />
-                  {!isCollapsed && "MWL Worklist"}
-                </Link>
+                <NavItem 
+                  href="/mwl" 
+                  icon={<ListChecks className="h-5 w-5" />} 
+                  label="MWL Worklist" 
+                  isCollapsed={isCollapsed}
+                  isActive={isActive}
+                  getLinkClasses={getLinkClasses}
+                  getIconClasses={getIconClasses}
+                />
               </li>
               
               <li className="pt-4 pb-2">
@@ -315,24 +421,47 @@ export default function Sidebar({ className, isCollapsed, onToggleCollapse }: Si
                 </div>
               </li>
               <li>
-                <Link href="/staff" className={getLinkClasses("/staff")}>
-                  <UserCog className={getIconClasses("/staff")} />
-                  {!isCollapsed && "Staff Management"}
-                </Link>
+                <NavItem 
+                  href="/staff" 
+                  icon={<UserCog className="h-5 w-5" />} 
+                  label="Staff Management" 
+                  isCollapsed={isCollapsed}
+                  isActive={isActive}
+                  getLinkClasses={getLinkClasses}
+                  getIconClasses={getIconClasses}
+                />
               </li>
               {isSupervisor && (
                 <li>
-                  <Link href="/settings" className={getLinkClasses("/settings")}>
-                    <Settings className={getIconClasses("/settings")} />
-                    {!isCollapsed && "Settings"}
-                  </Link>
+                  <NavItem 
+                    href="/settings" 
+                    icon={<Settings className="h-5 w-5" />} 
+                    label="Settings" 
+                    isCollapsed={isCollapsed}
+                    isActive={isActive}
+                    getLinkClasses={getLinkClasses}
+                    getIconClasses={getIconClasses}
+                  />
                 </li>
               )}
               <li>
-                <div className="flex items-center p-2 text-gray-400 cursor-not-allowed">
-                  <BarChart className="h-5 w-5 mr-2" />
-                  {!isCollapsed && "Reports"}
-                </div>
+                {isCollapsed ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="flex items-center justify-center p-2 text-gray-400 cursor-not-allowed">
+                        <BarChart className="h-5 w-5" />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      <p>Reports</p>
+                    </TooltipContent>
+                  </Tooltip>
+                ) : (
+                  <div className="flex items-center p-2 text-gray-400 cursor-not-allowed">
+                    <BarChart className="h-5 w-5 mr-2" />
+                    Reports
+                  </div>
+                )}
               </li>
             </>
           )}
@@ -365,18 +494,33 @@ export default function Sidebar({ className, isCollapsed, onToggleCollapse }: Si
         ) : (
           <div className="flex flex-col gap-2 items-center">
             <ThemeIconOnly />
-            <Avatar className="h-8 w-8">
-              <AvatarImage src="" alt={user?.username ?? ""} />
-              <AvatarFallback>{user?.username?.[0].toUpperCase()}</AvatarFallback>
-            </Avatar>
-            <Link href="/profile">
-              <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-white/10 hover:text-white">
-                <Settings className="h-4 w-4" />
-              </Button>
-            </Link>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Avatar className="h-8 w-8 cursor-pointer">
+                  <AvatarImage src="" alt={user?.username ?? ""} />
+                  <AvatarFallback>{user?.username?.[0].toUpperCase()}</AvatarFallback>
+                </Avatar>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <p>{user?.username}</p>
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Link href="/profile">
+                  <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-white/10 hover:text-white">
+                    <Settings className="h-4 w-4" />
+                  </Button>
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <p>Profile Settings</p>
+              </TooltipContent>
+            </Tooltip>
           </div>
         )}
       </div>
     </aside>
+    </TooltipProvider>
   );
 } 
