@@ -4,16 +4,32 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { ArrowLeft, AlertTriangle, Server, CheckCircle, XCircle } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { ArrowLeft, AlertTriangle, Server, CheckCircle, XCircle, Settings, Save, RotateCcw } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePacsConfig } from '@/hooks/usePacsConfig';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from '@/lib/toast';
+
+// Default target reject rates
+const DEFAULT_TARGETS = {
+  xray: 2.0,
+  ct: 1.5,
+  mri: 1.0,
+  ultrasound: 1.5,
+  mammography: 3.0,
+  overall: 2.0
+};
 
 export default function RejectAnalysisSettingsPage() {
   const { user } = useAuth();
   const [savingServerId, setSavingServerId] = useState<number | null>(null);
+  const [isTargetDialogOpen, setIsTargetDialogOpen] = useState(false);
+  const [customTargets, setCustomTargets] = useState(DEFAULT_TARGETS);
+  const [targetsSaving, setTargetsSaving] = useState(false);
   
   const {
     servers: pacsServers,
@@ -25,6 +41,18 @@ export default function RejectAnalysisSettingsPage() {
 
   const isSuperuser = user?.is_superuser || false;
 
+  // Load custom targets from localStorage on component mount
+  useEffect(() => {
+    const savedTargets = localStorage.getItem('rejectAnalysisTargets');
+    if (savedTargets) {
+      try {
+        setCustomTargets(JSON.parse(savedTargets));
+      } catch (error) {
+        console.error('Failed to parse saved targets:', error);
+      }
+    }
+  }, []);
+
   // Handle updating reject analysis configuration for a PACS server
   const updateRejectAnalysisConfig = async (serverId: number, includeInAnalysis: boolean) => {
     try {
@@ -35,6 +63,42 @@ export default function RejectAnalysisSettingsPage() {
     } finally {
       setSavingServerId(null);
     }
+  };
+
+  // Handle target input changes
+  const handleTargetChange = (modality: keyof typeof DEFAULT_TARGETS, value: string) => {
+    const numValue = parseFloat(value);
+    if (!isNaN(numValue) && numValue >= 0 && numValue <= 100) {
+      setCustomTargets(prev => ({
+        ...prev,
+        [modality]: numValue
+      }));
+    }
+  };
+
+  // Save custom targets
+  const saveCustomTargets = async () => {
+    try {
+      setTargetsSaving(true);
+      
+      // Save to localStorage for now (later this could be an API call)
+      localStorage.setItem('rejectAnalysisTargets', JSON.stringify(customTargets));
+      
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      toast.success('Target reject rates updated successfully');
+      setIsTargetDialogOpen(false);
+    } catch (error) {
+      toast.error('Failed to save target reject rates');
+    } finally {
+      setTargetsSaving(false);
+    }
+  };
+
+  // Reset to default targets
+  const resetToDefaults = () => {
+    setCustomTargets(DEFAULT_TARGETS);
   };
 
   // Redirect if not superuser
@@ -216,52 +280,172 @@ export default function RejectAnalysisSettingsPage() {
           <div className="space-y-6">
             {/* Target Reject Rates */}
             <div>
-              <h3 className="font-medium mb-4">Default Target Reject Rates (%)</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-medium">Target Reject Rates (%)</h3>
+                <Dialog open={isTargetDialogOpen} onOpenChange={setIsTargetDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline">
+                      <Settings className="h-4 w-4 mr-2" />
+                      Customize Targets
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Customize Target Reject Rates</DialogTitle>
+                      <DialogDescription>
+                        Set custom target reject rates for each modality. These targets are used for performance analysis and alerts.
+                      </DialogDescription>
+                    </DialogHeader>
+                    
+                    <div className="space-y-4 py-4">
+                      <div className="grid gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="xray-target">X-Ray (%)</Label>
+                          <Input
+                            id="xray-target"
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            value={customTargets.xray}
+                            onChange={(e) => handleTargetChange('xray', e.target.value)}
+                          />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="ct-target">CT Scan (%)</Label>
+                          <Input
+                            id="ct-target"
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            value={customTargets.ct}
+                            onChange={(e) => handleTargetChange('ct', e.target.value)}
+                          />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="mri-target">MRI (%)</Label>
+                          <Input
+                            id="mri-target"
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            value={customTargets.mri}
+                            onChange={(e) => handleTargetChange('mri', e.target.value)}
+                          />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="ultrasound-target">Ultrasound (%)</Label>
+                          <Input
+                            id="ultrasound-target"
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            value={customTargets.ultrasound}
+                            onChange={(e) => handleTargetChange('ultrasound', e.target.value)}
+                          />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="mammography-target">Mammography (%)</Label>
+                          <Input
+                            id="mammography-target"
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            value={customTargets.mammography}
+                            onChange={(e) => handleTargetChange('mammography', e.target.value)}
+                          />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="overall-target">Overall Department (%)</Label>
+                          <Input
+                            id="overall-target"
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            value={customTargets.overall}
+                            onChange={(e) => handleTargetChange('overall', e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="flex gap-2 pt-4">
+                        <Button
+                          variant="outline"
+                          onClick={resetToDefaults}
+                          className="flex-1"
+                        >
+                          <RotateCcw className="h-4 w-4 mr-2" />
+                          Reset to Defaults
+                        </Button>
+                        <Button
+                          onClick={saveCustomTargets}
+                          disabled={targetsSaving}
+                          className="flex-1"
+                        >
+                          {targetsSaving ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                              Saving...
+                            </>
+                          ) : (
+                            <>
+                              <Save className="h-4 w-4 mr-2" />
+                              Save Changes
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
+              
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">X-Ray</label>
-                  <div className="text-lg font-bold text-blue-600">2.0%</div>
-                  <p className="text-xs text-muted-foreground">Standard target for X-Ray examinations</p>
+                  <div className="text-lg font-bold text-blue-600">{customTargets.xray}%</div>
+                  <p className="text-xs text-muted-foreground">Target for X-Ray examinations</p>
                 </div>
                 
                 <div className="space-y-2">
                   <label className="text-sm font-medium">CT Scan</label>
-                  <div className="text-lg font-bold text-blue-600">1.5%</div>
-                  <p className="text-xs text-muted-foreground">Standard target for CT examinations</p>
+                  <div className="text-lg font-bold text-blue-600">{customTargets.ct}%</div>
+                  <p className="text-xs text-muted-foreground">Target for CT examinations</p>
                 </div>
                 
                 <div className="space-y-2">
                   <label className="text-sm font-medium">MRI</label>
-                  <div className="text-lg font-bold text-blue-600">1.0%</div>
-                  <p className="text-xs text-muted-foreground">Standard target for MRI examinations</p>
+                  <div className="text-lg font-bold text-blue-600">{customTargets.mri}%</div>
+                  <p className="text-xs text-muted-foreground">Target for MRI examinations</p>
                 </div>
                 
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Ultrasound</label>
-                  <div className="text-lg font-bold text-blue-600">1.5%</div>
-                  <p className="text-xs text-muted-foreground">Standard target for Ultrasound examinations</p>
+                  <div className="text-lg font-bold text-blue-600">{customTargets.ultrasound}%</div>
+                  <p className="text-xs text-muted-foreground">Target for Ultrasound examinations</p>
                 </div>
                 
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Mammography</label>
-                  <div className="text-lg font-bold text-blue-600">3.0%</div>
-                  <p className="text-xs text-muted-foreground">Standard target for Mammography examinations</p>
+                  <div className="text-lg font-bold text-blue-600">{customTargets.mammography}%</div>
+                  <p className="text-xs text-muted-foreground">Target for Mammography examinations</p>
                 </div>
                 
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Overall</label>
-                  <div className="text-lg font-bold text-green-600">2.0%</div>
+                  <div className="text-lg font-bold text-green-600">{customTargets.overall}%</div>
                   <p className="text-xs text-muted-foreground">Overall department target</p>
                 </div>
-              </div>
-              
-              <div className="mt-4">
-                <Button variant="outline" disabled>
-                  Customize Targets
-                </Button>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Target customization will be available in a future update
-                </p>
               </div>
             </div>
 
