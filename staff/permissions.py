@@ -31,43 +31,27 @@ class IsStaffOrReadOnly(BasePermission):
         return request.user and request.user.is_authenticated and request.user.is_staff
 
 
-class IsRadiologist(BasePermission):
+class CanReport(BasePermission):
     """
-    Allows access only to radiologists (doctors and medical officers).
-    """
-    
-    def has_permission(self, request, view):
-        if not (request.user and request.user.is_authenticated):
-            return False
-        
-        # Check if user is a radiologist based on job position (jawatan)
-        radiologist_positions = ['Pegawai Perubatan', 'Penolong Pegawai Perubatan']
-        return request.user.jawatan in radiologist_positions or request.user.is_superuser
-
-
-class IsTechnologist(BasePermission):
-    """
-    Allows access only to radiologic technologists.
+    Allows access only to users who can create reports.
     """
     
     def has_permission(self, request, view):
         if not (request.user and request.user.is_authenticated):
             return False
         
-        # Check if user is a technologist based on job position (jawatan)
-        technologist_positions = ['Juru X-Ray']
-        return request.user.jawatan in technologist_positions or request.user.is_superuser
+        # Check if user has reporting permission or is superuser
+        return request.user.can_report or request.user.is_superuser
 
 
-class IsRadiologistOrTechnologist(BasePermission):
+class CanViewReport(BasePermission):
     """
-    Allows access to both radiologists and technologists.
+    Allows access to users who can view reports.
     """
     
     def has_permission(self, request, view):
         if not (request.user and request.user.is_authenticated):
             return False
         
-        # Check if user is either a radiologist or technologist
-        medical_positions = ['Pegawai Perubatan', 'Penolong Pegawai Perubatan', 'Juru X-Ray']
-        return request.user.jawatan in medical_positions or request.user.is_superuser
+        # Check if user has report viewing permission, is supervisor, or is superuser
+        return request.user.can_view_report or request.user.is_staff or request.user.is_superuser

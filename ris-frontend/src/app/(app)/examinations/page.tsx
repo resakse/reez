@@ -736,24 +736,21 @@ export default function ExaminationsPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-2">
-                          {exam.daftar_info.study_instance_uid ? (
-                            <Button asChild variant="outline" size="sm">
-                              <Link href={`/pacs-browser/${exam.daftar_info.study_instance_uid}`}>
-                                <Eye className="h-4 w-4 mr-1" />
-                                View
+                          {exam.study_instance_uid || exam.daftar_info.study_instance_uid ? (
+                            <Button asChild variant="outline" size="sm" title="View DICOM Images">
+                              <Link href={`/pacs-browser/${exam.study_instance_uid || exam.daftar_info.study_instance_uid}`}>
+                                <Eye className="h-4 w-4" />
                               </Link>
                             </Button>
                           ) : (
-                            <Button variant="outline" size="sm" disabled>
-                              <Eye className="h-4 w-4 mr-1" />
-                              View
+                            <Button variant="outline" size="sm" disabled title="No DICOM images available">
+                              <Eye className="h-4 w-4" />
                             </Button>
                           )}
                           {(user?.is_superuser || user?.is_staff) && (
-                            <Button asChild variant="outline" size="sm">
+                            <Button asChild variant="outline" size="sm" title="Edit Examination">
                               <Link href={`/studies/${exam.daftar_info.id}/edit`}>
-                                <Edit className="h-4 w-4 mr-1" />
-                                Edit
+                                <Edit className="h-4 w-4" />
                               </Link>
                             </Button>
                           )}

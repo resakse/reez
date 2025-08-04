@@ -11,7 +11,7 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import AuthService from '@/lib/auth';
-import { ArrowLeft, Calendar, User, MapPin, Phone, Mail, CreditCard, Edit } from 'lucide-react';
+import { ArrowLeft, Calendar, User, MapPin, Phone, Mail, CreditCard, Edit, Eye } from 'lucide-react';
 
 interface Patient {
   id: number;
@@ -493,9 +493,20 @@ export default function PatientDetailPage() {
                                           className="text-xs"
                                           title="View DICOM images"
                                         >
-                                          View
+                                          <Eye className="h-3 w-3" />
                                         </Button>
                                       ) : (
+                                        <Button 
+                                          variant="outline" 
+                                          size="sm"
+                                          disabled
+                                          className="text-xs"
+                                          title="No DICOM images available"
+                                        >
+                                          <Eye className="h-3 w-3" />
+                                        </Button>
+                                      )}
+                                      {!registration.study_instance_uid && (
                                         <Button 
                                           variant="outline" 
                                           size="sm"

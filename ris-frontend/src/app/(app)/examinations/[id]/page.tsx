@@ -151,13 +151,21 @@ export default function ExaminationDetailPage() {
           Back to Examinations
         </Button>
         <div className="flex gap-2">
-          {hasStudyInstanceUID && (
+          {examination.study_instance_uid || examination.daftar_info.study_instance_uid ? (
             <Button 
-              onClick={() => router.push(`/viewer/${encodeURIComponent(examination.daftar_info.study_instance_uid!)}`)}
+              onClick={() => router.push(`/pacs-browser/${examination.study_instance_uid || examination.daftar_info.study_instance_uid}`)}
               variant="default"
+              title="View DICOM Images"
             >
-              <Eye className="w-4 h-4 mr-2" />
-              Open in Full Viewer
+              <Eye className="w-4 h-4" />
+            </Button>
+          ) : (
+            <Button 
+              disabled
+              variant="default"
+              title="No DICOM images available"
+            >
+              <Eye className="w-4 h-4" />
             </Button>
           )}
           <Button 
@@ -180,12 +188,10 @@ export default function ExaminationDetailPage() {
             </TabsTrigger>
             <TabsTrigger 
               value="viewer" 
-              disabled={!hasStudyInstanceUID}
               className="flex items-center gap-2"
             >
               <Monitor className="h-4 w-4" />
-              DICOM Viewer
-              {!hasStudyInstanceUID && <Badge variant="secondary" className="ml-1 text-xs">N/A</Badge>}
+              Collaborative Viewer
             </TabsTrigger>
           </TabsList>
           
@@ -420,67 +426,70 @@ export default function ExaminationDetailPage() {
           </TabsContent>
           
           <TabsContent value="viewer" className="mt-6">
-            {hasStudyInstanceUID ? (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Monitor className="h-5 w-5" />
-                    DICOM Viewer
-                  </CardTitle>
-                  <CardDescription>
-                    View DICOM images for study: {examination.daftar_info.study_instance_uid}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center py-8">
-                    <Monitor className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                    <p className="text-lg font-semibold mb-2">DICOM Viewer Available</p>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Click the button below to open the full DICOM viewer for this study.
-                    </p>
-                    <Button 
-                      onClick={() => router.push(`/pacs-browser/${examination.daftar_info.study_instance_uid}`)}
-                      size="lg"
-                    >
-                      <Eye className="w-4 h-4 mr-2" />
-                      Open DICOM Viewer
-                    </Button>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Monitor className="h-5 w-5" />
+                  Collaborative Viewer
+                </CardTitle>
+                <CardDescription>
+                  View DICOM images and create radiology reports in a unified interface
+                  {examination.daftar_info.study_instance_uid && (
+                    <> - Study: {examination.daftar_info.study_instance_uid}</>
+                  )}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8">
+                  <div className="flex justify-center items-center gap-4 mb-6">
+                    <div className="flex flex-col items-center">
+                      <Monitor className="h-8 w-8 mb-2 text-blue-600" />
+                      <span className="text-sm font-medium">DICOM Viewing</span>
+                    </div>
+                    <div className="w-8 h-0.5 bg-border"></div>
+                    <div className="flex flex-col items-center">
+                      <FileText className="h-8 w-8 mb-2 text-green-600" />
+                      <span className="text-sm font-medium">Report Editor</span>
+                    </div>
+                    <div className="w-8 h-0.5 bg-border"></div>
+                    <div className="flex flex-col items-center">
+                      <Stethoscope className="h-8 w-8 mb-2 text-purple-600" />
+                      <span className="text-sm font-medium">AI Assistance</span>
+                    </div>
                   </div>
-                </CardContent>
-              </Card>
-            ) : (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-muted-foreground">
-                    <Monitor className="h-5 w-5" />
-                    DICOM Viewer Not Available
-                  </CardTitle>
-                  <CardDescription>
-                    No Study Instance UID found for this examination
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Monitor className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p className="text-lg mb-2">DICOM Images Not Available</p>
-                    <p className="text-sm">
-                      This examination does not have an associated DICOM study.
-                      Images may not have been acquired yet or the study may not be linked to the PACS system.
-                    </p>
-                    {examination.daftar_info.accession_number && (
-                      <div className="mt-4 p-3 bg-muted rounded-lg">
-                        <p className="text-xs">
+                  
+                  <p className="text-lg font-semibold mb-2">Integrated Collaborative Reporting</p>
+                  <p className="text-sm text-muted-foreground mb-6">
+                    View DICOM images and write radiology reports in a single seamless interface.
+                    {!examination.daftar_info.study_instance_uid && (
+                      <> Note: This examination has no DICOM images, but you can still create reports.</>
+                    )}
+                  </p>
+                  
+                  <Button 
+                    onClick={() => router.push(`/collaborative-viewer/${examinationId}`)}
+                    size="lg"
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    <Eye className="w-4 h-4 mr-2" />
+                    Open Collaborative Viewer
+                  </Button>
+                  
+                  {examination.daftar_info.study_instance_uid && (
+                    <div className="mt-4 p-3 bg-muted/30 rounded-lg text-left">
+                      <p className="text-xs">
+                        <strong>Study Instance UID:</strong> {examination.daftar_info.study_instance_uid}
+                      </p>
+                      {examination.daftar_info.accession_number && (
+                        <p className="text-xs mt-1">
                           <strong>Accession Number:</strong> {examination.daftar_info.accession_number}
                         </p>
-                        <p className="text-xs mt-1">
-                          Use this accession number to manually link the study in the PACS system.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+                      )}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>

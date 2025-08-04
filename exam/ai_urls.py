@@ -22,12 +22,20 @@ from .ai_views import (
     AIReportGenerationAPIView
 )
 
+from .manual_report_views import (
+    ManualRadiologyReportViewSet,
+    ManualReportCompleteView
+)
+
 # Create router for ViewSets
 router = DefaultRouter()
 router.register(r'ai-reports', AIGeneratedReportViewSet, basename='ai-reports')
 router.register(r'radiologist-reports', RadiologistReportViewSet, basename='radiologist-reports')
 router.register(r'collaborations', ReportCollaborationViewSet, basename='collaborations')
 router.register(r'performance', AIModelPerformanceViewSet, basename='performance')
+
+# Manual reporting (AI-independent)
+router.register(r'manual-reports', ManualRadiologyReportViewSet, basename='manual-reports')
 
 app_name = 'ai_reporting'
 
@@ -68,4 +76,9 @@ urlpatterns = [
     path('api/ai-reporting/performance/summary/', 
          AIModelPerformanceViewSet.as_view({'get': 'summary_stats'}), 
          name='performance-summary'),
+    
+    # Manual reporting endpoints (AI-independent)
+    path('api/manual-reports/<int:report_id>/complete/', 
+         ManualReportCompleteView.as_view(), 
+         name='manual-report-complete'),
 ]

@@ -37,7 +37,7 @@ from .serializers import (
     AIConfigurationSerializer, PemeriksaanSerializer
 )
 from .ai_services import AIReportingService
-from staff.permissions import IsRadiologist, IsTechnologist
+from staff.permissions import CanReport, CanViewReport
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +117,7 @@ class AIGeneratedReportViewSet(viewsets.ModelViewSet):
             return AIGeneratedReportListSerializer
         return AIGeneratedReportSerializer
     
-    @action(detail=False, methods=['post'], permission_classes=[IsRadiologist])
+    @action(detail=False, methods=['post'], permission_classes=[CanReport])
     def generate_report(self, request):
         """
         Generate AI report for a specific examination
@@ -167,7 +167,7 @@ class AIGeneratedReportViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
-    @action(detail=True, methods=['post'], permission_classes=[IsRadiologist])
+    @action(detail=True, methods=['post'], permission_classes=[CanReport])
     def update_review_status(self, request, pk=None):
         """
         Update review status of AI report
@@ -252,7 +252,7 @@ class RadiologistReportViewSet(viewsets.ModelViewSet):
     """
     serializer_class = RadiologistReportSerializer
     pagination_class = StandardResultsSetPagination
-    permission_classes = [permissions.IsAuthenticated, IsRadiologist]
+    permission_classes = [permissions.IsAuthenticated, CanReport]
     
     def get_queryset(self):
         """Get filtered queryset based on user and query parameters"""
@@ -413,7 +413,7 @@ class ReportCollaborationViewSet(viewsets.ReadOnlyModelViewSet):
     """
     serializer_class = ReportCollaborationSerializer
     pagination_class = StandardResultsSetPagination
-    permission_classes = [permissions.IsAuthenticated, IsRadiologist]
+    permission_classes = [permissions.IsAuthenticated, CanReport]
     
     def get_queryset(self):
         """Get filtered collaboration records"""
@@ -455,7 +455,7 @@ class AIModelPerformanceViewSet(viewsets.ModelViewSet):
     """
     serializer_class = AIModelPerformanceSerializer
     pagination_class = StandardResultsSetPagination
-    permission_classes = [permissions.IsAuthenticated, IsRadiologist]
+    permission_classes = [permissions.IsAuthenticated, CanReport]
     
     def get_queryset(self):
         """Get filtered performance records"""
@@ -543,7 +543,7 @@ class AIConfigurationView(APIView):
     API view for AI system configuration management
     Singleton configuration with proper permissions
     """
-    permission_classes = [permissions.IsAuthenticated, IsRadiologist]
+    permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
     
     def get(self, request):
         """Get current AI configuration"""
@@ -573,7 +573,7 @@ class AIConfigurationView(APIView):
 
 class AIConnectionTestView(APIView):
     """Test AI service connection"""
-    permission_classes = [permissions.IsAuthenticated, IsRadiologist]
+    permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
     
     def post(self, request):
         """Test connection to AI services"""

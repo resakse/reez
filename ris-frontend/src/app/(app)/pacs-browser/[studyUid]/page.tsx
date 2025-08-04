@@ -68,8 +68,26 @@ import {
   Building,
   ChevronLeft,
   ChevronRight,
-  Maximize2
+  Maximize2,
+  FileText
 } from 'lucide-react';
+
+const ReportingPanel = dynamic(() => import('@/components/ReportingPanel'), {
+  ssr: false,
+  loading: () => (
+    <div className="p-4">
+      <div className="animate-pulse space-y-3">
+        <div className="h-4 bg-muted rounded w-3/4"></div>
+        <div className="h-20 bg-muted rounded"></div>
+        <div className="h-20 bg-muted rounded"></div>
+      </div>
+    </div>
+  ),
+});
+
+const ReportingModal = dynamic(() => import('@/components/ReportingModal'), {
+  ssr: false,
+});
 
 interface StudyMetadata {
   PatientName?: string;
@@ -105,6 +123,9 @@ export default function LegacyStudyViewerPage() {
   const [risStudyId, setRisStudyId] = useState<number | null>(null);
   const [risExaminations, setRisExaminations] = useState<any[]>([]);
   const [enhancedDicomData, setEnhancedDicomData] = useState<any[]>([]);
+  const [hasReport, setHasReport] = useState(false);
+  const [showReporting, setShowReporting] = useState(false);
+  const [showReportingModal, setShowReportingModal] = useState(false);
   
   // Track fetched studies to prevent duplicate API calls
   const fetchedStudiesRef = useRef(new Set<string>());
@@ -547,14 +568,28 @@ export default function LegacyStudyViewerPage() {
             Press F to toggle full window • ESC to exit
           </div>
           
-          {/* Exit Full Window Button */}
-          <Button
-            onClick={() => setIsFullWindow(false)}
-            className="absolute top-4 right-4 bg-black/50 hover:bg-black/70"
-            size="sm"
-          >
-            Exit Full Window
-          </Button>
+          {/* Exit Full Window and Report Buttons */}
+          <div className="absolute top-4 right-4 flex gap-2">
+            {(user?.can_report || user?.can_view_report || user?.is_staff || user?.is_superuser) && (
+              <Button
+                onClick={() => setShowReportingModal(true)}
+                className="bg-blue-600/90 hover:bg-blue-700/90"
+                size="sm"
+                title="Create/View Report"
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                Report
+              </Button>
+            )}
+            
+            <Button
+              onClick={() => setIsFullWindow(false)}
+              className="bg-black/50 hover:bg-black/70"
+              size="sm"
+            >
+              Exit Full Window
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -618,35 +653,72 @@ export default function LegacyStudyViewerPage() {
           </div>
         )}
         
-        {/* Full Window Button */}
-        <Button
-          onClick={() => setIsFullWindow(true)}
-          className="absolute top-4 right-4 z-10"
-          size="sm"
-          variant="secondary"
-          title="Full Window View (Press F)"
-        >
-          <Maximize2 className="h-4 w-4 mr-2" />
-          Full Window
-        </Button>
+        {/* Action Buttons */}
+        <div className="absolute top-4 right-4 z-10 flex gap-2">
+          {(user?.can_report || user?.can_view_report || user?.is_staff || user?.is_superuser) && (
+            <Button
+              onClick={() => setShowReportingModal(true)}
+              size="sm"
+              variant="default"
+              title="Create/View Report"
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              Report
+            </Button>
+          )}
+          
+          <Button
+            onClick={() => setIsFullWindow(true)}
+            size="sm"
+            variant="secondary"
+            title="Full Window View (Press F)"
+          >
+            <Maximize2 className="h-4 w-4 mr-2" />
+            Full Window
+          </Button>
+        </div>
       </div>
 
-      {/* Collapsible Info Panel */}
+      {/* Collapsible Info/Report Panel */}
       <div className={`${isPanelCollapsed ? 'w-12' : 'w-80'} border-l bg-muted/5 overflow-hidden transition-all duration-300 ease-in-out relative`}>
-        {/* Collapse Toggle Button */}
-        <Button
-          onClick={() => setIsPanelCollapsed(!isPanelCollapsed)}
-          className="absolute top-4 left-1 z-20 bg-background border shadow-sm"
-          size="sm"
-          variant="secondary"
-          title={isPanelCollapsed ? "Expand Panel" : "Collapse Panel"}
-        >
-          {isPanelCollapsed ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-        </Button>
+        {/* Panel Toggle Buttons */}
+        <div className="absolute top-4 left-1 z-20 flex flex-col gap-1">
+          <Button
+            onClick={() => setIsPanelCollapsed(!isPanelCollapsed)}
+            className="bg-background border shadow-sm"
+            size="sm"
+            variant="secondary"
+            title={isPanelCollapsed ? "Expand Panel" : "Collapse Panel"}
+          >
+            {isPanelCollapsed ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          </Button>
+          
+          {!isPanelCollapsed && (user?.can_report || user?.can_view_report || user?.is_staff || user?.is_superuser) && (
+            <Button
+              onClick={() => setShowReporting(!showReporting)}
+              className="bg-background border shadow-sm"
+              size="sm"
+              variant={showReporting ? "default" : "secondary"}
+              title={showReporting ? "Show Study Info" : "Show Reports"}
+            >
+              {showReporting ? <Eye className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
+            </Button>
+          )}
+        </div>
         
         {!isPanelCollapsed && (
           <div className="overflow-y-auto h-full">
-        <div className="p-4 space-y-4">
+            {showReporting ? (
+              <div className="p-4">
+                <ReportingPanel
+                  studyInstanceUID={studyUid}
+                  examinations={risExaminations}
+                  onReportChange={setHasReport}
+                />
+              </div>
+            ) : (
+              <div className="p-4 space-y-4">
 
           {/* Import Button or RIS Link */}
           {isImportedToRis ? (
@@ -918,10 +990,20 @@ export default function LegacyStudyViewerPage() {
               </Badge>
             </CardContent>
           </Card>
-        </div>
+              </div>
+            )}
           </div>
         )}
       </div>
+
+      {/* Reporting Modal */}
+      <ReportingModal
+        isOpen={showReportingModal}
+        onClose={() => setShowReportingModal(false)}
+        studyInstanceUID={studyUid}
+        examinations={risExaminations}
+        studyMetadata={metadata}
+      />
     </div>
   );
 }

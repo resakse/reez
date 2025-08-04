@@ -19,6 +19,9 @@ class Staff(AbstractUser):
     komen = models.CharField(max_length=200, blank=True, null=True)
     jxr = models.CharField(max_length=150, blank=True, null=True)
     kemaskini = models.DateTimeField(auto_now=True)
+    
+    can_report = models.BooleanField(default=False, help_text="User can create and edit radiology reports")
+    can_view_report = models.BooleanField(default=True, help_text="User can view radiology reports")
 
     def __str__(self):
         return self.username

@@ -24,7 +24,7 @@ const AISettingsContext = createContext<AISettingsContextType | undefined>(undef
 
 export function AISettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<AISettings>({
-    enabled: false,
+    enabled: false, // DISABLED until backend APIs are implemented
     ollama_url: 'http://localhost:11434',
     vision_model: 'llava-med:7b',
     medical_llm: 'meditron:7b',
@@ -33,14 +33,25 @@ export function AISettingsProvider({ children }: { children: ReactNode }) {
     confidence_threshold: 0.8
   });
   
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false); // No loading needed
 
   const loadSettings = async () => {
     try {
       setIsLoading(true);
-      const response = await AuthService.authenticatedFetch('/api/ai-reporting/config/');
+      
+      // Check AI configuration directly from the database
+      const response = await AuthService.authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai-reporting/config/`);
       if (response.ok) {
         const data = await response.json();
+        
+        // If AI is disabled in settings, don't make any more AI calls
+        if (!data.enable_ai_reporting) {
+          console.log('AI reporting disabled in settings');
+          setSettings(prev => ({ ...prev, enabled: false }));
+          return;
+        }
+        
+        // AI is enabled, load full configuration
         setSettings({
           enabled: data.enable_ai_reporting,
           ollama_url: data.ollama_server_url,
@@ -50,9 +61,14 @@ export function AISettingsProvider({ children }: { children: ReactNode }) {
           max_concurrent_requests: data.max_concurrent_requests,
           confidence_threshold: data.confidence_threshold
         });
+      } else if (response.status === 404) {
+        // AI reporting endpoints not implemented yet
+        console.log('AI reporting API not available');
+        setSettings(prev => ({ ...prev, enabled: false }));
       }
     } catch (error) {
-      console.error('Failed to load AI settings:', error);
+      console.log('Failed to load AI settings:', error);
+      setSettings(prev => ({ ...prev, enabled: false }));
     } finally {
       setIsLoading(false);
     }
