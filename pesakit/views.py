@@ -4,8 +4,9 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q
 from .models import Pesakit
 from .serializers import PesakitSerializer
+from audit.mixins import PatientAuditMixin
 
-class PesakitViewSet(viewsets.ModelViewSet):
+class PesakitViewSet(PatientAuditMixin, viewsets.ModelViewSet):
     """
     API endpoint that allows patients to be viewed or edited.
     """

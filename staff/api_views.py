@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from django.contrib.auth import get_user_model
 from .models import Staff
 from .serializers import StaffSerializer, StaffCreateUpdateSerializer
+from audit.mixins import APIAuditMixin
 
 User = get_user_model()
 
@@ -17,7 +18,7 @@ class IsStaffPermission(permissions.BasePermission):
             request.user.is_staff
         )
 
-class StaffListCreateAPIView(generics.ListCreateAPIView):
+class StaffListCreateAPIView(APIAuditMixin, generics.ListCreateAPIView):
     queryset = Staff.objects.all()
     permission_classes = [IsStaffPermission]
     
@@ -39,9 +40,10 @@ class StaffListCreateAPIView(generics.ListCreateAPIView):
         return context
     
     def perform_create(self, serializer):
-        serializer.save()
+        # Use the audit mixin's perform_create method
+        return super().perform_create(serializer)
 
-class StaffRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
+class StaffRetrieveUpdateDestroyAPIView(APIAuditMixin, generics.RetrieveUpdateDestroyAPIView):
     queryset = Staff.objects.all()
     permission_classes = [IsStaffPermission]
     
@@ -56,11 +58,24 @@ class StaffRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
         return context
     
     def perform_update(self, serializer):
-        serializer.save()
+        # Use the audit mixin's perform_update method
+        return super().perform_update(serializer)
     
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
-        # Instead of deleting, just deactivate the staff
-        instance.is_active = False
-        instance.save()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        try:
+            # Log deactivation instead of deletion
+            old_data = {'is_active': instance.is_active, 'username': instance.username}
+            new_data = {'is_active': False, 'username': instance.username}
+            
+            # Instead of deleting, just deactivate the staff
+            instance.is_active = False
+            instance.save()
+            
+            # Log the deactivation
+            self.log_api_audit('DEACTIVATE', instance=instance, success=True)
+            
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except Exception as e:
+            self.log_api_audit('DEACTIVATE', instance=instance, success=False, exception=e)
+            raise

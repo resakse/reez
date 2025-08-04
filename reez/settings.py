@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'wad',
     'pesakit',
     'exam',
+    'audit',  # Small-scale audit trails system
 
     'rest_framework',
     'corsheaders',
@@ -71,10 +72,12 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'audit.middleware.AuditContextMiddleware',  # Audit context for thread-local storage
     'login_required.middleware.LoginRequiredMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     "django_htmx.middleware.HtmxMiddleware",
+    'audit.middleware.SimpleAuditMiddleware',  # Simple audit logging
 ]
 LOGIN_REQUIRED_IGNORE_PATHS = [
     r'/api/',
@@ -225,3 +228,47 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = 1000  # Allow many files in one upload
 DICOM_ORG_ROOT = '1.2.826.0.1.3680043.8.498'  # Example organization root UID
 DICOM_AE_TITLE = 'RIS_MWL_SCP'  # Application Entity title for MWL server
 DICOM_MWL_PORT = 11112  # Default port for MWL server
+
+# Audit Trail Configuration
+AUDIT_LOG_RETENTION_DAYS = 730  # 2 years retention period for compliance
+AUDIT_LOG_CLEANUP_BATCH_SIZE = 1000  # Batch size for cleanup operations
+AUDIT_SENSITIVE_FIELDS = [
+    'ic', 'nric', 'phone', 'email', 'address', 
+    'telefon', 'alamat', 'no_telefon', 'emel'
+]  # Fields that should be masked in audit logs
+
+# Configure logging for audit system
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'audit_file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': 'logs/audit.log',
+            'formatter': 'verbose',
+        },
+        'console': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+    },
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'loggers': {
+        'audit': {
+            'handlers': ['audit_file', 'console'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+    },
+}

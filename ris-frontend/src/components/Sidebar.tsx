@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Users, Settings, BarChart, Home, Stethoscope, X, Bone, FileText, ClipboardList, ListChecks, UserCog, Archive, Upload, Disc3, AlertTriangle, TrendingUp, Menu, Moon, Sun, Monitor, LogOut } from "lucide-react";
+import { LayoutDashboard, Users, Settings, BarChart, Home, Stethoscope, X, Bone, FileText, ClipboardList, ListChecks, UserCog, Archive, Upload, Disc3, AlertTriangle, TrendingUp, Menu, Moon, Sun, Monitor, LogOut, Shield } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "next-themes";
 import Swal from 'sweetalert2';
@@ -465,6 +465,19 @@ export default function Sidebar({ className, isCollapsed, onToggleCollapse }: Si
                     href="/settings" 
                     icon={<Settings className="h-5 w-5" />} 
                     label="Settings" 
+                    isCollapsed={isCollapsed}
+                    isActive={isActive}
+                    getLinkClasses={getLinkClasses}
+                    getIconClasses={getIconClasses}
+                  />
+                </li>
+              )}
+              {isSupervisor && (
+                <li>
+                  <NavItem 
+                    href="/audit-dashboard" 
+                    icon={<Shield className="h-5 w-5" />} 
+                    label="Audit Dashboard" 
                     isCollapsed={isCollapsed}
                     isActive={isActive}
                     getLinkClasses={getLinkClasses}
