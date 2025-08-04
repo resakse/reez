@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { TargetRatesProvider } from '@/contexts/TargetRatesContext';
+import { AISettingsProvider } from '@/contexts/AISettingsContext';
 import Sidebar from "@/components/Sidebar";
 
 export default function AppLayout({
@@ -45,10 +46,12 @@ export default function AppLayout({
 
   return (
     <TargetRatesProvider>
-      <div className="flex min-h-screen">
-        <Sidebar isCollapsed={isSidebarCollapsed} onToggleCollapse={toggleSidebar} />
-        <main className="flex-1 p-4 bg-background">{children}</main>
-      </div>
+      <AISettingsProvider>
+        <div className="flex min-h-screen">
+          <Sidebar isCollapsed={isSidebarCollapsed} onToggleCollapse={toggleSidebar} />
+          <main className="flex-1 p-4 bg-background">{children}</main>
+        </div>
+      </AISettingsProvider>
     </TargetRatesProvider>
   );
 } 

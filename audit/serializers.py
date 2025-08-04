@@ -40,7 +40,7 @@ class AuditLogDetailSerializer(serializers.ModelSerializer):
     action_display = serializers.CharField(source='get_action_display', read_only=True)
     formatted_timestamp = serializers.CharField(source='get_formatted_timestamp', read_only=True)
     action_color = serializers.CharField(source='get_action_display_color', read_only=True)
-    pretty_old_data = serializers.CharField(source='get_pretty_data', read_only=True)
+    pretty_old_data = serializers.SerializerMethodField()
     pretty_new_data = serializers.SerializerMethodField()
     
     class Meta:
@@ -64,6 +64,10 @@ class AuditLogDetailSerializer(serializers.ModelSerializer):
             'ip_address'
         ]
         read_only_fields = fields
+    
+    def get_pretty_old_data(self, obj):
+        """Return formatted old_data for display"""
+        return obj.get_pretty_data('old_data')
     
     def get_pretty_new_data(self, obj):
         """Return formatted new_data for display"""

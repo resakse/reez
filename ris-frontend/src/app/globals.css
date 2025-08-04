@@ -1,6 +1,12 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* Custom CSS for AI reporting interface */
+.writing-mode-vertical {
+  writing-mode: vertical-lr;
+  text-orientation: mixed;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {

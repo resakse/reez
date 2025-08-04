@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Shield, AlertCircle } from 'lucide-react';
 import PacsServerManager from '@/components/PacsServerManager';
+import AISettingsManager from '@/components/AISettingsManager';
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -41,10 +42,11 @@ export default function SettingsPage() {
           System Settings
         </h1>
         <p className="mt-2 text-muted-foreground">
-          Configure system-wide settings and PACS server connections
+          Configure system-wide settings, PACS server connections, and AI reporting
         </p>
       </div>
       
+      <AISettingsManager />
       <PacsServerManager />
     </div>
   );

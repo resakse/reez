@@ -263,7 +263,7 @@ export default function AuditTable({
 
       {/* Detail Dialog */}
       <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Audit Log Details</DialogTitle>
           </DialogHeader>
@@ -320,18 +320,22 @@ export default function AuditTable({
               {(selectedLog as any).old_data && (
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Previous Data</label>
-                  <pre className="text-xs bg-muted p-3 rounded-md overflow-auto max-h-32">
-                    {(selectedLog as any).pretty_old_data || JSON.stringify((selectedLog as any).old_data, null, 2)}
-                  </pre>
+                  <div className="mt-2 border rounded-md">
+                    <pre className="text-xs bg-muted p-4 rounded-md overflow-auto max-h-48 whitespace-pre-wrap break-words">
+                      {(selectedLog as any).pretty_old_data || JSON.stringify((selectedLog as any).old_data, null, 2)}
+                    </pre>
+                  </div>
                 </div>
               )}
 
               {(selectedLog as any).new_data && (
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">New Data</label>
-                  <pre className="text-xs bg-muted p-3 rounded-md overflow-auto max-h-32">
-                    {(selectedLog as any).pretty_new_data || JSON.stringify((selectedLog as any).new_data, null, 2)}
-                  </pre>
+                  <div className="mt-2 border rounded-md">
+                    <pre className="text-xs bg-muted p-4 rounded-md overflow-auto max-h-48 whitespace-pre-wrap break-words">
+                      {(selectedLog as any).pretty_new_data || JSON.stringify((selectedLog as any).new_data, null, 2)}
+                    </pre>
+                  </div>
                 </div>
               )}
             </div>
