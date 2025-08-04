@@ -270,5 +270,75 @@ LOGGING = {
             'level': 'INFO',
             'propagate': True,
         },
+        'exam.ai_services': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'exam.ai_views': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': True,
+        },
     },
 }
+
+# ========== AI REPORTING SYSTEM CONFIGURATION ==========
+
+# Ollama Server Configuration
+AI_OLLAMA_SERVER_URL = os.environ.get('AI_OLLAMA_SERVER_URL', 'http://localhost:11434')
+
+# Default AI Model Configuration
+AI_DEFAULT_VISION_MODEL = os.environ.get('AI_VISION_MODEL', 'llava-med:7b')
+AI_DEFAULT_MEDICAL_LLM = os.environ.get('AI_MEDICAL_LLM', 'meditron:7b')
+AI_DEFAULT_QA_MODEL = os.environ.get('AI_QA_MODEL', 'medalpaca:7b')
+
+# AI Processing Configuration
+AI_MAX_PROCESSING_TIME = int(os.environ.get('AI_MAX_PROCESSING_TIME', '300'))  # 5 minutes
+AI_CONFIDENCE_THRESHOLD = float(os.environ.get('AI_CONFIDENCE_THRESHOLD', '0.7'))
+AI_CRITICAL_FINDINGS_THRESHOLD = float(os.environ.get('AI_CRITICAL_FINDINGS_THRESHOLD', '0.8'))
+
+# AI Quality Assurance Settings
+AI_ENABLE_QA_VALIDATION = os.environ.get('AI_ENABLE_QA_VALIDATION', 'True').lower() == 'true'
+AI_REQUIRE_PEER_REVIEW_CRITICAL = os.environ.get('AI_REQUIRE_PEER_REVIEW_CRITICAL', 'True').lower() == 'true'
+AI_AUTO_APPROVE_ROUTINE = os.environ.get('AI_AUTO_APPROVE_ROUTINE', 'False').lower() == 'true'
+
+# AI Notification Settings
+AI_NOTIFY_CRITICAL_FINDINGS = os.environ.get('AI_NOTIFY_CRITICAL_FINDINGS', 'True').lower() == 'true'
+AI_NOTIFICATION_EMAILS = os.environ.get('AI_NOTIFICATION_EMAILS', '').split(',') if os.environ.get('AI_NOTIFICATION_EMAILS') else []
+
+# AI System Settings
+AI_REPORTING_ENABLED = os.environ.get('AI_REPORTING_ENABLED', 'True').lower() == 'true'
+AI_MAINTENANCE_MODE = os.environ.get('AI_MAINTENANCE_MODE', 'False').lower() == 'true'
+
+# Cache Configuration for AI Services
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'ai-reporting-cache',
+        'TIMEOUT': 300,  # 5 minutes default timeout
+        'OPTIONS': {
+            'MAX_ENTRIES': 1000,
+        }
+    }
+}
+
+# Email Configuration for AI Notifications
+if AI_NOTIFY_CRITICAL_FINDINGS and AI_NOTIFICATION_EMAILS:
+    EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
+    EMAIL_HOST = os.environ.get('EMAIL_HOST', 'localhost')
+    EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '25'))
+    EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'False').lower() == 'true'
+    EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+    EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+    DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'ris@localhost')
+
+# AI Report Template Settings
+AI_REPORT_TEMPLATES = {
+    'critical_findings_notification': 'exam/ai_critical_findings_notification.txt',
+    'daily_ai_summary': 'exam/ai_daily_summary.txt',
+}
+
+# Security Settings for AI API Access
+AI_API_RATE_LIMIT = os.environ.get('AI_API_RATE_LIMIT', '100/hour')  # Rate limiting for AI endpoints
+AI_REQUIRE_2FA_FOR_CONFIG = os.environ.get('AI_REQUIRE_2FA_FOR_CONFIG', 'False').lower() == 'true'

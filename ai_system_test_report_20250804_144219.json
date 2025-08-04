@@ -1,0 +1,208 @@
+{
+  "summary": {
+    "total_tests": 26,
+    "passed_tests": 11,
+    "failed_tests": 15,
+    "success_rate": 42.30769230769231,
+    "execution_time": 2.176676034927368,
+    "timestamp": "2025-08-04T14:42:19.113209"
+  },
+  "details": [
+    {
+      "test_name": "Setup Test Data",
+      "passed": true,
+      "details": "Test data created successfully",
+      "timestamp": "2025-08-04T14:42:17.213577"
+    },
+    {
+      "test_name": "AI Config GET",
+      "passed": false,
+      "details": "Status: 404, Data keys: N/A",
+      "timestamp": "2025-08-04T14:42:17.503488",
+      "error": "Unknown error"
+    },
+    {
+      "test_name": "Ollama Connection Test",
+      "passed": true,
+      "details": "Expected failure (no Ollama): Status 404",
+      "timestamp": "2025-08-04T14:42:17.579310"
+    },
+    {
+      "test_name": "AI Report Generation API",
+      "passed": false,
+      "details": "Unexpected status code: 404",
+      "timestamp": "2025-08-04T14:42:17.659869",
+      "error": "Unknown error"
+    },
+    {
+      "test_name": "AI Report Generation - Invalid Exam",
+      "passed": true,
+      "details": "Status: 404 (should be 404)",
+      "timestamp": "2025-08-04T14:42:17.737142"
+    },
+    {
+      "test_name": "AI Reports List",
+      "passed": false,
+      "details": "Status: 404, Count: N/A",
+      "timestamp": "2025-08-04T14:42:17.811849",
+      "error": "Unknown error"
+    },
+    {
+      "test_name": "AI Reports List - Filtered",
+      "passed": false,
+      "details": "Status: 404, Filtered results",
+      "timestamp": "2025-08-04T14:42:17.890497",
+      "error": "Unknown error"
+    },
+    {
+      "test_name": "AI Reports List - Search",
+      "passed": false,
+      "details": "Status: 404, Search functionality",
+      "timestamp": "2025-08-04T14:42:17.963140",
+      "error": "Unknown error"
+    },
+    {
+      "test_name": "Radiologist Reports List",
+      "passed": false,
+      "details": "Status: 404, Count: N/A",
+      "timestamp": "2025-08-04T14:42:18.039584",
+      "error": "Unknown error"
+    },
+    {
+      "test_name": "Radiologist Reports - My Reports Only",
+      "passed": false,
+      "details": "Status: 404, User-specific reports",
+      "timestamp": "2025-08-04T14:42:18.118339",
+      "error": "Unknown error"
+    },
+    {
+      "test_name": "AI Dashboard API",
+      "passed": false,
+      "details": "Status: 404",
+      "timestamp": "2025-08-04T14:42:18.194355",
+      "error": "Unknown error"
+    },
+    {
+      "test_name": "AI Performance List",
+      "passed": false,
+      "details": "Status: 404, Count: N/A",
+      "timestamp": "2025-08-04T14:42:18.268361",
+      "error": "Unknown error"
+    },
+    {
+      "test_name": "AI Performance Summary Stats",
+      "passed": false,
+      "details": "Status: 404",
+      "timestamp": "2025-08-04T14:42:18.344596",
+      "error": "Unknown error"
+    },
+    {
+      "test_name": "AIConfiguration Model",
+      "passed": true,
+      "details": "Config exists: True, Ollama URL: http://localhost:11434",
+      "timestamp": "2025-08-04T14:42:18.346310"
+    },
+    {
+      "test_name": "AI Report Creation",
+      "passed": true,
+      "details": "AI Report created with ID: 3",
+      "timestamp": "2025-08-04T14:42:18.352929"
+    },
+    {
+      "test_name": "Radiologist Report Creation",
+      "passed": true,
+      "details": "Radiologist Report created with ID: 1",
+      "timestamp": "2025-08-04T14:42:18.360493"
+    },
+    {
+      "test_name": "Database Model Operations",
+      "passed": false,
+      "details": "",
+      "timestamp": "2025-08-04T14:42:18.361267",
+      "error": "NOT NULL constraint failed: exam_reportcollaboration.confidence_before"
+    },
+    {
+      "test_name": "Invalid Endpoint Handling",
+      "passed": true,
+      "details": "Status: 404 (should be 404)",
+      "timestamp": "2025-08-04T14:42:18.441678"
+    },
+    {
+      "test_name": "Malformed JSON Handling",
+      "passed": false,
+      "details": "Status: 404 (should be 400 or 422)",
+      "timestamp": "2025-08-04T14:42:18.516830",
+      "error": "Unknown error"
+    },
+    {
+      "test_name": "Missing Required Fields",
+      "passed": false,
+      "details": "Status: 404 (should be 400)",
+      "timestamp": "2025-08-04T14:42:18.599353",
+      "error": "Unknown error"
+    },
+    {
+      "test_name": "Unauthenticated Access Block",
+      "passed": false,
+      "details": "Status: 404 (should be 401 or 403)",
+      "timestamp": "2025-08-04T14:42:18.683807",
+      "error": "Unknown error"
+    },
+    {
+      "test_name": "Authenticated Access Allow",
+      "passed": false,
+      "details": "Status: 404 (should be 200)",
+      "timestamp": "2025-08-04T14:42:18.759748",
+      "error": "Unknown error"
+    },
+    {
+      "test_name": "Response Time - /api/ai/config/",
+      "passed": true,
+      "details": "Time: 0.124s, Status: 404",
+      "timestamp": "2025-08-04T14:42:18.883592"
+    },
+    {
+      "test_name": "Response Time - /api/ai/reports/",
+      "passed": true,
+      "details": "Time: 0.078s, Status: 404",
+      "timestamp": "2025-08-04T14:42:18.962108"
+    },
+    {
+      "test_name": "Response Time - /api/ai/dashboard/",
+      "passed": true,
+      "details": "Time: 0.075s, Status: 404",
+      "timestamp": "2025-08-04T14:42:19.037188"
+    },
+    {
+      "test_name": "Response Time - /api/ai/performance/",
+      "passed": true,
+      "details": "Time: 0.076s, Status: 404",
+      "timestamp": "2025-08-04T14:42:19.112947"
+    }
+  ],
+  "errors": [
+    "AI Config GET: Unknown error",
+    "AI Report Generation API: Unknown error",
+    "AI Reports List: Unknown error",
+    "AI Reports List - Filtered: Unknown error",
+    "AI Reports List - Search: Unknown error",
+    "Radiologist Reports List: Unknown error",
+    "Radiologist Reports - My Reports Only: Unknown error",
+    "AI Dashboard API: Unknown error",
+    "AI Performance List: Unknown error",
+    "AI Performance Summary Stats: Unknown error",
+    "Database Model Operations: NOT NULL constraint failed: exam_reportcollaboration.confidence_before",
+    "Malformed JSON Handling: Unknown error",
+    "Missing Required Fields: Unknown error",
+    "Unauthenticated Access Block: Unknown error",
+    "Authenticated Access Allow: Unknown error"
+  ],
+  "warnings": [
+    "Ollama service not available - this is expected in test environment"
+  ],
+  "recommendations": [
+    "\ud83d\udd27 Start Ollama service for full AI functionality",
+    "\ud83d\udc1b Fix failing tests before production deployment",
+    "\u26a0\ufe0f  Address system warnings"
+  ]
+}

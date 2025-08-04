@@ -5,7 +5,8 @@ from django.utils import timezone
 from .models import (
     Pemeriksaan, Exam, Modaliti, Daftar, Part, Region, PacsConfig, PacsExam, 
     MediaDistribution, PacsServer, RejectCategory, RejectReason, RejectAnalysis, 
-    RejectIncident
+    RejectIncident, AIGeneratedReport, RadiologistReport, ReportCollaboration,
+    AIModelPerformance, AIConfiguration
 )
 from ordered_model.admin import (
     OrderedModelAdmin,
@@ -446,3 +447,418 @@ class PacsServerAdmin(admin.ModelAdmin):
         queryset.update(is_primary=True)
         self.message_user(request, 'Primary PACS server updated.')
     mark_as_primary.short_description = 'Mark as primary PACS server'
+
+
+# ============================================================================
+# AI REPORTING SYSTEM ADMIN CONFIGURATIONS
+# ============================================================================
+
+@admin.register(AIGeneratedReport)
+class AIGeneratedReportAdmin(admin.ModelAdmin):
+    """Admin for AI-generated radiology reports"""
+    list_display = (
+        'examination_display', 'patient_name', 'ai_model_version', 
+        'confidence_display', 'review_status', 'urgent_review_display', 'created'
+    )
+    list_filter = (
+        'review_status', 'ai_model_type', 'requires_urgent_review', 
+        'ai_model_version', 'created', 'reviewed_by'
+    )
+    search_fields = (
+        'pemeriksaan__no_xray', 'pemeriksaan__daftar__pesakit__nama',
+        'pemeriksaan__daftar__pesakit__mrn', 'generated_report'
+    )
+    readonly_fields = (
+        'pemeriksaan', 'ai_model_version', 'ai_model_type', 'generated_report',
+        'report_sections', 'confidence_score', 'section_confidence', 'quality_metrics',
+        'critical_findings', 'critical_findings_confidence', 'requires_urgent_review',
+        'orthanc_study_id', 'orthanc_series_ids', 'dicom_metadata',
+        'processing_time_seconds', 'processing_errors', 'processing_warnings',
+        'created', 'modified'
+    )
+    date_hierarchy = 'created'
+    
+    fieldsets = (
+        ('Examination Information', {
+            'fields': ('pemeriksaan',)
+        }),
+        ('AI Model Information', {
+            'fields': ('ai_model_version', 'ai_model_type', 'processing_time_seconds')
+        }),
+        ('Generated Report Content', {
+            'fields': ('generated_report', 'report_sections'),
+            'classes': ('wide',)
+        }),
+        ('Quality Metrics', {
+            'fields': (
+                ('confidence_score', 'section_confidence'),
+                ('quality_metrics',)
+            )
+        }),
+        ('Critical Findings', {
+            'fields': (
+                ('critical_findings', 'critical_findings_confidence'),
+                'requires_urgent_review'
+            )
+        }),
+        ('Review Status', {
+            'fields': ('review_status', 'reviewed_by', 'reviewed_at', 'final_report'),
+            'classes': ('wide',)
+        }),
+        ('DICOM Integration', {
+            'fields': ('orthanc_study_id', 'orthanc_series_ids', 'dicom_metadata'),
+            'classes': ('collapse',)
+        }),
+        ('Processing Information', {
+            'fields': ('processing_errors', 'processing_warnings'),
+            'classes': ('collapse',)
+        }),
+        ('System Information', {
+            'fields': ('created', 'modified'),
+            'classes': ('collapse',)
+        })
+    )
+    
+    def examination_display(self, obj):
+        return obj.pemeriksaan.no_xray
+    examination_display.short_description = 'Examination'
+    examination_display.admin_order_field = 'pemeriksaan__no_xray'
+    
+    def patient_name(self, obj):
+        return obj.pemeriksaan.daftar.pesakit.nama
+    patient_name.short_description = 'Patient'
+    patient_name.admin_order_field = 'pemeriksaan__daftar__pesakit__nama'
+    
+    def confidence_display(self, obj):
+        confidence = obj.confidence_score
+        if confidence >= 0.8:
+            color = 'green'
+        elif confidence >= 0.6:
+            color = 'orange'
+        else:
+            color = 'red'
+        return format_html(
+            '<span style="color: {}; font-weight: bold;">{:.1%}</span>',
+            color, confidence
+        )
+    confidence_display.short_description = 'Confidence'
+    confidence_display.admin_order_field = 'confidence_score'
+    
+    def urgent_review_display(self, obj):
+        if obj.requires_urgent_review:
+            return format_html('<span style="color: red;">🚨 Urgent</span>')
+        return format_html('<span style="color: green;">✓ Normal</span>')
+    urgent_review_display.short_description = 'Priority'
+    urgent_review_display.admin_order_field = 'requires_urgent_review'
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related(
+            'pemeriksaan__daftar__pesakit', 'reviewed_by'
+        )
+    
+    actions = ['mark_for_review', 'approve_reports']
+    
+    def mark_for_review(self, request, queryset):
+        count = queryset.update(review_status='pending')
+        self.message_user(request, f'{count} reports marked for review.')
+    mark_for_review.short_description = 'Mark for review'
+    
+    def approve_reports(self, request, queryset):
+        count = queryset.filter(
+            confidence_score__gte=0.8,
+            requires_urgent_review=False
+        ).update(
+            review_status='approved',
+            reviewed_by=request.user,
+            reviewed_at=timezone.now()
+        )
+        self.message_user(request, f'{count} high-confidence reports approved.')
+    approve_reports.short_description = 'Approve high-confidence reports'
+
+
+class ReportCollaborationInline(admin.TabularInline):
+    """Inline for collaboration tracking within radiologist reports"""
+    model = ReportCollaboration
+    extra = 0
+    readonly_fields = ('timestamp',)
+    fields = (
+        'interaction_type', 'report_section', 'confidence_before', 
+        'confidence_after', 'feedback_category', 'timestamp'
+    )
+
+
+@admin.register(RadiologistReport)
+class RadiologistReportAdmin(admin.ModelAdmin):
+    """Admin for radiologist collaborative reports"""
+    list_display = (
+        'examination_display', 'radiologist', 'complexity_level', 
+        'report_status', 'completion_time_display', 'ai_adoption_display'
+    )
+    list_filter = (
+        'complexity_level', 'report_status', 'peer_review_required',
+        'radiologist', 'report_completion_time'
+    )
+    search_fields = (
+        'ai_report__pemeriksaan__no_xray', 'radiologist__username',
+        'findings', 'impression', 'clinical_history'
+    )
+    readonly_fields = (
+        'ai_report', 'report_start_time', 'total_reporting_time', 
+        'ai_adoption_rate', 'created', 'modified'
+    )
+    date_hierarchy = 'created'
+    inlines = [ReportCollaborationInline]
+    
+    fieldsets = (
+        ('Report Information', {
+            'fields': ('ai_report', 'radiologist', 'complexity_level', 'report_status')
+        }),
+        ('Report Content', {
+            'fields': ('clinical_history', 'technique', 'findings', 'impression', 'recommendations'),
+            'classes': ('wide',)
+        }),
+        ('AI Collaboration Tracking', {
+            'fields': (
+                'ai_suggestions_used', 'ai_suggestions_modified', 'ai_suggestions_rejected',
+                'radiologist_additions'
+            ),
+            'classes': ('collapse',)
+        }),
+        ('Workflow Metrics', {
+            'fields': (
+                ('report_start_time', 'report_completion_time'),
+                ('time_saved_estimate', 'radiologist_confidence'),
+                ('total_reporting_time', 'ai_adoption_rate')
+            )
+        }),
+        ('Quality Assurance', {
+            'fields': (
+                'peer_review_required', 'peer_reviewer', 'peer_review_date',
+                'peer_review_comments'
+            )
+        }),
+        ('System Information', {
+            'fields': ('created', 'modified'),
+            'classes': ('collapse',)
+        })
+    )
+    
+    def examination_display(self, obj):
+        return obj.ai_report.pemeriksaan.no_xray
+    examination_display.short_description = 'Examination'
+    
+    def completion_time_display(self, obj):
+        if obj.report_completion_time:
+            total_time = obj.total_reporting_time
+            if total_time:
+                return f"{total_time:.1f} min"
+        return "In progress"
+    completion_time_display.short_description = 'Time Taken'
+    
+    def ai_adoption_display(self, obj):
+        rate = obj.ai_adoption_rate
+        if rate >= 80:
+            color = 'green'
+        elif rate >= 50:
+            color = 'orange'
+        else:
+            color = 'red'
+        return format_html(
+            '<span style="color: {};">{:.0f}%</span>',
+            color, rate
+        )
+    ai_adoption_display.short_description = 'AI Adoption'
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related(
+            'ai_report__pemeriksaan', 'radiologist', 'peer_reviewer'
+        )
+
+
+@admin.register(ReportCollaboration)
+class ReportCollaborationAdmin(admin.ModelAdmin):
+    """Admin for detailed collaboration tracking"""
+    list_display = (
+        'examination_display', 'radiologist_display', 'interaction_type',
+        'report_section', 'feedback_category', 'timestamp'
+    )
+    list_filter = (
+        'interaction_type', 'report_section', 'feedback_category', 'timestamp'
+    )
+    search_fields = (
+        'radiologist_report__ai_report__pemeriksaan__no_xray',
+        'radiologist_report__radiologist__username',
+        'ai_suggestion', 'radiologist_action'
+    )
+    readonly_fields = ('timestamp',)
+    date_hierarchy = 'timestamp'
+    
+    fieldsets = (
+        ('Collaboration Context', {
+            'fields': ('radiologist_report', 'interaction_type', 'report_section')
+        }),
+        ('Content', {
+            'fields': ('ai_suggestion', 'radiologist_action'),
+            'classes': ('wide',)
+        }),
+        ('Confidence Tracking', {
+            'fields': ('confidence_before', 'confidence_after')
+        }),
+        ('Feedback', {
+            'fields': ('feedback_category', 'improvement_suggestion'),
+            'classes': ('wide',)
+        }),
+        ('Technical Details', {
+            'fields': ('ai_reasoning', 'image_regions'),
+            'classes': ('collapse',)
+        }),
+        ('System Information', {
+            'fields': ('timestamp',),
+            'classes': ('collapse',)
+        })
+    )
+    
+    def examination_display(self, obj):
+        return obj.radiologist_report.ai_report.pemeriksaan.no_xray
+    examination_display.short_description = 'Examination'
+    
+    def radiologist_display(self, obj):
+        return obj.radiologist_report.radiologist.username
+    radiologist_display.short_description = 'Radiologist'
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related(
+            'radiologist_report__ai_report__pemeriksaan',
+            'radiologist_report__radiologist'
+        )
+
+
+@admin.register(AIModelPerformance)
+class AIModelPerformanceAdmin(admin.ModelAdmin):
+    """Admin for AI model performance tracking"""
+    list_display = (
+        'model_version', 'analysis_date', 'modality', 'accuracy_display',
+        'total_reports_generated', 'approval_rate_display'
+    )
+    list_filter = (
+        'model_type', 'modality', 'analysis_date', 'created_by'
+    )
+    search_fields = ('model_version', 'modality__nama', 'performance_notes')
+    readonly_fields = ('accuracy_rate', 'approval_rate', 'modification_rate', 'created', 'modified')
+    date_hierarchy = 'analysis_date'
+    
+    fieldsets = (
+        ('Model Information', {
+            'fields': ('model_version', 'model_type', 'analysis_date', 'modality')
+        }),
+        ('Performance Metrics', {
+            'fields': (
+                ('total_reports_generated', 'reports_approved_unchanged'),
+                ('reports_modified', 'reports_rejected'),
+                ('accuracy_rate', 'critical_findings_sensitivity', 'false_positive_rate')
+            )
+        }),
+        ('Efficiency Metrics', {
+            'fields': (
+                ('average_processing_time', 'average_time_saved'),
+                ('user_satisfaction_score', 'system_uptime_percentage', 'error_rate')
+            )
+        }),
+        ('Analysis', {
+            'fields': ('performance_notes', 'improvement_actions'),
+            'classes': ('wide',)
+        }),
+        ('System Information', {
+            'fields': ('created_by', 'created', 'modified'),
+            'classes': ('collapse',)
+        })
+    )
+    
+    def accuracy_display(self, obj):
+        if obj.accuracy_rate:
+            rate = float(obj.accuracy_rate)
+            if rate >= 90:
+                color = 'green'
+            elif rate >= 80:
+                color = 'orange'
+            else:
+                color = 'red'
+            return format_html(
+                '<span style="color: {}; font-weight: bold;">{:.1f}%</span>',
+                color, rate
+            )
+        return "N/A"
+    accuracy_display.short_description = 'Accuracy'
+    accuracy_display.admin_order_field = 'accuracy_rate'
+    
+    def approval_rate_display(self, obj):
+        rate = obj.approval_rate
+        if rate >= 90:
+            color = 'green'
+        elif rate >= 75:
+            color = 'orange'
+        else:
+            color = 'red'
+        return format_html(
+            '<span style="color: {};">{:.1f}%</span>',
+            color, rate
+        )
+    approval_rate_display.short_description = 'Approval Rate'
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('modality', 'created_by')
+    
+    def save_model(self, request, obj, form, change):
+        if not change and not obj.created_by:
+            obj.created_by = request.user
+        super().save_model(request, obj, form, change)
+
+
+@admin.register(AIConfiguration)
+class AIConfigurationAdmin(admin.ModelAdmin):
+    """Admin for AI system configuration (singleton)"""
+    list_display = ('ollama_server_url', 'vision_language_model', 'enable_ai_reporting', 'maintenance_mode', 'modified')
+    readonly_fields = ('created', 'modified')
+    
+    fieldsets = (
+        ('Ollama Server Configuration', {
+            'fields': ('ollama_server_url',)
+        }),
+        ('AI Model Configuration', {
+            'fields': ('vision_language_model', 'medical_llm_model', 'qa_model')
+        }),
+        ('Processing Configuration', {
+            'fields': (
+                'max_processing_time_seconds', 'confidence_threshold', 
+                'critical_findings_threshold'
+            )
+        }),
+        ('Quality Assurance Settings', {
+            'fields': (
+                'enable_qa_validation', 'require_peer_review_critical',
+                'auto_approve_routine_reports'
+            )
+        }),
+        ('Notification Settings', {
+            'fields': ('notify_on_critical_findings', 'notification_emails')
+        }),
+        ('System Settings', {
+            'fields': ('enable_ai_reporting', 'maintenance_mode')
+        }),
+        ('System Information', {
+            'fields': ('modified_by', 'created', 'modified'),
+            'classes': ('collapse',)
+        })
+    )
+    
+    def has_add_permission(self, request):
+        # Only allow one configuration
+        return not AIConfiguration.objects.exists()
+    
+    def has_delete_permission(self, request, obj=None):
+        # Don't allow deletion of configuration
+        return False
+    
+    def save_model(self, request, obj, form, change):
+        obj.modified_by = request.user
+        super().save_model(request, obj, form, change)

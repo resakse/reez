@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Brain, Server, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { toast } from '@/lib/toast';
+import AuthService from '@/lib/auth';
 
 interface AISettings {
   enabled: boolean;
@@ -60,12 +61,20 @@ export default function AISettingsManager() {
 
   const loadSettings = async () => {
     try {
-      const response = await fetch('/api/ai/settings/');
+      const response = await AuthService.authenticatedFetch('/api/ai-reporting/config/');
       if (response.ok) {
         const data = await response.json();
-        setSettings(data);
-        if (data.enabled && data.ollama_url) {
-          testConnection(data.ollama_url, false);
+        setSettings({
+          enabled: data.enable_ai_reporting,
+          ollama_url: data.ollama_server_url,
+          vision_model: data.vision_model,
+          medical_llm: data.medical_llm_model,
+          qa_model: data.qa_model,
+          max_concurrent_requests: data.max_concurrent_requests,
+          confidence_threshold: data.confidence_threshold
+        });
+        if (data.enable_ai_reporting && data.ollama_server_url) {
+          testConnection(data.ollama_server_url, false);
         }
       }
     } catch (error) {
@@ -76,10 +85,18 @@ export default function AISettingsManager() {
   const saveSettings = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('/api/ai/settings/', {
-        method: 'POST',
+      const response = await AuthService.authenticatedFetch('/api/ai-reporting/config/', {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settings)
+        body: JSON.stringify({
+          enable_ai_reporting: settings.enabled,
+          ollama_server_url: settings.ollama_url,
+          vision_model: settings.vision_model,
+          medical_llm_model: settings.medical_llm,
+          qa_model: settings.qa_model,
+          max_concurrent_requests: settings.max_concurrent_requests,
+          confidence_threshold: settings.confidence_threshold
+        })
       });
 
       if (response.ok) {
@@ -99,7 +116,7 @@ export default function AISettingsManager() {
     setIsTesting(true);
     
     try {
-      const response = await fetch('/api/ai/test-connection/', {
+      const response = await AuthService.authenticatedFetch('/api/ai-reporting/config/test/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ollama_url: testUrl })

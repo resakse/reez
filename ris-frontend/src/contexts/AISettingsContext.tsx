@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import AuthService from '@/lib/auth';
 
 interface AISettings {
   enabled: boolean;
@@ -37,10 +38,18 @@ export function AISettingsProvider({ children }: { children: ReactNode }) {
   const loadSettings = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('/api/ai/settings/');
+      const response = await AuthService.authenticatedFetch('/api/ai-reporting/config/');
       if (response.ok) {
         const data = await response.json();
-        setSettings(data);
+        setSettings({
+          enabled: data.enable_ai_reporting,
+          ollama_url: data.ollama_server_url,
+          vision_model: data.vision_model,
+          medical_llm: data.medical_llm_model,
+          qa_model: data.qa_model,
+          max_concurrent_requests: data.max_concurrent_requests,
+          confidence_threshold: data.confidence_threshold
+        });
       }
     } catch (error) {
       console.error('Failed to load AI settings:', error);

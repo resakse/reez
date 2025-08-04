@@ -1,7 +1,8 @@
 from rest_framework import serializers
 from .models import (
     Modaliti, Part, Exam, Daftar, Pemeriksaan, PacsConfig, PacsServer, MediaDistribution,
-    RejectCategory, RejectReason, RejectAnalysis, RejectIncident, RejectAnalysisTargetSettings
+    RejectCategory, RejectReason, RejectAnalysis, RejectIncident, RejectAnalysisTargetSettings,
+    AIGeneratedReport, RadiologistReport, ReportCollaboration, AIModelPerformance, AIConfiguration
 )
 from pesakit.models import Pesakit
 from wad.models import Ward
@@ -1097,6 +1098,395 @@ class RejectAnalysisTargetSettingsDetailSerializer(serializers.ModelSerializer):
                 matrix[modality]['display_name'] = 'Overall'
         
         return matrix
+
+
+# ===============================================
+# AI REPORTING SERIALIZERS
+# ===============================================
+
+class AIGeneratedReportSerializer(serializers.ModelSerializer):
+    """Serializer for AI-generated reports with related field information"""
+    # Related field displays
+    examination_number = serializers.CharField(source='pemeriksaan.no_xray', read_only=True)
+    examination_accession = serializers.CharField(source='pemeriksaan.accession_number', read_only=True)
+    patient_name = serializers.CharField(source='pemeriksaan.daftar.pesakit.nama', read_only=True)
+    patient_mrn = serializers.CharField(source='pemeriksaan.daftar.pesakit.mrn', read_only=True)
+    modality_name = serializers.CharField(source='pemeriksaan.exam.modaliti.nama', read_only=True)
+    exam_name = serializers.CharField(source='pemeriksaan.exam.exam', read_only=True)
+    
+    # Staff details
+    reviewed_by_name = serializers.SerializerMethodField()
+    
+    # Computed properties
+    is_completed = serializers.ReadOnlyField()
+    patient_name_prop = serializers.ReadOnlyField(source='patient_name')
+    examination_type_prop = serializers.ReadOnlyField(source='examination_type')
+    
+    # Choice fields for frontend
+    ai_model_type_choices = serializers.SerializerMethodField()
+    review_status_choices = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = AIGeneratedReport
+        fields = [
+            'id', 'pemeriksaan', 'ai_model_version', 'ai_model_type', 'ai_model_type_choices',
+            'generated_report', 'report_sections', 'confidence_score', 'section_confidence',
+            'quality_metrics', 'critical_findings', 'critical_findings_confidence',
+            'requires_urgent_review', 'review_status', 'review_status_choices',
+            'reviewed_by', 'reviewed_by_name', 'reviewed_at', 'final_report',
+            'orthanc_study_id', 'orthanc_series_ids', 'dicom_metadata',
+            'processing_time_seconds', 'processing_errors', 'processing_warnings',
+            # Related field displays
+            'examination_number', 'examination_accession', 'patient_name', 'patient_mrn',
+            'modality_name', 'exam_name', 'is_completed', 'patient_name_prop', 'examination_type_prop',
+            'created', 'modified'
+        ]
+        read_only_fields = ['created', 'modified', 'is_completed', 'patient_name_prop', 'examination_type_prop']
+    
+    def get_reviewed_by_name(self, obj):
+        if obj.reviewed_by:
+            return f"{obj.reviewed_by.first_name} {obj.reviewed_by.last_name}".strip()
+        return None
+    
+    def get_ai_model_type_choices(self, obj):
+        return [{'value': choice[0], 'label': choice[1]} for choice in AIGeneratedReport._meta.get_field('ai_model_type').choices]
+    
+    def get_review_status_choices(self, obj):
+        return [{'value': choice[0], 'label': choice[1]} for choice in AIGeneratedReport._meta.get_field('review_status').choices]
+    
+    def validate(self, data):
+        """Custom validation for AI reports"""
+        # Validate confidence scores
+        confidence_score = data.get('confidence_score')
+        if confidence_score is not None and (confidence_score < 0.0 or confidence_score > 1.0):
+            raise serializers.ValidationError("Confidence score must be between 0.0 and 1.0")
+        
+        critical_findings_confidence = data.get('critical_findings_confidence')
+        if critical_findings_confidence is not None and (critical_findings_confidence < 0.0 or critical_findings_confidence > 1.0):
+            raise serializers.ValidationError("Critical findings confidence must be between 0.0 and 1.0")
+        
+        # Validate critical findings consistency
+        critical_findings = data.get('critical_findings', [])
+        if critical_findings and not critical_findings_confidence:
+            raise serializers.ValidationError("Critical findings confidence is required when critical findings are present")
+        
+        return data
+
+
+class RadiologistReportSerializer(serializers.ModelSerializer):
+    """Serializer for radiologist reports with collaboration tracking"""
+    # AI report details
+    ai_report_details = AIGeneratedReportSerializer(source='ai_report', read_only=True)
+    ai_report_id = serializers.PrimaryKeyRelatedField(
+        queryset=AIGeneratedReport.objects.all(),
+        source='ai_report',
+        write_only=True
+    )
+    
+    # Staff details
+    radiologist_name = serializers.SerializerMethodField()
+    peer_reviewer_name = serializers.SerializerMethodField()
+    
+    # Computed properties
+    total_reporting_time = serializers.ReadOnlyField()
+    ai_adoption_rate = serializers.ReadOnlyField()
+    
+    # Related collaborations
+    collaborations = serializers.SerializerMethodField()
+    collaborations_count = serializers.SerializerMethodField()
+    
+    # Choice fields for frontend
+    complexity_level_choices = serializers.SerializerMethodField()
+    report_status_choices = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = RadiologistReport
+        fields = [
+            'id', 'ai_report', 'ai_report_id', 'ai_report_details', 'radiologist', 'radiologist_name',
+            'clinical_history', 'technique', 'findings', 'impression', 'recommendations',
+            'ai_suggestions_used', 'ai_suggestions_modified', 'ai_suggestions_rejected',
+            'radiologist_additions', 'report_start_time', 'report_completion_time', 
+            'time_saved_estimate', 'complexity_level', 'complexity_level_choices',
+            'radiologist_confidence', 'report_status', 'report_status_choices',
+            'peer_review_required', 'peer_reviewer', 'peer_reviewer_name', 'peer_review_date',
+            'peer_review_comments', 'total_reporting_time', 'ai_adoption_rate',
+            'collaborations', 'collaborations_count', 'created', 'modified'
+        ]
+        read_only_fields = ['report_start_time', 'created', 'modified', 'total_reporting_time', 'ai_adoption_rate']
+    
+    def get_radiologist_name(self, obj):
+        return f"{obj.radiologist.first_name} {obj.radiologist.last_name}".strip()
+    
+    def get_peer_reviewer_name(self, obj):
+        if obj.peer_reviewer:
+            return f"{obj.peer_reviewer.first_name} {obj.peer_reviewer.last_name}".strip()
+        return None
+    
+    def get_collaborations(self, obj):
+        collaborations = obj.collaborations.all().order_by('-timestamp')[:10]  # Latest 10
+        return ReportCollaborationSerializer(collaborations, many=True).data
+    
+    def get_collaborations_count(self, obj):
+        return obj.collaborations.count()
+    
+    def get_complexity_level_choices(self, obj):
+        return [{'value': choice[0], 'label': choice[1]} for choice in RadiologistReport._meta.get_field('complexity_level').choices]
+    
+    def get_report_status_choices(self, obj):
+        return [{'value': choice[0], 'label': choice[1]} for choice in RadiologistReport._meta.get_field('report_status').choices]
+    
+    def validate(self, data):
+        """Custom validation for radiologist reports"""
+        # Validate confidence score
+        radiologist_confidence = data.get('radiologist_confidence')
+        if radiologist_confidence is not None and (radiologist_confidence < 0.0 or radiologist_confidence > 1.0):
+            raise serializers.ValidationError("Radiologist confidence must be between 0.0 and 1.0")
+        
+        # Ensure required fields for completion
+        report_status = data.get('report_status')
+        if report_status == 'completed':
+            required_fields = ['findings', 'impression']
+            for field in required_fields:
+                if not data.get(field):
+                    raise serializers.ValidationError(f"{field.replace('_', ' ').title()} is required for completed reports")
+        
+        return data
+    
+    def create(self, validated_data):
+        """Create radiologist report with auto-assignment"""
+        # Set radiologist from request user if not provided
+        request = self.context.get('request')
+        if request and hasattr(request, 'user') and not validated_data.get('radiologist'):
+            validated_data['radiologist'] = request.user
+        
+        return super().create(validated_data)
+
+
+class ReportCollaborationSerializer(serializers.ModelSerializer):
+    """Serializer for report collaboration tracking"""
+    # Related report details
+    radiologist_report_details = serializers.SerializerMethodField()
+    
+    # Choice fields for frontend
+    interaction_type_choices = serializers.SerializerMethodField()
+    report_section_choices = serializers.SerializerMethodField()
+    feedback_category_choices = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = ReportCollaboration
+        fields = [
+            'id', 'radiologist_report', 'radiologist_report_details', 'interaction_type',
+            'interaction_type_choices', 'ai_suggestion', 'radiologist_action', 'report_section',
+            'report_section_choices', 'confidence_before', 'confidence_after', 'feedback_category',
+            'feedback_category_choices', 'improvement_suggestion', 'ai_reasoning', 'image_regions',
+            'timestamp'
+        ]
+        read_only_fields = ['timestamp']
+    
+    def get_radiologist_report_details(self, obj):
+        return {
+            'id': obj.radiologist_report.id,
+            'examination_number': obj.radiologist_report.ai_report.pemeriksaan.no_xray,
+            'patient_name': obj.radiologist_report.ai_report.pemeriksaan.daftar.pesakit.nama,
+            'radiologist_name': f"{obj.radiologist_report.radiologist.first_name} {obj.radiologist_report.radiologist.last_name}".strip()
+        }
+    
+    def get_interaction_type_choices(self, obj):
+        return [{'value': choice[0], 'label': choice[1]} for choice in ReportCollaboration._meta.get_field('interaction_type').choices]
+    
+    def get_report_section_choices(self, obj):
+        return [{'value': choice[0], 'label': choice[1]} for choice in ReportCollaboration._meta.get_field('report_section').choices]
+    
+    def get_feedback_category_choices(self, obj):
+        return [{'value': choice[0], 'label': choice[1]} for choice in ReportCollaboration._meta.get_field('feedback_category').choices]
+    
+    def validate(self, data):
+        """Custom validation for collaborations"""
+        # Validate confidence scores
+        confidence_before = data.get('confidence_before')
+        if confidence_before is not None and (confidence_before < 0.0 or confidence_before > 1.0):
+            raise serializers.ValidationError("Confidence before must be between 0.0 and 1.0")
+        
+        confidence_after = data.get('confidence_after')
+        if confidence_after is not None and (confidence_after < 0.0 or confidence_after > 1.0):
+            raise serializers.ValidationError("Confidence after must be between 0.0 and 1.0")
+        
+        return data
+
+
+class AIModelPerformanceSerializer(serializers.ModelSerializer):
+    """Serializer for AI model performance tracking"""
+    # Related field displays
+    modality_name = serializers.CharField(source='modality.nama', read_only=True)
+    created_by_name = serializers.SerializerMethodField()
+    
+    # Computed properties
+    approval_rate = serializers.ReadOnlyField()
+    modification_rate = serializers.ReadOnlyField()
+    
+    # Choice fields for frontend
+    model_type_choices = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = AIModelPerformance
+        fields = [
+            'id', 'model_version', 'model_type', 'model_type_choices', 'analysis_date',
+            'modality', 'modality_name', 'total_reports_generated', 'reports_approved_unchanged',
+            'reports_modified', 'reports_rejected', 'accuracy_rate', 'critical_findings_sensitivity',
+            'false_positive_rate', 'average_processing_time', 'average_time_saved',
+            'user_satisfaction_score', 'system_uptime_percentage', 'error_rate',
+            'performance_notes', 'improvement_actions', 'approval_rate', 'modification_rate',
+            'created_by', 'created_by_name', 'created', 'modified'
+        ]
+        read_only_fields = ['accuracy_rate', 'approval_rate', 'modification_rate', 'created', 'modified']
+    
+    def get_created_by_name(self, obj):
+        if obj.created_by:
+            return f"{obj.created_by.first_name} {obj.created_by.last_name}".strip()
+        return None
+    
+    def get_model_type_choices(self, obj):
+        return [{'value': choice[0], 'label': choice[1]} for choice in AIModelPerformance._meta.get_field('model_type').choices]
+    
+    def validate(self, data):
+        """Custom validation for performance metrics"""
+        # Validate that totals add up correctly
+        total_reports = data.get('total_reports_generated', 0)
+        approved_unchanged = data.get('reports_approved_unchanged', 0)
+        modified = data.get('reports_modified', 0)
+        rejected = data.get('reports_rejected', 0)
+        
+        if approved_unchanged + modified + rejected > total_reports:
+            raise serializers.ValidationError(
+                "Sum of approved, modified, and rejected reports cannot exceed total reports generated"
+            )
+        
+        # Validate percentage fields
+        percentage_fields = [
+            'accuracy_rate', 'critical_findings_sensitivity', 'false_positive_rate',
+            'system_uptime_percentage', 'error_rate'
+        ]
+        for field in percentage_fields:
+            value = data.get(field)
+            if value is not None and (value < 0 or value > 100):
+                raise serializers.ValidationError(f"{field.replace('_', ' ').title()} must be between 0 and 100")
+        
+        # Validate satisfaction score
+        satisfaction_score = data.get('user_satisfaction_score')
+        if satisfaction_score is not None and (satisfaction_score < 1.0 or satisfaction_score > 5.0):
+            raise serializers.ValidationError("User satisfaction score must be between 1.0 and 5.0")
+        
+        return data
+    
+    def create(self, validated_data):
+        """Create performance record with audit information"""
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            validated_data['created_by'] = request.user
+        
+        return super().create(validated_data)
+
+
+class AIConfigurationSerializer(serializers.ModelSerializer):
+    """Serializer for AI system configuration"""
+    # Staff details
+    modified_by_name = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = AIConfiguration
+        fields = [
+            'id', 'ollama_server_url', 'vision_language_model', 'medical_llm_model', 'qa_model',
+            'max_processing_time_seconds', 'confidence_threshold', 'critical_findings_threshold',
+            'enable_qa_validation', 'require_peer_review_critical', 'auto_approve_routine_reports',
+            'notify_on_critical_findings', 'notification_emails', 'enable_ai_reporting',
+            'maintenance_mode', 'modified_by', 'modified_by_name', 'created', 'modified'
+        ]
+        read_only_fields = ['created', 'modified', 'modified_by_name']
+    
+    def get_modified_by_name(self, obj):
+        if obj.modified_by:
+            return f"{obj.modified_by.first_name} {obj.modified_by.last_name}".strip()
+        return None
+    
+    def validate(self, data):
+        """Custom validation for AI configuration"""
+        # Validate thresholds
+        confidence_threshold = data.get('confidence_threshold')
+        if confidence_threshold is not None and (confidence_threshold < 0.0 or confidence_threshold > 1.0):
+            raise serializers.ValidationError("Confidence threshold must be between 0.0 and 1.0")
+        
+        critical_findings_threshold = data.get('critical_findings_threshold')
+        if critical_findings_threshold is not None and (critical_findings_threshold < 0.0 or critical_findings_threshold > 1.0):
+            raise serializers.ValidationError("Critical findings threshold must be between 0.0 and 1.0")
+        
+        # Validate processing time
+        max_processing_time = data.get('max_processing_time_seconds')
+        if max_processing_time is not None and max_processing_time <= 0:
+            raise serializers.ValidationError("Maximum processing time must be greater than 0")
+        
+        # Validate notification emails
+        notification_emails = data.get('notification_emails', [])
+        if notification_emails:
+            from django.core.validators import validate_email
+            from django.core.exceptions import ValidationError as DjangoValidationError
+            
+            for email in notification_emails:
+                if email:  # Skip empty strings
+                    try:
+                        validate_email(email)
+                    except DjangoValidationError:
+                        raise serializers.ValidationError(f"Invalid email address: {email}")
+        
+        return data
+    
+    def update(self, instance, validated_data):
+        """Update configuration with audit information"""
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            validated_data['modified_by'] = request.user
+        
+        return super().update(instance, validated_data)
+
+
+# Simplified serializers for list views
+class AIGeneratedReportListSerializer(serializers.ModelSerializer):
+    """Simplified serializer for listing AI reports"""
+    examination_number = serializers.CharField(source='pemeriksaan.no_xray', read_only=True)
+    patient_name = serializers.CharField(source='pemeriksaan.daftar.pesakit.nama', read_only=True)
+    exam_name = serializers.CharField(source='pemeriksaan.exam.exam', read_only=True)
+    reviewed_by_name = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = AIGeneratedReport
+        fields = [
+            'id', 'examination_number', 'patient_name', 'exam_name', 'ai_model_version',
+            'confidence_score', 'requires_urgent_review', 'review_status', 'reviewed_by_name',
+            'reviewed_at', 'created'
+        ]
+    
+    def get_reviewed_by_name(self, obj):
+        if obj.reviewed_by:
+            return f"{obj.reviewed_by.first_name} {obj.reviewed_by.last_name}".strip()
+        return None
+
+
+class RadiologistReportListSerializer(serializers.ModelSerializer):
+    """Simplified serializer for listing radiologist reports"""
+    examination_number = serializers.CharField(source='ai_report.pemeriksaan.no_xray', read_only=True)
+    patient_name = serializers.CharField(source='ai_report.pemeriksaan.daftar.pesakit.nama', read_only=True)
+    radiologist_name = serializers.SerializerMethodField()
+    ai_adoption_rate = serializers.ReadOnlyField()
+    
+    class Meta:
+        model = RadiologistReport
+        fields = [
+            'id', 'examination_number', 'patient_name', 'radiologist_name', 'complexity_level',
+            'report_status', 'report_completion_time', 'time_saved_estimate', 'ai_adoption_rate',
+            'created'
+        ]
+    
+    def get_radiologist_name(self, obj):
+        return f"{obj.radiologist.first_name} {obj.radiologist.last_name}".strip()
     
     def get_qap_target_rate_display(self, obj):
         return f"{obj.qap_target_rate}%"
@@ -1361,3 +1751,392 @@ class RejectAnalysisTargetSettingsDetailSerializer(serializers.ModelSerializer):
                 matrix[modality]['display_name'] = 'Overall'
         
         return matrix
+
+
+# ===============================================
+# AI REPORTING SERIALIZERS
+# ===============================================
+
+class AIGeneratedReportSerializer(serializers.ModelSerializer):
+    """Serializer for AI-generated reports with related field information"""
+    # Related field displays
+    examination_number = serializers.CharField(source='pemeriksaan.no_xray', read_only=True)
+    examination_accession = serializers.CharField(source='pemeriksaan.accession_number', read_only=True)
+    patient_name = serializers.CharField(source='pemeriksaan.daftar.pesakit.nama', read_only=True)
+    patient_mrn = serializers.CharField(source='pemeriksaan.daftar.pesakit.mrn', read_only=True)
+    modality_name = serializers.CharField(source='pemeriksaan.exam.modaliti.nama', read_only=True)
+    exam_name = serializers.CharField(source='pemeriksaan.exam.exam', read_only=True)
+    
+    # Staff details
+    reviewed_by_name = serializers.SerializerMethodField()
+    
+    # Computed properties
+    is_completed = serializers.ReadOnlyField()
+    patient_name_prop = serializers.ReadOnlyField(source='patient_name')
+    examination_type_prop = serializers.ReadOnlyField(source='examination_type')
+    
+    # Choice fields for frontend
+    ai_model_type_choices = serializers.SerializerMethodField()
+    review_status_choices = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = AIGeneratedReport
+        fields = [
+            'id', 'pemeriksaan', 'ai_model_version', 'ai_model_type', 'ai_model_type_choices',
+            'generated_report', 'report_sections', 'confidence_score', 'section_confidence',
+            'quality_metrics', 'critical_findings', 'critical_findings_confidence',
+            'requires_urgent_review', 'review_status', 'review_status_choices',
+            'reviewed_by', 'reviewed_by_name', 'reviewed_at', 'final_report',
+            'orthanc_study_id', 'orthanc_series_ids', 'dicom_metadata',
+            'processing_time_seconds', 'processing_errors', 'processing_warnings',
+            # Related field displays
+            'examination_number', 'examination_accession', 'patient_name', 'patient_mrn',
+            'modality_name', 'exam_name', 'is_completed', 'patient_name_prop', 'examination_type_prop',
+            'created', 'modified'
+        ]
+        read_only_fields = ['created', 'modified', 'is_completed', 'patient_name_prop', 'examination_type_prop']
+    
+    def get_reviewed_by_name(self, obj):
+        if obj.reviewed_by:
+            return f"{obj.reviewed_by.first_name} {obj.reviewed_by.last_name}".strip()
+        return None
+    
+    def get_ai_model_type_choices(self, obj):
+        return [{'value': choice[0], 'label': choice[1]} for choice in AIGeneratedReport._meta.get_field('ai_model_type').choices]
+    
+    def get_review_status_choices(self, obj):
+        return [{'value': choice[0], 'label': choice[1]} for choice in AIGeneratedReport._meta.get_field('review_status').choices]
+    
+    def validate(self, data):
+        """Custom validation for AI reports"""
+        # Validate confidence scores
+        confidence_score = data.get('confidence_score')
+        if confidence_score is not None and (confidence_score < 0.0 or confidence_score > 1.0):
+            raise serializers.ValidationError("Confidence score must be between 0.0 and 1.0")
+        
+        critical_findings_confidence = data.get('critical_findings_confidence')
+        if critical_findings_confidence is not None and (critical_findings_confidence < 0.0 or critical_findings_confidence > 1.0):
+            raise serializers.ValidationError("Critical findings confidence must be between 0.0 and 1.0")
+        
+        # Validate critical findings consistency
+        critical_findings = data.get('critical_findings', [])
+        if critical_findings and not critical_findings_confidence:
+            raise serializers.ValidationError("Critical findings confidence is required when critical findings are present")
+        
+        return data
+
+
+class RadiologistReportSerializer(serializers.ModelSerializer):
+    """Serializer for radiologist reports with collaboration tracking"""
+    # AI report details
+    ai_report_details = AIGeneratedReportSerializer(source='ai_report', read_only=True)
+    ai_report_id = serializers.PrimaryKeyRelatedField(
+        queryset=AIGeneratedReport.objects.all(),
+        source='ai_report',
+        write_only=True
+    )
+    
+    # Staff details
+    radiologist_name = serializers.SerializerMethodField()
+    peer_reviewer_name = serializers.SerializerMethodField()
+    
+    # Computed properties
+    total_reporting_time = serializers.ReadOnlyField()
+    ai_adoption_rate = serializers.ReadOnlyField()
+    
+    # Related collaborations
+    collaborations = serializers.SerializerMethodField()
+    collaborations_count = serializers.SerializerMethodField()
+    
+    # Choice fields for frontend
+    complexity_level_choices = serializers.SerializerMethodField()
+    report_status_choices = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = RadiologistReport
+        fields = [
+            'id', 'ai_report', 'ai_report_id', 'ai_report_details', 'radiologist', 'radiologist_name',
+            'clinical_history', 'technique', 'findings', 'impression', 'recommendations',
+            'ai_suggestions_used', 'ai_suggestions_modified', 'ai_suggestions_rejected',
+            'radiologist_additions', 'report_start_time', 'report_completion_time', 
+            'time_saved_estimate', 'complexity_level', 'complexity_level_choices',
+            'radiologist_confidence', 'report_status', 'report_status_choices',
+            'peer_review_required', 'peer_reviewer', 'peer_reviewer_name', 'peer_review_date',
+            'peer_review_comments', 'total_reporting_time', 'ai_adoption_rate',
+            'collaborations', 'collaborations_count', 'created', 'modified'
+        ]
+        read_only_fields = ['report_start_time', 'created', 'modified', 'total_reporting_time', 'ai_adoption_rate']
+    
+    def get_radiologist_name(self, obj):
+        return f"{obj.radiologist.first_name} {obj.radiologist.last_name}".strip()
+    
+    def get_peer_reviewer_name(self, obj):
+        if obj.peer_reviewer:
+            return f"{obj.peer_reviewer.first_name} {obj.peer_reviewer.last_name}".strip()
+        return None
+    
+    def get_collaborations(self, obj):
+        collaborations = obj.collaborations.all().order_by('-timestamp')[:10]  # Latest 10
+        return ReportCollaborationSerializer(collaborations, many=True).data
+    
+    def get_collaborations_count(self, obj):
+        return obj.collaborations.count()
+    
+    def get_complexity_level_choices(self, obj):
+        return [{'value': choice[0], 'label': choice[1]} for choice in RadiologistReport._meta.get_field('complexity_level').choices]
+    
+    def get_report_status_choices(self, obj):
+        return [{'value': choice[0], 'label': choice[1]} for choice in RadiologistReport._meta.get_field('report_status').choices]
+    
+    def validate(self, data):
+        """Custom validation for radiologist reports"""
+        # Validate confidence score
+        radiologist_confidence = data.get('radiologist_confidence')
+        if radiologist_confidence is not None and (radiologist_confidence < 0.0 or radiologist_confidence > 1.0):
+            raise serializers.ValidationError("Radiologist confidence must be between 0.0 and 1.0")
+        
+        # Ensure required fields for completion
+        report_status = data.get('report_status')
+        if report_status == 'completed':
+            required_fields = ['findings', 'impression']
+            for field in required_fields:
+                if not data.get(field):
+                    raise serializers.ValidationError(f"{field.replace('_', ' ').title()} is required for completed reports")
+        
+        return data
+    
+    def create(self, validated_data):
+        """Create radiologist report with auto-assignment"""
+        # Set radiologist from request user if not provided
+        request = self.context.get('request')
+        if request and hasattr(request, 'user') and not validated_data.get('radiologist'):
+            validated_data['radiologist'] = request.user
+        
+        return super().create(validated_data)
+
+
+class ReportCollaborationSerializer(serializers.ModelSerializer):
+    """Serializer for report collaboration tracking"""
+    # Related report details
+    radiologist_report_details = serializers.SerializerMethodField()
+    
+    # Choice fields for frontend
+    interaction_type_choices = serializers.SerializerMethodField()
+    report_section_choices = serializers.SerializerMethodField()
+    feedback_category_choices = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = ReportCollaboration
+        fields = [
+            'id', 'radiologist_report', 'radiologist_report_details', 'interaction_type',
+            'interaction_type_choices', 'ai_suggestion', 'radiologist_action', 'report_section',
+            'report_section_choices', 'confidence_before', 'confidence_after', 'feedback_category',
+            'feedback_category_choices', 'improvement_suggestion', 'ai_reasoning', 'image_regions',
+            'timestamp'
+        ]
+        read_only_fields = ['timestamp']
+    
+    def get_radiologist_report_details(self, obj):
+        return {
+            'id': obj.radiologist_report.id,
+            'examination_number': obj.radiologist_report.ai_report.pemeriksaan.no_xray,
+            'patient_name': obj.radiologist_report.ai_report.pemeriksaan.daftar.pesakit.nama,
+            'radiologist_name': f"{obj.radiologist_report.radiologist.first_name} {obj.radiologist_report.radiologist.last_name}".strip()
+        }
+    
+    def get_interaction_type_choices(self, obj):
+        return [{'value': choice[0], 'label': choice[1]} for choice in ReportCollaboration._meta.get_field('interaction_type').choices]
+    
+    def get_report_section_choices(self, obj):
+        return [{'value': choice[0], 'label': choice[1]} for choice in ReportCollaboration._meta.get_field('report_section').choices]
+    
+    def get_feedback_category_choices(self, obj):
+        return [{'value': choice[0], 'label': choice[1]} for choice in ReportCollaboration._meta.get_field('feedback_category').choices]
+    
+    def validate(self, data):
+        """Custom validation for collaborations"""
+        # Validate confidence scores
+        confidence_before = data.get('confidence_before')
+        if confidence_before is not None and (confidence_before < 0.0 or confidence_before > 1.0):
+            raise serializers.ValidationError("Confidence before must be between 0.0 and 1.0")
+        
+        confidence_after = data.get('confidence_after')
+        if confidence_after is not None and (confidence_after < 0.0 or confidence_after > 1.0):
+            raise serializers.ValidationError("Confidence after must be between 0.0 and 1.0")
+        
+        return data
+
+
+class AIModelPerformanceSerializer(serializers.ModelSerializer):
+    """Serializer for AI model performance tracking"""
+    # Related field displays
+    modality_name = serializers.CharField(source='modality.nama', read_only=True)
+    created_by_name = serializers.SerializerMethodField()
+    
+    # Computed properties
+    approval_rate = serializers.ReadOnlyField()
+    modification_rate = serializers.ReadOnlyField()
+    
+    # Choice fields for frontend
+    model_type_choices = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = AIModelPerformance
+        fields = [
+            'id', 'model_version', 'model_type', 'model_type_choices', 'analysis_date',
+            'modality', 'modality_name', 'total_reports_generated', 'reports_approved_unchanged',
+            'reports_modified', 'reports_rejected', 'accuracy_rate', 'critical_findings_sensitivity',
+            'false_positive_rate', 'average_processing_time', 'average_time_saved',
+            'user_satisfaction_score', 'system_uptime_percentage', 'error_rate',
+            'performance_notes', 'improvement_actions', 'approval_rate', 'modification_rate',
+            'created_by', 'created_by_name', 'created', 'modified'
+        ]
+        read_only_fields = ['accuracy_rate', 'approval_rate', 'modification_rate', 'created', 'modified']
+    
+    def get_created_by_name(self, obj):
+        if obj.created_by:
+            return f"{obj.created_by.first_name} {obj.created_by.last_name}".strip()
+        return None
+    
+    def get_model_type_choices(self, obj):
+        return [{'value': choice[0], 'label': choice[1]} for choice in AIModelPerformance._meta.get_field('model_type').choices]
+    
+    def validate(self, data):
+        """Custom validation for performance metrics"""
+        # Validate that totals add up correctly
+        total_reports = data.get('total_reports_generated', 0)
+        approved_unchanged = data.get('reports_approved_unchanged', 0)
+        modified = data.get('reports_modified', 0)
+        rejected = data.get('reports_rejected', 0)
+        
+        if approved_unchanged + modified + rejected > total_reports:
+            raise serializers.ValidationError(
+                "Sum of approved, modified, and rejected reports cannot exceed total reports generated"
+            )
+        
+        # Validate percentage fields
+        percentage_fields = [
+            'accuracy_rate', 'critical_findings_sensitivity', 'false_positive_rate',
+            'system_uptime_percentage', 'error_rate'
+        ]
+        for field in percentage_fields:
+            value = data.get(field)
+            if value is not None and (value < 0 or value > 100):
+                raise serializers.ValidationError(f"{field.replace('_', ' ').title()} must be between 0 and 100")
+        
+        # Validate satisfaction score
+        satisfaction_score = data.get('user_satisfaction_score')
+        if satisfaction_score is not None and (satisfaction_score < 1.0 or satisfaction_score > 5.0):
+            raise serializers.ValidationError("User satisfaction score must be between 1.0 and 5.0")
+        
+        return data
+    
+    def create(self, validated_data):
+        """Create performance record with audit information"""
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            validated_data['created_by'] = request.user
+        
+        return super().create(validated_data)
+
+
+class AIConfigurationSerializer(serializers.ModelSerializer):
+    """Serializer for AI system configuration"""
+    # Staff details
+    modified_by_name = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = AIConfiguration
+        fields = [
+            'id', 'ollama_server_url', 'vision_language_model', 'medical_llm_model', 'qa_model',
+            'max_processing_time_seconds', 'confidence_threshold', 'critical_findings_threshold',
+            'enable_qa_validation', 'require_peer_review_critical', 'auto_approve_routine_reports',
+            'notify_on_critical_findings', 'notification_emails', 'enable_ai_reporting',
+            'maintenance_mode', 'modified_by', 'modified_by_name', 'created', 'modified'
+        ]
+        read_only_fields = ['created', 'modified', 'modified_by_name']
+    
+    def get_modified_by_name(self, obj):
+        if obj.modified_by:
+            return f"{obj.modified_by.first_name} {obj.modified_by.last_name}".strip()
+        return None
+    
+    def validate(self, data):
+        """Custom validation for AI configuration"""
+        # Validate thresholds
+        confidence_threshold = data.get('confidence_threshold')
+        if confidence_threshold is not None and (confidence_threshold < 0.0 or confidence_threshold > 1.0):
+            raise serializers.ValidationError("Confidence threshold must be between 0.0 and 1.0")
+        
+        critical_findings_threshold = data.get('critical_findings_threshold')
+        if critical_findings_threshold is not None and (critical_findings_threshold < 0.0 or critical_findings_threshold > 1.0):
+            raise serializers.ValidationError("Critical findings threshold must be between 0.0 and 1.0")
+        
+        # Validate processing time
+        max_processing_time = data.get('max_processing_time_seconds')
+        if max_processing_time is not None and max_processing_time <= 0:
+            raise serializers.ValidationError("Maximum processing time must be greater than 0")
+        
+        # Validate notification emails
+        notification_emails = data.get('notification_emails', [])
+        if notification_emails:
+            from django.core.validators import validate_email
+            from django.core.exceptions import ValidationError as DjangoValidationError
+            
+            for email in notification_emails:
+                if email:  # Skip empty strings
+                    try:
+                        validate_email(email)
+                    except DjangoValidationError:
+                        raise serializers.ValidationError(f"Invalid email address: {email}")
+        
+        return data
+    
+    def update(self, instance, validated_data):
+        """Update configuration with audit information"""
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            validated_data['modified_by'] = request.user
+        
+        return super().update(instance, validated_data)
+
+
+# Simplified serializers for list views
+class AIGeneratedReportListSerializer(serializers.ModelSerializer):
+    """Simplified serializer for listing AI reports"""
+    examination_number = serializers.CharField(source='pemeriksaan.no_xray', read_only=True)
+    patient_name = serializers.CharField(source='pemeriksaan.daftar.pesakit.nama', read_only=True)
+    exam_name = serializers.CharField(source='pemeriksaan.exam.exam', read_only=True)
+    reviewed_by_name = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = AIGeneratedReport
+        fields = [
+            'id', 'examination_number', 'patient_name', 'exam_name', 'ai_model_version',
+            'confidence_score', 'requires_urgent_review', 'review_status', 'reviewed_by_name',
+            'reviewed_at', 'created'
+        ]
+    
+    def get_reviewed_by_name(self, obj):
+        if obj.reviewed_by:
+            return f"{obj.reviewed_by.first_name} {obj.reviewed_by.last_name}".strip()
+        return None
+
+
+class RadiologistReportListSerializer(serializers.ModelSerializer):
+    """Simplified serializer for listing radiologist reports"""
+    examination_number = serializers.CharField(source='ai_report.pemeriksaan.no_xray', read_only=True)
+    patient_name = serializers.CharField(source='ai_report.pemeriksaan.daftar.pesakit.nama', read_only=True)
+    radiologist_name = serializers.SerializerMethodField()
+    ai_adoption_rate = serializers.ReadOnlyField()
+    
+    class Meta:
+        model = RadiologistReport
+        fields = [
+            'id', 'examination_number', 'patient_name', 'radiologist_name', 'complexity_level',
+            'report_status', 'report_completion_time', 'time_saved_estimate', 'ai_adoption_rate',
+            'created'
+        ]
+    
+    def get_radiologist_name(self, obj):
+        return f"{obj.radiologist.first_name} {obj.radiologist.last_name}".strip()

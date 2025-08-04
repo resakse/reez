@@ -1,0 +1,190 @@
+{
+  "summary": {
+    "steps_completed": 4,
+    "total_steps": 6,
+    "success_rate": 66.66666666666666,
+    "duration_seconds": 2.124161,
+    "timestamp": "2025-08-04T14:47:15.210959"
+  },
+  "workflow_steps": [
+    {
+      "step": "Setup Users and Data",
+      "success": true,
+      "details": "Created supervisor, radiologist, patient, and examination WF1754290034",
+      "data": null,
+      "timestamp": "2025-08-04T14:47:14.123058"
+    },
+    {
+      "step": "Configure AI Settings",
+      "success": true,
+      "details": "AI settings configured: enabled=True, threshold=0.7",
+      "data": {
+        "ai_enabled": true,
+        "confidence_threshold": 0.7,
+        "qa_enabled": true
+      },
+      "timestamp": "2025-08-04T14:47:14.538680"
+    },
+    {
+      "step": "Generate AI Report",
+      "success": true,
+      "details": "AI report generated successfully (ID: 5)",
+      "data": {
+        "id": 5,
+        "pemeriksaan": 97,
+        "ai_model_version": "llava-med:7b",
+        "ai_model_type": "vision_language",
+        "ai_model_type_choices": [
+          {
+            "value": "vision_language",
+            "label": "Vision-Language Model"
+          },
+          {
+            "value": "medical_llm",
+            "label": "Medical LLM"
+          },
+          {
+            "value": "ensemble",
+            "label": "Ensemble Model"
+          }
+        ],
+        "generated_report": "AI report generation failed: Study not found in PACS for accession ACC1754290034WF",
+        "report_sections": {},
+        "confidence_score": 0.0,
+        "section_confidence": {},
+        "quality_metrics": {
+          "error": "Study not found in PACS for accession ACC1754290034WF"
+        },
+        "critical_findings": [],
+        "critical_findings_confidence": 0.0,
+        "requires_urgent_review": false,
+        "review_status": "rejected",
+        "review_status_choices": [
+          {
+            "value": "pending",
+            "label": "Pending Review"
+          },
+          {
+            "value": "in_review",
+            "label": "Under Review"
+          },
+          {
+            "value": "approved",
+            "label": "Approved"
+          },
+          {
+            "value": "modified",
+            "label": "Modified by Radiologist"
+          },
+          {
+            "value": "rejected",
+            "label": "Rejected"
+          }
+        ],
+        "reviewed_by": null,
+        "reviewed_by_name": null,
+        "reviewed_at": null,
+        "final_report": "",
+        "orthanc_study_id": null,
+        "orthanc_series_ids": [],
+        "dicom_metadata": {},
+        "processing_time_seconds": 0.007647991180419922,
+        "processing_errors": [
+          "Study not found in PACS for accession ACC1754290034WF"
+        ],
+        "processing_warnings": [],
+        "examination_number": "WF1754290034",
+        "examination_accession": "ACC1754290034WF",
+        "patient_name": "WORKFLOW TEST PATIENT",
+        "patient_mrn": "WF001",
+        "modality_name": "CT",
+        "exam_name": "Chest Ct",
+        "is_completed": false,
+        "patient_name_prop": "WORKFLOW TEST PATIENT",
+        "examination_type_prop": "Chest Ct",
+        "created": "2025-08-04T14:47:14.560317+08:00",
+        "modified": "2025-08-04T14:47:14.560354+08:00"
+      },
+      "timestamp": "2025-08-04T14:47:14.674283"
+    },
+    {
+      "step": "Radiologist Collaboration",
+      "success": false,
+      "details": "Failed to create radiologist report: 403",
+      "data": null,
+      "timestamp": "2025-08-04T14:47:14.702891"
+    },
+    {
+      "step": "Performance Dashboard",
+      "success": true,
+      "details": "Dashboard loaded: 3 AI reports, 0 approved",
+      "data": {
+        "total_reports": 3,
+        "pending_review": 2,
+        "approved_reports": 0,
+        "average_confidence": 0.5666666666666667,
+        "system_health": {
+          "ai_reporting_enabled": true,
+          "maintenance_mode": false,
+          "qa_validation_enabled": true,
+          "critical_notifications_enabled": true,
+          "last_config_update": "2025-08-04T06:47:14.487744+00:00"
+        }
+      },
+      "timestamp": "2025-08-04T14:47:14.836146"
+    },
+    {
+      "step": "Data Persistence Verification",
+      "success": false,
+      "details": "Data verification: 1 AI reports, 0 radiologist reports, 0 collaborations",
+      "data": {
+        "ai_reports": 1,
+        "radiologist_reports": 0,
+        "collaborations": 0,
+        "examination_id": 97,
+        "patient_mrn": "WF001"
+      },
+      "timestamp": "2025-08-04T14:47:14.838757"
+    },
+    {
+      "step": "System Health Check",
+      "success": false,
+      "details": "System health: Some issues detected",
+      "data": {
+        "overall_healthy": false,
+        "checks": [
+          {
+            "component": "AI Configuration",
+            "healthy": true
+          },
+          {
+            "component": "Endpoint /api/ai-reporting/config/",
+            "healthy": false
+          },
+          {
+            "component": "Endpoint /api/ai-reporting/ai-reports/",
+            "healthy": true
+          },
+          {
+            "component": "Endpoint /api/ai-reporting/dashboard/",
+            "healthy": true
+          },
+          {
+            "component": "Database Connectivity",
+            "healthy": true
+          }
+        ],
+        "ai_reports_in_db": 3
+      },
+      "timestamp": "2025-08-04T14:47:15.210712"
+    }
+  ],
+  "errors": [
+    "Step 4: Radiologist Collaboration - Failed to create radiologist report: 403",
+    "Step 6: Data Persistence Verification - Data verification: 1 AI reports, 0 radiologist reports, 0 collaborations",
+    "Step 7: System Health Check - System health: Some issues detected"
+  ],
+  "recommendations": [
+    "Address system health issues"
+  ]
+}

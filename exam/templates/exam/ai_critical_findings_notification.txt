@@ -1,0 +1,40 @@
+URGENT: Critical Findings Detected by AI Analysis
+
+Patient Information:
+- Name: {{ patient.nama }}
+- MRN: {{ patient.mrn }}
+- NRIC: {{ patient.nric }}
+- Age: {{ patient.kira_umur }} years
+- Gender: {{ patient.jantina }}
+
+Examination Details:
+- Examination Number: {{ pemeriksaan.no_xray }}
+- Study Type: {{ pemeriksaan.exam.exam }}
+- Modality: {{ pemeriksaan.exam.modaliti.nama }}
+- Date: {{ pemeriksaan.created|date:"Y-m-d H:i" }}
+- Accession Number: {{ pemeriksaan.accession_number }}
+
+AI Analysis Results:
+- AI Model: {{ ai_report.ai_model_version }}
+- Confidence Score: {{ ai_report.confidence_score|floatformat:2 }}
+- Critical Findings Confidence: {{ confidence|floatformat:2 }}
+
+Critical Findings Detected:
+{% for finding in critical_findings %}
+- {{ finding }}
+{% endfor %}
+
+Generated Report Summary:
+{{ ai_report.generated_report|truncatewords:100 }}
+
+Action Required:
+This examination requires urgent radiologist review due to potential critical findings identified by AI analysis. Please prioritize this case for immediate interpretation.
+
+Access the full report and images through the RIS system:
+- Examination ID: {{ pemeriksaan.id }}
+- AI Report ID: {{ ai_report.id }}
+
+Automated notification from {{ KLINIK }} RIS
+Generated at: {{ ai_report.created|date:"Y-m-d H:i:s" }}
+
+Note: This is an automated AI analysis. Final diagnosis must be confirmed by a qualified radiologist.

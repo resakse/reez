@@ -139,4 +139,7 @@ urlpatterns = [
     # Reject Analysis Statistics API endpoints
     path('reject-analysis/statistics/', RejectAnalysisStatisticsView.as_view(), name='reject-analysis-statistics'),
     path('reject-analysis/trends/', RejectAnalysisTrendsView.as_view(), name='reject-analysis-trends'),
+    
+    # AI Reporting System endpoints
+    path('', include('exam.ai_urls')),
 ]

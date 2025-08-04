@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { DicomViewer } from '@/components/DicomViewer';
+import SimpleDicomViewer from '@/components/SimpleDicomViewer';
 import { useAISettings } from '@/contexts/AISettingsContext';
 import { 
   Brain, 
@@ -20,6 +20,7 @@ import {
   EyeOff
 } from 'lucide-react';
 import { toast } from '@/lib/toast';
+import AuthService from '@/lib/auth';
 
 interface AIReport {
   id: string;
@@ -79,7 +80,7 @@ export function CollaborativeReportingInterface({
     if (!aiReportId) return;
     
     try {
-      const response = await fetch(`/api/ai/report/${aiReportId}/`);
+      const response = await AuthService.authenticatedFetch(`/api/ai-reporting/ai-reports/${aiReportId}/`);
       if (response.ok) {
         const data = await response.json();
         setAiReport(data);
@@ -93,10 +94,11 @@ export function CollaborativeReportingInterface({
     if (!aiReportId) return;
     
     try {
-      const response = await fetch(`/api/ai/suggestions/${aiReportId}/`);
+      const response = await AuthService.authenticatedFetch(`/api/ai-reporting/ai-reports/${aiReportId}/`);
       if (response.ok) {
         const data = await response.json();
-        setAiSuggestions(data.suggestions || []);
+        // Extract suggestions from report data - this would need to be implemented in the backend
+        setAiSuggestions(data.ai_suggestions || []);
       }
     } catch (error) {
       console.error('Failed to load AI suggestions:', error);
@@ -108,10 +110,10 @@ export function CollaborativeReportingInterface({
     
     setIsGeneratingAI(true);
     try {
-      const response = await fetch('/api/ai/generate-report/', {
+      const response = await AuthService.authenticatedFetch('/api/ai-reporting/generate/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ exam_id: examinationId })
+        body: JSON.stringify({ examination_number: examinationId })
       });
       
       if (response.ok) {
@@ -151,13 +153,14 @@ export function CollaborativeReportingInterface({
 
   const handleRejectSuggestion = (suggestionId: string) => {
     // Track rejection for learning
-    fetch('/api/ai/track-interaction/', {
+    AuthService.authenticatedFetch('/api/ai-reporting/collaborations/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        suggestion_id: suggestionId,
-        action: 'reject',
-        reason: 'Not applicable'
+        interaction_type: 'reject_ai_finding',
+        ai_suggestion: suggestionId,
+        radiologist_action: 'Rejected',
+        feedback_category: 'not_applicable'
       })
     });
     
@@ -175,10 +178,19 @@ export function CollaborativeReportingInterface({
     };
 
     try {
-      const response = await fetch('/api/ai/collaborative-report/', {
+      const response = await AuthService.authenticatedFetch('/api/ai-reporting/radiologist-reports/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(reportData)
+        body: JSON.stringify({
+          ai_report: aiReportId,
+          clinical_history: radiologistReport.clinical_history,
+          technique: radiologistReport.technique,
+          findings: radiologistReport.findings,
+          impression: radiologistReport.impression,
+          recommendations: radiologistReport.recommendations,
+          complexity_level: calculateComplexity(),
+          radiologist_confidence: calculateConfidence()
+        })
       });
 
       if (response.ok) {
@@ -255,7 +267,7 @@ export function CollaborativeReportingInterface({
             )}
           </div>
         </div>
-        <DicomViewer examinationId={examinationId} />
+        <SimpleDicomViewer studyId={examinationId} />
       </div>
       
       {/* AI Suggestions Panel - Only when AI is enabled */}

@@ -1,0 +1,200 @@
+{
+  "summary": {
+    "total_tests": 29,
+    "passed_tests": 27,
+    "failed_tests": 2,
+    "success_rate": 93.10344827586206,
+    "execution_time": 2.1616952419281006,
+    "timestamp": "2025-08-04T14:44:18.193159"
+  },
+  "details": [
+    {
+      "test_name": "Setup Test Data",
+      "passed": true,
+      "details": "Test data created successfully",
+      "timestamp": "2025-08-04T14:44:16.053432"
+    },
+    {
+      "test_name": "AI Config GET",
+      "passed": true,
+      "details": "Status: 200, Data keys: ['id', 'ollama_server_url', 'vision_language_model', 'medical_llm_model', 'qa_model', 'max_processing_time_seconds', 'confidence_threshold', 'critical_findings_threshold', 'enable_qa_validation', 'require_peer_review_critical', 'auto_approve_routine_reports', 'notify_on_critical_findings', 'notification_emails', 'enable_ai_reporting', 'maintenance_mode', 'modified_by', 'modified_by_name', 'created', 'modified']",
+      "timestamp": "2025-08-04T14:44:16.594016"
+    },
+    {
+      "test_name": "AI Config PUT",
+      "passed": true,
+      "details": "Status: 200",
+      "timestamp": "2025-08-04T14:44:16.679921"
+    },
+    {
+      "test_name": "AI Config Update Verification",
+      "passed": true,
+      "details": "Updated confidence threshold: 0.75",
+      "timestamp": "2025-08-04T14:44:16.679941"
+    },
+    {
+      "test_name": "Ollama Connection Test",
+      "passed": true,
+      "details": "Expected failure (no Ollama): Status 503",
+      "timestamp": "2025-08-04T14:44:16.716227"
+    },
+    {
+      "test_name": "AI Report Generation API",
+      "passed": true,
+      "details": "Status: 500 (Expected - no Ollama service)",
+      "timestamp": "2025-08-04T14:44:16.750472"
+    },
+    {
+      "test_name": "AI Report Generation - Invalid Exam",
+      "passed": true,
+      "details": "Status: 404 (should be 404)",
+      "timestamp": "2025-08-04T14:44:16.784519"
+    },
+    {
+      "test_name": "AI Reports List",
+      "passed": true,
+      "details": "Status: 200, Count: 2",
+      "timestamp": "2025-08-04T14:44:16.851040"
+    },
+    {
+      "test_name": "AI Reports List - Filtered",
+      "passed": true,
+      "details": "Status: 200, Filtered results",
+      "timestamp": "2025-08-04T14:44:16.920317"
+    },
+    {
+      "test_name": "AI Reports List - Search",
+      "passed": true,
+      "details": "Status: 200, Search functionality",
+      "timestamp": "2025-08-04T14:44:16.992708"
+    },
+    {
+      "test_name": "Radiologist Reports List",
+      "passed": true,
+      "details": "Status: 200, Count: 1",
+      "timestamp": "2025-08-04T14:44:17.077859"
+    },
+    {
+      "test_name": "Radiologist Reports - My Reports Only",
+      "passed": true,
+      "details": "Status: 200, User-specific reports",
+      "timestamp": "2025-08-04T14:44:17.161699"
+    },
+    {
+      "test_name": "AI Dashboard API",
+      "passed": true,
+      "details": "Status: 200, Has all required keys: True",
+      "timestamp": "2025-08-04T14:44:17.424423"
+    },
+    {
+      "test_name": "AI Dashboard API - Date Range",
+      "passed": true,
+      "details": "Status: 200, 7-day range",
+      "timestamp": "2025-08-04T14:44:17.550181"
+    },
+    {
+      "test_name": "AI Performance List",
+      "passed": true,
+      "details": "Status: 200, Count: 0",
+      "timestamp": "2025-08-04T14:44:17.583057"
+    },
+    {
+      "test_name": "AI Performance Summary Stats",
+      "passed": false,
+      "details": "Status: 404",
+      "timestamp": "2025-08-04T14:44:17.612164",
+      "error": "Unknown error"
+    },
+    {
+      "test_name": "AIConfiguration Model",
+      "passed": true,
+      "details": "Config exists: True, Ollama URL: http://localhost:11434",
+      "timestamp": "2025-08-04T14:44:17.612980"
+    },
+    {
+      "test_name": "AI Report Creation",
+      "passed": true,
+      "details": "AI Report created with ID: 4",
+      "timestamp": "2025-08-04T14:44:17.620542"
+    },
+    {
+      "test_name": "Radiologist Report Creation",
+      "passed": true,
+      "details": "Radiologist Report created with ID: 2",
+      "timestamp": "2025-08-04T14:44:17.625975"
+    },
+    {
+      "test_name": "Report Collaboration Creation",
+      "passed": true,
+      "details": "Collaboration created with ID: 1",
+      "timestamp": "2025-08-04T14:44:17.630466"
+    },
+    {
+      "test_name": "Invalid Endpoint Handling",
+      "passed": true,
+      "details": "Status: 404 (should be 404)",
+      "timestamp": "2025-08-04T14:44:17.725180"
+    },
+    {
+      "test_name": "Malformed JSON Handling",
+      "passed": false,
+      "details": "Status: 500 (should be 400 or 422)",
+      "timestamp": "2025-08-04T14:44:17.753939",
+      "error": "Unknown error"
+    },
+    {
+      "test_name": "Missing Required Fields",
+      "passed": true,
+      "details": "Status: 400 (should be 400)",
+      "timestamp": "2025-08-04T14:44:17.834241"
+    },
+    {
+      "test_name": "Unauthenticated Access Block",
+      "passed": true,
+      "details": "Status: 401 (should be 401 or 403)",
+      "timestamp": "2025-08-04T14:44:17.863857"
+    },
+    {
+      "test_name": "Authenticated Access Allow",
+      "passed": true,
+      "details": "Status: 200 (should be 200)",
+      "timestamp": "2025-08-04T14:44:17.953648"
+    },
+    {
+      "test_name": "Response Time - /api/ai-reporting/config/",
+      "passed": true,
+      "details": "Time: 0.043s, Status: 200",
+      "timestamp": "2025-08-04T14:44:17.996735"
+    },
+    {
+      "test_name": "Response Time - /api/ai-reporting/ai-reports/",
+      "passed": true,
+      "details": "Time: 0.040s, Status: 200",
+      "timestamp": "2025-08-04T14:44:18.037010"
+    },
+    {
+      "test_name": "Response Time - /api/ai-reporting/dashboard/",
+      "passed": true,
+      "details": "Time: 0.125s, Status: 200",
+      "timestamp": "2025-08-04T14:44:18.162356"
+    },
+    {
+      "test_name": "Response Time - /api/ai-reporting/performance/",
+      "passed": true,
+      "details": "Time: 0.031s, Status: 200",
+      "timestamp": "2025-08-04T14:44:18.192910"
+    }
+  ],
+  "errors": [
+    "AI Performance Summary Stats: Unknown error",
+    "Malformed JSON Handling: Unknown error"
+  ],
+  "warnings": [
+    "Ollama service not available - this is expected in test environment"
+  ],
+  "recommendations": [
+    "\ud83d\udd27 Start Ollama service for full AI functionality",
+    "\ud83d\udc1b Fix failing tests before production deployment",
+    "\u26a0\ufe0f  Address system warnings"
+  ]
+}

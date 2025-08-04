@@ -1,0 +1,28 @@
+{
+  "summary": {
+    "total_tests": 1,
+    "passed_tests": 0,
+    "failed_tests": 1,
+    "success_rate": 0.0,
+    "execution_time": 0.41274476051330566,
+    "timestamp": "2025-08-04T14:41:56.617214"
+  },
+  "details": [
+    {
+      "test_name": "Setup Test Data",
+      "passed": false,
+      "details": "",
+      "timestamp": "2025-08-04T14:41:56.617009",
+      "error": "Cannot resolve keyword 'nama' into field. Choices are: catatan, contrast, exam, id, modaliti, modaliti_id, part, part_id, pemeriksaan, short_desc, statistik, statistik_id, status_ca"
+    }
+  ],
+  "errors": [
+    "Setup Test Data: Cannot resolve keyword 'nama' into field. Choices are: catatan, contrast, exam, id, modaliti, modaliti_id, part, part_id, pemeriksaan, short_desc, statistik, statistik_id, status_ca",
+    "Critical error: Cannot resolve keyword 'nama' into field. Choices are: catatan, contrast, exam, id, modaliti, modaliti_id, part, part_id, pemeriksaan, short_desc, statistik, statistik_id, status_ca"
+  ],
+  "warnings": [],
+  "recommendations": [
+    "\ud83d\udd27 Start Ollama service for full AI functionality",
+    "\ud83d\udc1b Fix failing tests before production deployment"
+  ]
+}

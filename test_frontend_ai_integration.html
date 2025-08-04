@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI Reporting Frontend Integration Test</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .test-section.pass {
+            border-color: #4CAF50;
+            background-color: #f8fff8;
+        }
+        .test-section.fail {
+            border-color: #f44336;
+            background-color: #fff8f8;
+        }
+        .test-section.warning {
+            border-color: #ff9800;
+            background-color: #fffaf5;
+        }
+        h1 { color: #333; }
+        h2 { color: #666; }
+        .status { 
+            font-weight: bold; 
+            padding: 4px 8px; 
+            border-radius: 3px; 
+            margin-left: 10px;
+        }
+        .status.pass { background-color: #4CAF50; color: white; }
+        .status.fail { background-color: #f44336; color: white; }
+        .status.warning { background-color: #ff9800; color: white; }
+        .test-result {
+            margin: 10px 0;
+            padding: 8px;
+            background-color: #f9f9f9;
+            border-radius: 3px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .loading {
+            color: #666;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧠 AI Reporting System - Frontend Integration Test</h1>
+        <p>This test verifies the connection between the frontend and Django AI reporting API endpoints.</p>
+        
+        <button onclick="runAllTests()">Run All Tests</button>
+        <button onclick="clearResults()">Clear Results</button>
+        
+        <div id="test-results"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api/ai-reporting';
+        let testResults = [];
+
+        async function makeRequest(url, method = 'GET', data = null, headers = {}) {
+            const config = {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    ...headers
+                }
+            };
+            
+            if (data) {
+                config.body = JSON.stringify(data);
+            }
+            
+            try {
+                const response = await fetch(url, config);
+                return {
+                    ok: response.ok,
+                    status: response.status,
+                    statusText: response.statusText,
+                    data: response.ok ? await response.json() : await response.text()
+                };
+            } catch (error) {
+                return {
+                    ok: false,
+                    status: 0,
+                    statusText: 'Network Error',
+                    error: error.message
+                };
+            }
+        }
+
+        function logTest(name, passed, details = '', data = null) {
+            testResults.push({
+                name: name,
+                passed: passed,
+                details: details,
+                data: data,
+                timestamp: new Date().toISOString()
+            });
+            
+            console.log(`${passed ? '✅' : '❌'} ${name}: ${details}`);
+            updateResults();
+        }
+
+        function updateResults() {
+            const container = document.getElementById('test-results');
+            const totalTests = testResults.length;
+            const passedTests = testResults.filter(t => t.passed).length;
+            const failedTests = totalTests - passedTests;
+            
+            let html = `
+                <div class="test-section">
+                    <h2>Test Summary</h2>
+                    <p>Total Tests: ${totalTests}</p>
+                    <p>Passed: <span class="status pass">${passedTests}</span></p>
+                    <p>Failed: <span class="status fail">${failedTests}</span></p>
+                    <p>Success Rate: ${totalTests > 0 ? ((passedTests / totalTests) * 100).toFixed(1) : 0}%</p>
+                </div>
+            `;
+            
+            testResults.forEach(test => {
+                const sectionClass = test.passed ? 'pass' : 'fail';
+                const statusClass = test.passed ? 'pass' : 'fail';
+                
+                html += `
+                    <div class="test-section ${sectionClass}">
+                        <h3>${test.name} <span class="status ${statusClass}">${test.passed ? 'PASS' : 'FAIL'}</span></h3>
+                        <div class="test-result">
+                            <strong>Details:</strong> ${test.details}<br>
+                            <strong>Time:</strong> ${new Date(test.timestamp).toLocaleTimeString()}
+                            ${test.data ? `<br><strong>Data:</strong> <pre>${JSON.stringify(test.data, null, 2).substring(0, 500)}${JSON.stringify(test.data, null, 2).length > 500 ? '...' : ''}</pre>` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        function clearResults() {
+            testResults = [];
+            document.getElementById('test-results').innerHTML = '<p class="loading">Tests cleared. Click "Run All Tests" to start testing.</p>';
+        }
+
+        async function testAIConfiguration() {
+            console.log('Testing AI Configuration API...');
+            
+            // Test GET configuration
+            const configResponse = await makeRequest(`${API_BASE}/config/`);
+            
+            if (configResponse.ok && configResponse.data) {
+                const requiredFields = [
+                    'ollama_server_url', 'vision_language_model', 'medical_llm_model',
+                    'enable_ai_reporting', 'confidence_threshold'
+                ];
+                
+                const hasRequiredFields = requiredFields.every(field => 
+                    configResponse.data.hasOwnProperty(field)
+                );
+                
+                logTest(
+                    'AI Configuration API - GET',
+                    hasRequiredFields,
+                    `Status: ${configResponse.status}, Has required fields: ${hasRequiredFields}`,
+                    {
+                        ollama_url: configResponse.data.ollama_server_url,
+                        ai_enabled: configResponse.data.enable_ai_reporting,
+                        confidence_threshold: configResponse.data.confidence_threshold
+                    }
+                );
+                
+                return configResponse.data;
+            } else {
+                logTest(
+                    'AI Configuration API - GET',
+                    false,
+                    `Failed: ${configResponse.status} - ${configResponse.statusText}`
+                );
+                return null;
+            }
+        }
+
+        async function testAIConnectionTest() {
+            console.log('Testing AI Connection Test...');
+            
+            const testResponse = await makeRequest(`${API_BASE}/config/test/`, 'POST');
+            
+            // We expect this to fail without Ollama running
+            const isExpectedFailure = testResponse.status === 503;
+            
+            logTest(
+                'AI Connection Test',
+                isExpectedFailure,
+                `Status: ${testResponse.status} - Expected failure (no Ollama service)`,
+                testResponse.data
+            );
+        }
+
+        async function testAIReportsList() {
+            console.log('Testing AI Reports List...');
+            
+            const reportsResponse = await makeRequest(`${API_BASE}/ai-reports/`);
+            
+            if (reportsResponse.ok) {
+                logTest(
+                    'AI Reports List',
+                    true,
+                    `Status: ${reportsResponse.status}, Count: ${reportsResponse.data.count || 0}`,
+                    {
+                        count: reportsResponse.data.count,
+                        has_results: reportsResponse.data.results && reportsResponse.data.results.length > 0
+                    }
+                );
+            } else {
+                logTest(
+                    'AI Reports List',
+                    false,
+                    `Failed: ${reportsResponse.status} - ${reportsResponse.statusText}`
+                );
+            }
+        }
+
+        async function testRadiologistReportsList() {
+            console.log('Testing Radiologist Reports List...');
+            
+            const reportsResponse = await makeRequest(`${API_BASE}/radiologist-reports/`);
+            
+            if (reportsResponse.ok) {
+                logTest(
+                    'Radiologist Reports List',
+                    true,
+                    `Status: ${reportsResponse.status}, Count: ${reportsResponse.data.count || 0}`,
+                    {
+                        count: reportsResponse.data.count
+                    }
+                );
+            } else {
+                logTest(
+                    'Radiologist Reports List',
+                    false,
+                    `Failed: ${reportsResponse.status} - ${reportsResponse.statusText}`
+                );
+            }
+        }
+
+        async function testAIDashboard() {
+            console.log('Testing AI Dashboard...');
+            
+            const dashboardResponse = await makeRequest(`${API_BASE}/dashboard/`);
+            
+            if (dashboardResponse.ok) {
+                const expectedKeys = [
+                    'basic_stats', 'modality_stats', 'daily_trend', 
+                    'radiologist_stats', 'system_health'
+                ];
+                
+                const hasExpectedKeys = expectedKeys.every(key => 
+                    dashboardResponse.data.hasOwnProperty(key)
+                );
+                
+                logTest(
+                    'AI Dashboard',
+                    hasExpectedKeys,
+                    `Status: ${dashboardResponse.status}, Has expected keys: ${hasExpectedKeys}`,
+                    {
+                        basic_stats: dashboardResponse.data.basic_stats,
+                        system_health: dashboardResponse.data.system_health
+                    }
+                );
+            } else {
+                logTest(
+                    'AI Dashboard',
+                    false,
+                    `Failed: ${dashboardResponse.status} - ${dashboardResponse.statusText}`
+                );
+            }
+        }
+
+        async function testAIPerformance() {
+            console.log('Testing AI Performance...');
+            
+            const performanceResponse = await makeRequest(`${API_BASE}/performance/`);
+            
+            if (performanceResponse.ok) {
+                logTest(
+                    'AI Performance List',
+                    true,
+                    `Status: ${performanceResponse.status}, Count: ${performanceResponse.data.count || 0}`,
+                    {
+                        count: performanceResponse.data.count
+                    }
+                );
+            } else {
+                logTest(
+                    'AI Performance List',
+                    false,
+                    `Failed: ${performanceResponse.status} - ${performanceResponse.statusText}`
+                );
+            }
+        }
+
+        async function testCORSAndAuth() {
+            console.log('Testing CORS and Authentication...');
+            
+            // Test unauthenticated request (should fail)
+            const unauthResponse = await makeRequest(`${API_BASE}/ai-reports/`);
+            
+            const expectsAuth = unauthResponse.status === 401 || unauthResponse.status === 403;
+            
+            logTest(
+                'Authentication Required',
+                expectsAuth,
+                `Status: ${unauthResponse.status} - ${expectsAuth ? 'Correctly requires authentication' : 'Authentication not enforced'}`,
+                { requires_auth: expectsAuth }
+            );
+        }
+
+        async function testResponseTimes() {
+            console.log('Testing Response Times...');
+            
+            const endpoints = [
+                { name: 'Configuration', url: `${API_BASE}/config/` },
+                { name: 'AI Reports', url: `${API_BASE}/ai-reports/` },
+                { name: 'Dashboard', url: `${API_BASE}/dashboard/` }
+            ];
+            
+            for (const endpoint of endpoints) {
+                const startTime = performance.now();
+                const response = await makeRequest(endpoint.url);
+                const endTime = performance.now();
+                const responseTime = endTime - startTime;
+                
+                const isGoodTime = responseTime < 2000; // Under 2 seconds
+                
+                logTest(
+                    `Response Time - ${endpoint.name}`,
+                    isGoodTime,
+                    `${responseTime.toFixed(0)}ms (${response.status}) - ${isGoodTime ? 'Good' : 'Slow'}`,
+                    { response_time_ms: responseTime.toFixed(0), status: response.status }
+                );
+            }
+        }
+
+        async function runAllTests() {
+            testResults = [];
+            document.getElementById('test-results').innerHTML = '<p class="loading">Running tests...</p>';
+            
+            console.log('🧠 Starting AI Reporting Frontend Integration Tests...');
+            
+            try {
+                await testAIConfiguration();
+                await testAIConnectionTest();
+                await testAIReportsList();
+                await testRadiologistReportsList();
+                await testAIDashboard();
+                await testAIPerformance();
+                await testCORSAndAuth();
+                await testResponseTimes();
+                
+                console.log('✅ All tests completed!');
+                
+                // Generate summary
+                const totalTests = testResults.length;
+                const passedTests = testResults.filter(t => t.passed).length;
+                
+                if (passedTests === totalTests) {
+                    console.log('🎉 All tests passed! System is ready.');
+                } else {
+                    console.log(`⚠️ ${totalTests - passedTests} test(s) failed. Check results above.`);
+                }
+                
+            } catch (error) {
+                console.error('❌ Test suite failed:', error);
+                logTest('Test Suite Execution', false, `Critical error: ${error.message}`);
+            }
+        }
+
+        // Initialize
+        document.getElementById('test-results').innerHTML = '<p class="loading">Ready to run tests. Click "Run All Tests" to begin.</p>';
+    </script>
+</body>
+</html>

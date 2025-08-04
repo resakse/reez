@@ -1206,3 +1206,708 @@ class RejectAnalysisTargetSettings(models.Model):
         if not settings:
             settings = cls.objects.create()
         return settings
+
+
+# ========== AI REPORTING MODELS ==========
+
+class AIGeneratedReport(auto_prefetch.Model):
+    """AI-generated radiology reports with orthanc integration"""
+    pemeriksaan = auto_prefetch.ForeignKey(
+        Pemeriksaan, 
+        on_delete=models.CASCADE,
+        related_name='ai_reports',
+        help_text="The examination this AI report belongs to"
+    )
+    
+    # AI Model Information
+    ai_model_version = models.CharField(
+        max_length=50,
+        help_text="Version of the AI model used for generation (e.g., 'llava-med-v1.0')"
+    )
+    ai_model_type = models.CharField(
+        max_length=30,
+        choices=[
+            ('vision_language', 'Vision-Language Model'),
+            ('medical_llm', 'Medical LLM'),
+            ('ensemble', 'Ensemble Model'),
+        ],
+        default='vision_language',
+        help_text="Type of AI model used"
+    )
+    
+    # Generated Report Content
+    generated_report = models.TextField(
+        help_text="The complete AI-generated report text"
+    )
+    report_sections = models.JSONField(
+        default=dict,
+        help_text="Structured report sections (clinical_history, findings, impression, etc.)"
+    )
+    
+    # AI Confidence and Quality Metrics
+    confidence_score = models.FloatField(
+        help_text="Overall confidence score from AI model (0.0 to 1.0)"
+    )
+    section_confidence = models.JSONField(
+        default=dict,
+        help_text="Confidence scores for each report section"
+    )
+    quality_metrics = models.JSONField(
+        default=dict,
+        help_text="Quality assurance metrics from validation models"
+    )
+    
+    # Critical Findings Detection
+    critical_findings = models.JSONField(
+        default=list,
+        help_text="List of critical findings detected by AI"
+    )
+    critical_findings_confidence = models.FloatField(
+        null=True, blank=True,
+        help_text="Confidence score for critical findings detection"
+    )
+    requires_urgent_review = models.BooleanField(
+        default=False,
+        help_text="Flag indicating if report requires urgent radiologist review"
+    )
+    
+    # Review Status
+    review_status = models.CharField(
+        max_length=20, 
+        choices=[
+            ('pending', 'Pending Review'),
+            ('in_review', 'Under Review'),
+            ('approved', 'Approved'),
+            ('modified', 'Modified by Radiologist'),
+            ('rejected', 'Rejected')
+        ],
+        default='pending',
+        help_text="Current review status of the AI-generated report"
+    )
+    
+    # Staff Assignments
+    reviewed_by = auto_prefetch.ForeignKey(
+        User, 
+        on_delete=models.SET_NULL, 
+        null=True, blank=True,
+        related_name='reviewed_ai_reports',
+        help_text="Radiologist who reviewed this AI report"
+    )
+    reviewed_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="Timestamp when the report was reviewed"
+    )
+    
+    # Final Report Output
+    final_report = models.TextField(
+        blank=True,
+        help_text="Final report text after radiologist review/modification"
+    )
+    
+    # Orthanc PACS Integration
+    orthanc_study_id = models.CharField(
+        max_length=100, null=True, blank=True,
+        help_text="Orthanc study ID for DICOM images used in analysis"
+    )
+    orthanc_series_ids = models.JSONField(
+        default=list,
+        help_text="List of Orthanc series IDs analyzed by AI"
+    )
+    dicom_metadata = models.JSONField(
+        default=dict,
+        help_text="Relevant DICOM metadata used for analysis"
+    )
+    
+    # Processing Information
+    processing_time_seconds = models.FloatField(
+        null=True, blank=True,
+        help_text="Time taken for AI report generation in seconds"
+    )
+    processing_errors = models.JSONField(
+        default=list,
+        help_text="List of errors encountered during processing"
+    )
+    processing_warnings = models.JSONField(
+        default=list,
+        help_text="List of warnings from AI processing pipeline"
+    )
+    
+    # Audit fields
+    created = models.DateTimeField(auto_now_add=True)
+    modified = models.DateTimeField(auto_now=True)
+    
+    class Meta(auto_prefetch.Model.Meta):
+        verbose_name = "AI Generated Report"
+        verbose_name_plural = "AI Generated Reports"
+        ordering = ['-created']
+        indexes = [
+            models.Index(fields=['pemeriksaan', 'review_status']),
+            models.Index(fields=['ai_model_version', 'confidence_score']),
+            models.Index(fields=['orthanc_study_id']),
+            models.Index(fields=['requires_urgent_review', 'review_status']),
+            models.Index(fields=['created']),
+        ]
+    
+    def __str__(self):
+        return f"AI Report - {self.pemeriksaan.no_xray} ({self.review_status})"
+    
+    def save(self, *args, **kwargs):
+        # Auto-set requires_urgent_review based on critical findings
+        if self.critical_findings and self.critical_findings_confidence:
+            self.requires_urgent_review = (
+                len(self.critical_findings) > 0 and 
+                self.critical_findings_confidence > 0.8
+            )
+        super().save(*args, **kwargs)
+    
+    @property
+    def is_completed(self):
+        """Check if AI report processing is completed"""
+        return self.review_status in ['approved', 'modified']
+    
+    @property
+    def patient_name(self):
+        """Get patient name for this report"""
+        return self.pemeriksaan.daftar.pesakit.nama
+    
+    @property
+    def examination_type(self):
+        """Get examination type"""
+        return self.pemeriksaan.exam.exam
+
+
+class RadiologistReport(auto_prefetch.Model):
+    """Collaborative reporting model for radiologist input"""
+    ai_report = models.OneToOneField(
+        AIGeneratedReport, 
+        on_delete=models.CASCADE,
+        related_name='radiologist_report',
+        help_text="The AI report this radiologist report is based on"
+    )
+    radiologist = auto_prefetch.ForeignKey(
+        User, 
+        on_delete=models.CASCADE,
+        related_name='radiologist_reports',
+        help_text="Radiologist creating this report"
+    )
+    
+    # Report Content Sections
+    clinical_history = models.TextField(
+        blank=True,
+        help_text="Clinical history and indication for examination"
+    )
+    technique = models.TextField(
+        blank=True,
+        help_text="Imaging technique and parameters used"
+    )
+    findings = models.TextField(
+        help_text="Detailed imaging findings"
+    )
+    impression = models.TextField(
+        help_text="Clinical impression and diagnosis"
+    )
+    recommendations = models.TextField(
+        blank=True,
+        help_text="Follow-up recommendations and next steps"
+    )
+    
+    # AI Collaboration Metadata
+    ai_suggestions_used = models.JSONField(
+        default=list,
+        help_text="List of AI suggestions that were accepted and used"
+    )
+    ai_suggestions_modified = models.JSONField(
+        default=list,
+        help_text="List of AI suggestions that were modified by radiologist"
+    )
+    ai_suggestions_rejected = models.JSONField(
+        default=list,
+        help_text="List of AI suggestions that were rejected"
+    )
+    radiologist_additions = models.TextField(
+        blank=True,
+        help_text="Additional findings/content added by radiologist"
+    )
+    
+    # Workflow Tracking
+    report_start_time = models.DateTimeField(
+        auto_now_add=True,
+        help_text="When radiologist started working on the report"
+    )
+    report_completion_time = models.DateTimeField(
+        null=True, blank=True,
+        help_text="When radiologist completed the report"
+    )
+    time_saved_estimate = models.IntegerField(
+        null=True, blank=True,
+        help_text="Estimated time saved using AI assistance (in minutes)"
+    )
+    
+    # Quality and Complexity Metrics
+    complexity_level = models.CharField(
+        max_length=20, 
+        choices=[
+            ('routine', 'Routine'),
+            ('complex', 'Complex'),
+            ('critical', 'Critical')
+        ],
+        default='routine',
+        help_text="Complexity level as assessed by radiologist"
+    )
+    radiologist_confidence = models.FloatField(
+        null=True, blank=True,
+        help_text="Radiologist's confidence in final report (0.0 to 1.0)"
+    )
+    
+    # Report Status
+    report_status = models.CharField(
+        max_length=20,
+        choices=[
+            ('draft', 'Draft'),
+            ('in_progress', 'In Progress'),
+            ('completed', 'Completed'),
+            ('approved', 'Approved'),
+            ('archived', 'Archived')
+        ],
+        default='draft',
+        help_text="Current status of the radiologist report"
+    )
+    
+    # Quality Assurance
+    peer_review_required = models.BooleanField(
+        default=False,
+        help_text="Flag indicating if peer review is required"
+    )
+    peer_reviewer = auto_prefetch.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='peer_reviewed_reports',
+        help_text="Peer reviewer for quality assurance"
+    )
+    peer_review_date = models.DateTimeField(
+        null=True, blank=True,
+        help_text="Date of peer review completion"
+    )
+    peer_review_comments = models.TextField(
+        blank=True,
+        help_text="Comments from peer reviewer"
+    )
+    
+    # Audit fields
+    created = models.DateTimeField(auto_now_add=True)
+    modified = models.DateTimeField(auto_now=True)
+    
+    class Meta(auto_prefetch.Model.Meta):
+        verbose_name = "Radiologist Report"
+        verbose_name_plural = "Radiologist Reports"
+        ordering = ['-created']
+        indexes = [
+            models.Index(fields=['radiologist', 'report_completion_time']),
+            models.Index(fields=['complexity_level', 'radiologist_confidence']),
+            models.Index(fields=['report_status']),
+            models.Index(fields=['peer_review_required', 'peer_review_date']),
+        ]
+    
+    def __str__(self):
+        return f"Report by {self.radiologist.username} - {self.ai_report.pemeriksaan.no_xray}"
+    
+    def save(self, *args, **kwargs):
+        # Auto-set completion time when status changes to completed
+        if self.report_status == 'completed' and not self.report_completion_time:
+            from django.utils import timezone
+            self.report_completion_time = timezone.now()
+        
+        # Calculate time saved estimate
+        if self.report_completion_time and self.time_saved_estimate is None:
+            # Simple heuristic: estimate based on AI suggestions used
+            ai_suggestions_count = len(self.ai_suggestions_used)
+            base_time_saved = min(ai_suggestions_count * 5, 30)  # 5 min per suggestion, max 30 min
+            self.time_saved_estimate = base_time_saved
+        
+        super().save(*args, **kwargs)
+    
+    @property
+    def total_reporting_time(self):
+        """Calculate total time spent on reporting"""
+        if self.report_completion_time:
+            delta = self.report_completion_time - self.report_start_time
+            return delta.total_seconds() / 60  # Return in minutes
+        return None
+    
+    @property
+    def ai_adoption_rate(self):
+        """Calculate percentage of AI suggestions adopted"""
+        total_suggestions = (
+            len(self.ai_suggestions_used) + 
+            len(self.ai_suggestions_modified) + 
+            len(self.ai_suggestions_rejected)
+        )
+        if total_suggestions > 0:
+            adopted = len(self.ai_suggestions_used) + len(self.ai_suggestions_modified)
+            return (adopted / total_suggestions) * 100
+        return 0
+
+
+class ReportCollaboration(auto_prefetch.Model):
+    """Track collaborative interactions between AI and radiologist"""
+    radiologist_report = auto_prefetch.ForeignKey(
+        RadiologistReport, 
+        on_delete=models.CASCADE,
+        related_name='collaborations',
+        help_text="The radiologist report this collaboration belongs to"
+    )
+    
+    # Interaction Details
+    interaction_type = models.CharField(
+        max_length=30, 
+        choices=[
+            ('accept_ai_finding', 'Accepted AI Finding'),
+            ('modify_ai_finding', 'Modified AI Finding'),
+            ('reject_ai_finding', 'Rejected AI Finding'),
+            ('add_new_finding', 'Added New Finding'),
+            ('request_ai_second_opinion', 'Requested AI Second Opinion'),
+            ('flag_ai_error', 'Flagged AI Error'),
+            ('approve_ai_suggestion', 'Approved AI Suggestion'),
+        ],
+        help_text="Type of collaborative interaction"
+    )
+    
+    # Content of the Interaction
+    ai_suggestion = models.TextField(
+        help_text="Original AI suggestion or finding"
+    )
+    radiologist_action = models.TextField(
+        help_text="Action taken by radiologist"
+    )
+    
+    # Context Information
+    report_section = models.CharField(
+        max_length=30,
+        choices=[
+            ('clinical_history', 'Clinical History'),
+            ('technique', 'Technique'),
+            ('findings', 'Findings'),
+            ('impression', 'Impression'),
+            ('recommendations', 'Recommendations'),
+        ],
+        help_text="Report section where interaction occurred"
+    )
+    
+    # Confidence Tracking
+    confidence_before = models.FloatField(
+        help_text="AI confidence score before radiologist interaction"
+    )
+    confidence_after = models.FloatField(
+        null=True, blank=True,
+        help_text="Updated confidence after radiologist input"
+    )
+    
+    # Learning and Feedback
+    feedback_category = models.CharField(
+        max_length=20,
+        choices=[
+            ('correct', 'AI was correct'),
+            ('incorrect', 'AI was incorrect'),
+            ('incomplete', 'AI was incomplete'),
+            ('irrelevant', 'AI was irrelevant'),
+            ('helpful', 'AI was helpful'),
+        ],
+        null=True, blank=True,
+        help_text="Radiologist feedback on AI performance"
+    )
+    
+    improvement_suggestion = models.TextField(
+        blank=True,
+        help_text="Radiologist suggestion for AI improvement"
+    )
+    
+    # Technical Details
+    ai_reasoning = models.JSONField(
+        default=dict,
+        help_text="AI's reasoning for the suggestion (if available)"
+    )
+    image_regions = models.JSONField(
+        default=list,
+        help_text="Image regions/coordinates relevant to this interaction"
+    )
+    
+    # Timing
+    timestamp = models.DateTimeField(
+        auto_now_add=True,
+        help_text="When this interaction occurred"
+    )
+    
+    class Meta(auto_prefetch.Model.Meta):
+        verbose_name = "Report Collaboration"
+        verbose_name_plural = "Report Collaborations"
+        ordering = ['timestamp']
+        indexes = [
+            models.Index(fields=['radiologist_report', 'timestamp']),
+            models.Index(fields=['interaction_type', 'feedback_category']),
+            models.Index(fields=['report_section']),
+        ]
+    
+    def __str__(self):
+        return f"{self.interaction_type} - {self.radiologist_report.ai_report.pemeriksaan.no_xray}"
+
+
+class AIModelPerformance(models.Model):
+    """Track AI model performance metrics over time"""
+    # Model Information
+    model_version = models.CharField(
+        max_length=50,
+        help_text="AI model version being tracked"
+    )
+    model_type = models.CharField(
+        max_length=30,
+        choices=[
+            ('vision_language', 'Vision-Language Model'),
+            ('medical_llm', 'Medical LLM'),
+            ('qa_model', 'Quality Assurance Model'),
+            ('ensemble', 'Ensemble Model'),
+        ],
+        help_text="Type of AI model"
+    )
+    
+    # Time Period
+    analysis_date = models.DateField(
+        help_text="Date of performance analysis (typically monthly)"
+    )
+    modality = auto_prefetch.ForeignKey(
+        Modaliti,
+        on_delete=models.CASCADE,
+        null=True, blank=True,
+        help_text="Specific modality for this performance analysis"
+    )
+    
+    # Performance Metrics
+    total_reports_generated = models.PositiveIntegerField(
+        default=0,
+        help_text="Total number of reports generated in this period"
+    )
+    reports_approved_unchanged = models.PositiveIntegerField(
+        default=0,
+        help_text="Reports approved without any changes"
+    )
+    reports_modified = models.PositiveIntegerField(
+        default=0,
+        help_text="Reports modified by radiologists"
+    )
+    reports_rejected = models.PositiveIntegerField(
+        default=0,
+        help_text="Reports completely rejected"
+    )
+    
+    # Accuracy Metrics
+    accuracy_rate = models.DecimalField(
+        max_digits=5, decimal_places=2,
+        null=True, blank=True,
+        help_text="Overall accuracy rate as percentage"
+    )
+    critical_findings_sensitivity = models.DecimalField(
+        max_digits=5, decimal_places=2,
+        null=True, blank=True,
+        help_text="Sensitivity for detecting critical findings"
+    )
+    false_positive_rate = models.DecimalField(
+        max_digits=5, decimal_places=2,
+        null=True, blank=True,
+        help_text="False positive rate as percentage"
+    )
+    
+    # Efficiency Metrics
+    average_processing_time = models.FloatField(
+        null=True, blank=True,
+        help_text="Average processing time in seconds"
+    )
+    average_time_saved = models.FloatField(
+        null=True, blank=True,
+        help_text="Average time saved by radiologists in minutes"
+    )
+    user_satisfaction_score = models.DecimalField(
+        max_digits=3, decimal_places=2,
+        null=True, blank=True,
+        help_text="User satisfaction score (1.0 to 5.0)"
+    )
+    
+    # Technical Metrics
+    system_uptime_percentage = models.DecimalField(
+        max_digits=5, decimal_places=2,
+        null=True, blank=True,
+        help_text="System uptime percentage for the period"
+    )
+    error_rate = models.DecimalField(
+        max_digits=5, decimal_places=2,
+        null=True, blank=True,
+        help_text="Processing error rate as percentage"
+    )
+    
+    # Comments and Analysis
+    performance_notes = models.TextField(
+        blank=True,
+        help_text="Notes about performance trends and issues"
+    )
+    improvement_actions = models.TextField(
+        blank=True,
+        help_text="Actions taken or planned for improvement"
+    )
+    
+    # Audit fields
+    created = models.DateTimeField(auto_now_add=True)
+    modified = models.DateTimeField(auto_now=True)
+    created_by = auto_prefetch.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        help_text="User who created this performance record"
+    )
+    
+    class Meta:
+        verbose_name = "AI Model Performance"
+        verbose_name_plural = "AI Model Performance Records"
+        ordering = ['-analysis_date', 'model_version']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['model_version', 'analysis_date', 'modality'],
+                name='unique_performance_per_model_date_modality'
+            )
+        ]
+        indexes = [
+            models.Index(fields=['model_version', 'analysis_date']),
+            models.Index(fields=['modality', 'analysis_date']),
+        ]
+    
+    def __str__(self):
+        modality_str = f" - {self.modality.nama}" if self.modality else ""
+        return f"{self.model_version} - {self.analysis_date.strftime('%B %Y')}{modality_str}"
+    
+    def save(self, *args, **kwargs):
+        # Calculate accuracy rate if not provided
+        if not self.accuracy_rate and self.total_reports_generated > 0:
+            accurate_reports = self.reports_approved_unchanged + self.reports_modified
+            self.accuracy_rate = Decimal(
+                (accurate_reports / self.total_reports_generated) * 100
+            ).quantize(Decimal('0.01'))
+        
+        super().save(*args, **kwargs)
+    
+    @property
+    def approval_rate(self):
+        """Get the rate of reports approved (with or without modifications)"""
+        if self.total_reports_generated > 0:
+            approved = self.reports_approved_unchanged + self.reports_modified
+            return (approved / self.total_reports_generated) * 100
+        return 0
+    
+    @property
+    def modification_rate(self):
+        """Get the rate of reports that required modifications"""
+        if self.total_reports_generated > 0:
+            return (self.reports_modified / self.total_reports_generated) * 100
+        return 0
+
+
+class AIConfiguration(models.Model):
+    """Configuration settings for AI reporting system"""
+    # Ollama Server Configuration
+    ollama_server_url = models.URLField(
+        default='http://localhost:11434',
+        help_text="URL of the Ollama server"
+    )
+    
+    # Model Configuration
+    vision_language_model = models.CharField(
+        max_length=100,
+        default='llava-med:7b',
+        help_text="Vision-language model for image analysis"
+    )
+    medical_llm_model = models.CharField(
+        max_length=100,
+        default='meditron:7b',
+        help_text="Medical LLM for report generation"
+    )
+    qa_model = models.CharField(
+        max_length=100,
+        default='medalpaca:7b',
+        help_text="Quality assurance model"
+    )
+    
+    # Processing Configuration
+    max_processing_time_seconds = models.PositiveIntegerField(
+        default=300,
+        help_text="Maximum time allowed for AI processing (seconds)"
+    )
+    confidence_threshold = models.FloatField(
+        default=0.7,
+        help_text="Minimum confidence threshold for auto-approval"
+    )
+    critical_findings_threshold = models.FloatField(
+        default=0.8,
+        help_text="Confidence threshold for flagging critical findings"
+    )
+    
+    # Quality Assurance Settings
+    enable_qa_validation = models.BooleanField(
+        default=True,
+        help_text="Enable quality assurance validation"
+    )
+    require_peer_review_critical = models.BooleanField(
+        default=True,
+        help_text="Require peer review for critical findings"
+    )
+    auto_approve_routine_reports = models.BooleanField(
+        default=False,
+        help_text="Auto-approve routine reports above confidence threshold"
+    )
+    
+    # Notification Settings
+    notify_on_critical_findings = models.BooleanField(
+        default=True,
+        help_text="Send notifications for critical findings"
+    )
+    notification_emails = models.JSONField(
+        default=list,
+        help_text="Email addresses for notifications"
+    )
+    
+    # System Settings
+    enable_ai_reporting = models.BooleanField(
+        default=True,
+        help_text="Enable AI reporting system"
+    )
+    maintenance_mode = models.BooleanField(
+        default=False,
+        help_text="Enable maintenance mode (disable AI processing)"
+    )
+    
+    # Audit fields
+    created = models.DateTimeField(auto_now_add=True)
+    modified = models.DateTimeField(auto_now=True)
+    modified_by = auto_prefetch.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        help_text="User who last modified the configuration"
+    )
+    
+    class Meta:
+        verbose_name = "AI Configuration"
+        verbose_name_plural = "AI Configurations"
+    
+    def __str__(self):
+        return f"AI Configuration - {self.modified.strftime('%Y-%m-%d %H:%M')}"
+    
+    def save(self, *args, **kwargs):
+        # Ensure only one configuration exists
+        if not self.pk:
+            AIConfiguration.objects.all().delete()
+        super().save(*args, **kwargs)
+    
+    @classmethod
+    def get_current_config(cls):
+        """Get the current AI configuration"""
+        config = cls.objects.first()
+        if not config:
+            config = cls.objects.create()
+        return config
