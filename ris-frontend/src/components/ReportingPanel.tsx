@@ -37,12 +37,23 @@ interface ReportingPanelProps {
   studyInstanceUID: string;
   examinations: any[];
   onReportChange?: (hasReport: boolean) => void;
+  onCurrentReportChange?: (report: Report | null) => void;
+  onFunctionsReady?: (functions: {
+    startNewReport: () => void;
+    editReport: (report: Report) => void;
+    isEditing: boolean;
+    canReport: boolean;
+  }) => void;
+  showHeader?: boolean;
 }
 
 export default function ReportingPanel({ 
   studyInstanceUID, 
   examinations, 
-  onReportChange 
+  onReportChange,
+  onCurrentReportChange,
+  onFunctionsReady,
+  showHeader = true
 }: ReportingPanelProps) {
   const { user } = useAuth();
   const [reports, setReports] = useState<Report[]>([]);
@@ -69,6 +80,19 @@ export default function ReportingPanel({
     onReportChange?.(reports.length > 0);
   }, [reports.length, onReportChange]);
 
+  useEffect(() => {
+    onCurrentReportChange?.(currentReport);
+  }, [currentReport, onCurrentReportChange]);
+
+  useEffect(() => {
+    onFunctionsReady?.({
+      startNewReport,
+      editReport,
+      isEditing,
+      canReport
+    });
+  }, [isEditing, canReport, onFunctionsReady]);
+
   const loadReports = async () => {
     if (!studyInstanceUID) return;
     
@@ -84,18 +108,14 @@ export default function ReportingPanel({
       const reportPromises = examinations.map(async (exam) => {
         try {
           const response = await AuthService.authenticatedFetch(
-            `${process.env.NEXT_PUBLIC_API_URL}/api/ai-reporting/radiologist-reports/`
+            `${process.env.NEXT_PUBLIC_API_URL}/api/manual-reports/?examination_number=${exam.no_xray}`
           );
           if (response.ok) {
             const data = await response.json();
-            // Filter reports that match this examination
-            const examReports = (data.results || []).filter((report: any) => 
-              report.ai_report_details?.pemeriksaan?.id === exam.id
-            );
-            return examReports;
+            return data.results || [];
           }
         } catch (error) {
-          console.error('Error fetching reports for exam:', exam.id, error);
+          console.error('Error fetching reports for exam:', exam.no_xray, error);
         }
         return [];
       });
@@ -155,58 +175,31 @@ export default function ReportingPanel({
 
       let response;
       if (currentReport) {
-        // Update existing report
+        // Update existing manual report
         response = await AuthService.authenticatedFetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/ai-reporting/radiologist-reports/${currentReport.id}/`,
+          `${process.env.NEXT_PUBLIC_API_URL}/api/manual-reports/${currentReport.id}/`,
           {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(reportData)
+            body: JSON.stringify({
+              ...reportData,
+              pemeriksaan: examinations[0].id // Include pemeriksaan ID
+            })
           }
         );
       } else {
-        // Create new report - first need to create or find an AI report for this examination
-        try {
-          // Try to create an AI report first (this will create a placeholder)
-          const aiReportResponse = await AuthService.authenticatedFetch(
-            `${process.env.NEXT_PUBLIC_API_URL}/api/ai-reporting/generate/`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                examination_number: examinations[0].no_xray,
-                force_regenerate: false
-              })
-            }
-          );
-          
-          let aiReportId;
-          if (aiReportResponse.ok) {
-            const aiReportData = await aiReportResponse.json();
-            aiReportId = aiReportData.report.id;
-          } else {
-            // If AI report creation fails, we can't create a radiologist report
-            toast.error('Unable to create report. AI reporting system required.');
-            return;
+        // Create new manual report - no AI dependency!
+        response = await AuthService.authenticatedFetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/manual-reports/`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ...reportData,
+              examination_number: examinations[0].no_xray
+            })
           }
-          
-          // Now create the radiologist report
-          response = await AuthService.authenticatedFetch(
-            `${process.env.NEXT_PUBLIC_API_URL}/api/ai-reporting/radiologist-reports/`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                ...reportData,
-                ai_report_id: aiReportId
-              })
-            }
-          );
-        } catch (createError) {
-          console.error('Error creating AI report:', createError);
-          toast.error('Failed to initialize report');
-          return;
-        }
+        );
       }
 
       if (response.ok) {
@@ -236,13 +229,11 @@ export default function ReportingPanel({
     setSaving(true);
     try {
       const response = await AuthService.authenticatedFetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/ai-reporting/radiologist-reports/${currentReport.id}/complete_report/`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/manual-reports/${currentReport.id}/complete/`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            radiologist_confidence: 0.9
-          })
+          body: JSON.stringify({})
         }
       );
 
@@ -297,65 +288,67 @@ export default function ReportingPanel({
 
   return (
     <Card className="h-full">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Radiology Report
-          </CardTitle>
+      {showHeader && (
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Radiology Report
+            </CardTitle>
+            
+            {canReport && (
+              <div className="flex gap-2">
+                {!isEditing && (
+                  <>
+                    {currentReport ? (
+                      <Button
+                        onClick={() => editReport(currentReport)}
+                        size="sm"
+                        variant="outline"
+                      >
+                        <Edit className="h-4 w-4 mr-2" />
+                        Edit
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={startNewReport}
+                        size="sm"
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        New Report
+                      </Button>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
           
-          {canReport && (
-            <div className="flex gap-2">
-              {!isEditing && (
-                <>
-                  {currentReport ? (
-                    <Button
-                      onClick={() => editReport(currentReport)}
-                      size="sm"
-                      variant="outline"
-                    >
-                      <Edit className="h-4 w-4 mr-2" />
-                      Edit
-                    </Button>
-                  ) : (
-                    <Button
-                      onClick={startNewReport}
-                      size="sm"
-                    >
-                      <FileText className="h-4 w-4 mr-2" />
-                      New Report
-                    </Button>
-                  )}
-                </>
-              )}
-            </div>
+          {currentReport && (
+            <CardDescription className="flex items-center gap-4 text-xs">
+              <div className="flex items-center gap-1">
+                <User className="h-3 w-3" />
+                {currentReport.radiologist_name || 'Unknown User'}
+              </div>
+              <div className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {new Date(currentReport.modified).toLocaleDateString()}
+              </div>
+              <Badge 
+                variant={currentReport.report_status === 'completed' ? 'default' : 'secondary'}
+                className="text-xs"
+              >
+                {currentReport.report_status === 'completed' ? (
+                  <CheckCircle className="h-3 w-3 mr-1" />
+                ) : (
+                  <Edit className="h-3 w-3 mr-1" />
+                )}
+                {currentReport.report_status === 'completed' ? 'Completed' : 'Draft'}
+              </Badge>
+            </CardDescription>
           )}
-        </div>
-        
-        {currentReport && (
-          <CardDescription className="flex items-center gap-4 text-xs">
-            <div className="flex items-center gap-1">
-              <User className="h-3 w-3" />
-              {currentReport.radiologist_name || 'Unknown User'}
-            </div>
-            <div className="flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              {new Date(currentReport.modified).toLocaleDateString()}
-            </div>
-            <Badge 
-              variant={currentReport.report_status === 'completed' ? 'default' : 'secondary'}
-              className="text-xs"
-            >
-              {currentReport.report_status === 'completed' ? (
-                <CheckCircle className="h-3 w-3 mr-1" />
-              ) : (
-                <Edit className="h-3 w-3 mr-1" />
-              )}
-              {currentReport.report_status === 'completed' ? 'Completed' : 'Draft'}
-            </Badge>
-          </CardDescription>
-        )}
-      </CardHeader>
+        </CardHeader>
+      )}
       
       <CardContent className="space-y-4">
         {!currentReport && !isEditing ? (

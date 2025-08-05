@@ -69,7 +69,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Maximize2,
-  FileText
+  FileText,
+  Edit,
+  CheckCircle
 } from 'lucide-react';
 
 const ReportingPanel = dynamic(() => import('@/components/ReportingPanel'), {
@@ -117,7 +119,7 @@ export default function LegacyStudyViewerPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
-  const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
+  const [isPanelCollapsed, setIsPanelCollapsed] = useState(true);
   const [isFullWindow, setIsFullWindow] = useState(false);
   const [isImportedToRis, setIsImportedToRis] = useState(false);
   const [risStudyId, setRisStudyId] = useState<number | null>(null);
@@ -126,6 +128,9 @@ export default function LegacyStudyViewerPage() {
   const [hasReport, setHasReport] = useState(false);
   const [showReporting, setShowReporting] = useState(false);
   const [showReportingModal, setShowReportingModal] = useState(false);
+  const [currentReport, setCurrentReport] = useState<any>(null);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportFunctions, setReportFunctions] = useState<any>(null);
   
   // Track fetched studies to prevent duplicate API calls
   const fetchedStudiesRef = useRef(new Set<string>());
@@ -573,7 +578,7 @@ export default function LegacyStudyViewerPage() {
             {(user?.can_report || user?.can_view_report || user?.is_staff || user?.is_superuser) && (
               <Button
                 onClick={() => setShowReportingModal(true)}
-                className="bg-blue-600/90 hover:bg-blue-700/90"
+                className="bg-yellow-500/90 hover:bg-yellow-600/90 text-black"
                 size="sm"
                 title="Create/View Report"
               >
@@ -661,7 +666,7 @@ export default function LegacyStudyViewerPage() {
               size="sm"
               variant="default"
               title="Create/View Report"
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-yellow-500 hover:bg-yellow-600 text-black"
             >
               <FileText className="h-4 w-4 mr-2" />
               Report
@@ -694,44 +699,105 @@ export default function LegacyStudyViewerPage() {
             {isPanelCollapsed ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </Button>
           
-          {!isPanelCollapsed && (user?.can_report || user?.can_view_report || user?.is_staff || user?.is_superuser) && (
-            <Button
-              onClick={() => setShowReporting(!showReporting)}
-              className="bg-background border shadow-sm"
-              size="sm"
-              variant={showReporting ? "default" : "secondary"}
-              title={showReporting ? "Show Study Info" : "Show Reports"}
-            >
-              {showReporting ? <Eye className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
-            </Button>
-          )}
         </div>
         
         {!isPanelCollapsed && (
           <div className="overflow-y-auto h-full">
+            {/* Toggle Button - Always Visible */}
+            {isImportedToRis && (
+              <div className="p-4 pb-0">
+                <div className="relative z-10">
+                  <Button 
+                    onClick={() => setShowReporting(!showReporting)}
+                    className="w-full"
+                    variant={showReporting ? "default" : "outline"}
+                    title={showReporting ? "Show Study Info" : "Show Reports"}
+                  >
+                    {showReporting ? <Eye className="w-4 h-4 mr-2" /> : <FileText className="w-4 h-4 mr-2" />}
+                    {showReporting ? "Show Info" : "Show Report"}
+                  </Button>
+                </div>
+              </div>
+            )}
+            
             {showReporting ? (
               <div className="p-4">
+                {/* Report Controls */}
+                <div className="mb-4 space-y-3">
+                  {/* Report Status and Metadata */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">Radiology Report</span>
+                    </div>
+                    {currentReport && (
+                      <Badge 
+                        variant={currentReport.report_status === 'completed' ? 'default' : 'secondary'}
+                        className="text-xs"
+                      >
+                        {currentReport.report_status === 'completed' ? (
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                        ) : (
+                          <Edit className="h-3 w-3 mr-1" />
+                        )}
+                        {currentReport.report_status === 'completed' ? 'Completed' : 'Draft'}
+                      </Badge>
+                    )}
+                  </div>
+                  
+                  {/* Report Metadata */}
+                  {currentReport && (
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <User className="h-3 w-3" />
+                        {currentReport.radiologist_name || 'Unknown User'}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {new Date(currentReport.modified).toLocaleDateString()}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Report Action Buttons */}
+                  {reportFunctions && reportFunctions.canReport && !reportFunctions.isEditing && (
+                    <div className="flex gap-2">
+                      {currentReport ? (
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => reportFunctions.editReport(currentReport)}
+                        >
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit
+                        </Button>
+                      ) : (
+                        <Button 
+                          size="sm"
+                          onClick={reportFunctions.startNewReport}
+                        >
+                          <FileText className="h-4 w-4 mr-2" />
+                          New Report
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+                
                 <ReportingPanel
                   studyInstanceUID={studyUid}
                   examinations={risExaminations}
                   onReportChange={setHasReport}
+                  onCurrentReportChange={setCurrentReport}
+                  onFunctionsReady={setReportFunctions}
+                  showHeader={false}
                 />
               </div>
             ) : (
               <div className="p-4 space-y-4">
 
-          {/* Import Button or RIS Link */}
-          {isImportedToRis ? (
-            <Button 
-              onClick={() => router.push(`/studies/${risStudyId}`)}
-              className="w-full"
-              variant="outline"
-              title="View this study in RIS"
-            >
-              <Eye className="w-4 h-4 mr-2" />
-              View in RIS
-            </Button>
-          ) : user?.is_superuser ? (
+          {/* Import Button for non-RIS studies */}
+          {!isImportedToRis && user?.is_superuser ? (
             <Button 
               onClick={handleImportStudy}
               disabled={importing}
