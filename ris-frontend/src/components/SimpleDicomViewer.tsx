@@ -249,6 +249,7 @@ interface SimpleDicomViewerProps {
   };
   // DICOM overlay props
   showOverlay?: boolean;
+  setShowOverlay?: (show: boolean) => void;
   examinations?: any[];
   enhancedDicomData?: any[];
 }
@@ -296,6 +297,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({
   seriesInfo = [], 
   studyMetadata,
   showOverlay = false,
+  setShowOverlay,
   examinations = [],
   enhancedDicomData = []
 }) => {
@@ -347,7 +349,6 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({
   const [isPlaying, setIsPlayingRaw] = useState<boolean>(false);
   const [isInverted, setIsInvertedRaw] = useState<boolean>(false);  // Will be set automatically based on PhotometricInterpretation
   const [isFlippedHorizontal, setIsFlippedHorizontalRaw] = useState<boolean>(false);
-  const [annotationsVisible, setAnnotationsVisibleRaw] = useState<boolean>(true);
   const [isToolbarMinimized, setIsToolbarMinimizedRaw] = useState<boolean>(false);
   const [toolbarPosition, setToolbarPositionRaw] = useState({ x: 0, y: 16 }); // Initial position
   const [loadingSeries, setLoadingSeriesRaw] = useState<Set<string>>(new Set());
@@ -405,7 +406,6 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({
   const setIsPlaying = createDebugSetter('isPlaying', setIsPlayingRaw);
   const setIsInverted = createDebugSetter('isInverted', setIsInvertedRaw);
   const setIsFlippedHorizontal = createDebugSetter('isFlippedHorizontal', setIsFlippedHorizontalRaw);
-  const setAnnotationsVisible = createDebugSetter('annotationsVisible', setAnnotationsVisibleRaw);
   const setIsToolbarMinimized = createDebugSetter('isToolbarMinimized', setIsToolbarMinimizedRaw);
   const setToolbarPosition = createDebugSetter('toolbarPosition', setToolbarPositionRaw);
   const setLoadingSeries = createDebugSetter('loadingSeries', setLoadingSeriesRaw);
@@ -1698,43 +1698,11 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({
     }
   }, [viewport]);
 
-  const toggleAnnotationsVisibility = useCallback(() => {
-    if (viewport) {
-      try {
-        const newVisibility = !annotationsVisible;
-        setAnnotationsVisible(newVisibility);
-        
-        const frameOfReferenceUID = viewport.getFrameOfReferenceUID();
-        
-        if (frameOfReferenceUID) {
-          const allAnnotations = annotation.state.getAnnotationsByFrameOfReference(frameOfReferenceUID);
-          
-          if (newVisibility) {
-            // Show all annotations using the official Cornerstone3D API
-            annotation.visibility.showAllAnnotations();
-          } else {
-            // Hide each annotation individually using the official API
-            Object.keys(allAnnotations).forEach(toolName => {
-              const toolAnnotations = allAnnotations[toolName];
-              if (Array.isArray(toolAnnotations)) {
-                toolAnnotations.forEach(ann => {
-                  if (ann && ann.annotationUID) {
-                    annotation.visibility.setAnnotationVisibility(ann.annotationUID, false);
-                  }
-                });
-              }
-            });
-          }
-        }
-        
-        // Trigger viewport re-render
-        safeRender(viewport);
-        
-      } catch (error) {
-        console.error('Error in toggleAnnotationsVisibility:', error);
-      }
+  const toggleOverlayVisibility = useCallback(() => {
+    if (setShowOverlay) {
+      setShowOverlay(!showOverlay);
     }
-  }, [viewport, annotationsVisible, safeRender]);
+  }, [showOverlay, setShowOverlay]);
 
   
   // Mouse wheel navigation for scrollbar - only works when there are multiple images
@@ -2078,10 +2046,10 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({
             <Button
               variant="ghost"
               size="sm"
-              onClick={toggleAnnotationsVisibility}
-              title={annotationsVisible ? "Hide Annotations" : "Show Annotations"}
+              onClick={toggleOverlayVisibility}
+              title={showOverlay ? "Hide Info" : "Show Info"}
             >
-              {annotationsVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              {showOverlay ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </Button>
             <Button
               variant="ghost"

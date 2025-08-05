@@ -215,6 +215,7 @@ interface ProjectionDicomViewerProps {
   };
   // DICOM overlay props
   showOverlay?: boolean;
+  setShowOverlay?: (show: boolean) => void;
   examinations?: any[];
   enhancedDicomData?: any[];
 }
@@ -236,6 +237,7 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
   imageIds: initialImageIds, 
   studyMetadata,
   showOverlay = false,
+  setShowOverlay,
   examinations = [],
   enhancedDicomData = []
 }) => {
@@ -251,7 +253,6 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
   const [activeTool, setActiveTool] = useState<Tool>('wwwc');
   const [isInverted, setIsInverted] = useState<boolean>(false);
   const [isFlippedHorizontal, setIsFlippedHorizontal] = useState<boolean>(false);
-  const [annotationsVisible, setAnnotationsVisible] = useState<boolean>(true);
   
   const initializationRef = useRef(false);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
@@ -810,94 +811,11 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
     }
   }, [safeRender]);
 
-  const toggleAnnotationsVisibility = useCallback(() => {
-    console.log('=== ANNOTATION TOGGLE DEBUG ===');
-    console.log('Current annotationsVisible state:', annotationsVisible);
-    console.log('viewportRef.current:', viewportRef.current);
-    
-    if (viewportRef.current) {
-      try {
-        const newVisibility = !annotationsVisible;
-        console.log('Setting new visibility to:', newVisibility);
-        setAnnotationsVisible(newVisibility);
-        
-        const frameOfReferenceUID = viewportRef.current.getFrameOfReferenceUID();
-        console.log('Frame of reference UID:', frameOfReferenceUID);
-        
-        if (frameOfReferenceUID) {
-          const allAnnotations = annotation.state.getAnnotationsByFrameOfReference(frameOfReferenceUID);
-          console.log('All annotations found:', allAnnotations);
-          console.log('Annotation object keys:', Object.keys(allAnnotations));
-          
-          // Check if annotation.visibility exists
-          console.log('annotation.visibility exists:', !!annotation.visibility);
-          console.log('annotation.visibility methods:', annotation.visibility ? Object.keys(annotation.visibility) : 'N/A');
-          
-          // Let's try every possible approach
-          console.log('=== TRYING DIFFERENT APPROACHES ===');
-          
-          // Approach 1: Direct DOM manipulation
-          const element = viewportRef.current.element;
-          if (element) {
-            console.log('Viewport element:', element);
-            const svgLayers = element.querySelectorAll('svg');
-            console.log('Found SVG elements:', svgLayers.length);
-            svgLayers.forEach((svg, i) => {
-              console.log(`SVG ${i}:`, svg.className, svg.style.display, svg.style.visibility);
-              svg.style.display = newVisibility ? '' : 'none';
-              console.log(`SVG ${i} after change:`, svg.style.display);
-            });
-            
-            // Try other selectors
-            const allSvgElements = element.querySelectorAll('*');
-            console.log('All child elements:', allSvgElements.length);
-            let svgCount = 0;
-            allSvgElements.forEach((el, i) => {
-              if (el.tagName.toLowerCase() === 'svg' || el.className.includes('svg') || el.className.includes('annotation')) {
-                console.log(`Potential annotation element ${svgCount}:`, el.tagName, el.className);
-                svgCount++;
-              }
-            });
-          }
-          
-          // Approach 2: Try the official API if it exists
-          if (annotation.visibility) {
-            console.log('Using official annotation.visibility API');
-            if (newVisibility) {
-              console.log('Calling showAllAnnotations');
-              annotation.visibility.showAllAnnotations();
-            } else {
-              console.log('Hiding individual annotations');
-              Object.keys(allAnnotations).forEach(toolName => {
-                const toolAnnotations = allAnnotations[toolName];
-                console.log(`Tool ${toolName} has ${toolAnnotations?.length || 0} annotations`);
-                if (Array.isArray(toolAnnotations)) {
-                  toolAnnotations.forEach((ann, i) => {
-                    console.log(`Annotation ${i}:`, ann.annotationUID, ann);
-                    if (ann && ann.annotationUID) {
-                      annotation.visibility.setAnnotationVisibility(ann.annotationUID, false);
-                      console.log(`Set ${ann.annotationUID} visibility to false`);
-                    }
-                  });
-                }
-              });
-            }
-          } else {
-            console.log('annotation.visibility API not available');
-          }
-        }
-        
-        console.log('Triggering viewport re-render');
-        safeRender(viewportRef.current);
-        console.log('=== END DEBUG ===');
-        
-      } catch (error) {
-        console.error('Error in toggleAnnotationsVisibility:', error);
-      }
-    } else {
-      console.log('No viewport reference available');
+  const toggleOverlayVisibility = useCallback(() => {
+    if (setShowOverlay) {
+      setShowOverlay(!showOverlay);
     }
-  }, [annotationsVisible, safeRender]);
+  }, [showOverlay, setShowOverlay]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -1093,10 +1011,10 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
             <Button
               variant="ghost"
               size="sm"
-              onClick={toggleAnnotationsVisibility}
-              title={annotationsVisible ? "Hide Annotations" : "Show Annotations"}
+              onClick={toggleOverlayVisibility}
+              title={showOverlay ? "Hide Info" : "Show Info"}
             >
-              {annotationsVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              {showOverlay ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </Button>
             <Button
               variant="ghost"

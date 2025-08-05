@@ -547,6 +547,7 @@ export default function LegacyStudyViewerPage() {
                   imageIds={imageIds}
                   studyMetadata={studyMetadata}
                   showOverlay={showOverlay}
+                  setShowOverlay={setShowOverlay}
                   examinations={risExaminations}
                   enhancedDicomData={enhancedDicomData}
                 />
@@ -559,6 +560,7 @@ export default function LegacyStudyViewerPage() {
                   seriesInfo={seriesInfo}
                   studyMetadata={studyMetadata}
                   showOverlay={showOverlay}
+                  setShowOverlay={setShowOverlay}
                   examinations={risExaminations}
                   enhancedDicomData={enhancedDicomData}
                 />
@@ -626,15 +628,6 @@ export default function LegacyStudyViewerPage() {
               </Button>
             )}
             
-            <Button
-              onClick={() => setShowOverlay(!showOverlay)}
-              className={`${showOverlay ? 'bg-blue-500/90 hover:bg-blue-600/90' : 'bg-gray-500/90 hover:bg-gray-600/90'} text-white`}
-              size="sm"
-              title={showOverlay ? "Hide Overlay" : "Show Overlay"}
-            >
-              <Info className="h-4 w-4 mr-2" />
-              {showOverlay ? "Hide" : "Show"} Info
-            </Button>
             
             <Button
               onClick={() => setIsFullWindow(false)}
@@ -696,6 +689,7 @@ export default function LegacyStudyViewerPage() {
                 imageIds={imageIds}
                 studyMetadata={studyMetadata}
                 showOverlay={showOverlay}
+                setShowOverlay={setShowOverlay}
                 examinations={risExaminations}
                 enhancedDicomData={enhancedDicomData}
               />
@@ -708,6 +702,7 @@ export default function LegacyStudyViewerPage() {
                 seriesInfo={seriesInfo}
                 studyMetadata={studyMetadata}
                 showOverlay={showOverlay}
+                setShowOverlay={setShowOverlay}
                 examinations={risExaminations}
                 enhancedDicomData={enhancedDicomData}
               />
@@ -750,15 +745,6 @@ export default function LegacyStudyViewerPage() {
             </Button>
           )}
           
-          <Button
-            onClick={() => setShowOverlay(!showOverlay)}
-            size="sm"
-            variant={showOverlay ? "default" : "secondary"}
-            title={showOverlay ? "Hide Overlay" : "Show Overlay"}
-          >
-            <Info className="h-4 w-4 mr-2" />
-            {showOverlay ? "Hide" : "Show"} Info
-          </Button>
           
           <Button
             onClick={() => setIsFullWindow(true)}
