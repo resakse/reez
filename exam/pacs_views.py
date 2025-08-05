@@ -1401,14 +1401,26 @@ def get_study_image_ids(request, study_uid):
 def get_enhanced_study_metadata(request, study_uid):
     """
     Get enhanced DICOM metadata with detailed series and instance information
+    Supports multiple PACS servers via pacs_server_id query parameter
     """
     try:
-        # Get Orthanc URL from configuration
-        pacs_config = PacsConfig.objects.first()
-        if not pacs_config:
-            return Response({'error': 'PACS configuration not found'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        # Check if specific PACS server requested
+        pacs_server_id = request.GET.get('pacs_server_id')
         
-        orthanc_url = pacs_config.orthancurl
+        if pacs_server_id:
+            # Use specific PACS server
+            from .models import PacsServer
+            try:
+                pacs_server = PacsServer.objects.get(id=pacs_server_id, is_active=True, is_deleted=False)
+                orthanc_url = pacs_server.orthancurl
+            except PacsServer.DoesNotExist:
+                return Response({'error': f'PACS server {pacs_server_id} not found or inactive'}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            # Fall back to primary PACS configuration (legacy behavior)
+            pacs_config = PacsConfig.objects.first()
+            if not pacs_config:
+                return Response({'error': 'PACS configuration not found'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            orthanc_url = pacs_config.orthancurl
         
         # Find the study
         find_response = requests.post(
@@ -1421,6 +1433,16 @@ def get_enhanced_study_metadata(request, study_uid):
             },
             timeout=30
         )
+        
+        # Debug logging for enhanced metadata
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Enhanced metadata search - PACS: {orthanc_url}, Study: {study_uid}, Response: {find_response.status_code}")
+        if find_response.ok:
+            result_data = find_response.json()
+            logger.info(f"Enhanced metadata search result count: {len(result_data) if result_data else 0}")
+        else:
+            logger.error(f"Enhanced metadata search failed: {find_response.text}")
         
         if not find_response.ok or not find_response.json():
             return Response({'error': f'Study not found: {study_uid}'}, status=status.HTTP_404_NOT_FOUND)
@@ -1515,17 +1537,29 @@ def get_enhanced_study_metadata(request, study_uid):
 def get_study_series_metadata(request, study_uid):
     """
     Get DICOM series metadata for CT scan bulk retrieval
+    Supports multiple PACS servers via pacs_server_id query parameter
     
     URL format: /api/pacs/studies/{study_uid}/series/
     Returns series information with first frame URLs for thumbnails
     """
     try:
-        # Get Orthanc URL from configuration
-        pacs_config = PacsConfig.objects.first()
-        if not pacs_config:
-            return Response({'error': 'PACS configuration not found'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        # Check if specific PACS server requested
+        pacs_server_id = request.GET.get('pacs_server_id')
         
-        orthanc_url = pacs_config.orthancurl
+        if pacs_server_id:
+            # Use specific PACS server
+            from .models import PacsServer
+            try:
+                pacs_server = PacsServer.objects.get(id=pacs_server_id, is_active=True, is_deleted=False)
+                orthanc_url = pacs_server.orthancurl
+            except PacsServer.DoesNotExist:
+                return Response({'error': f'PACS server {pacs_server_id} not found or inactive'}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            # Fall back to primary PACS configuration (legacy behavior)
+            pacs_config = PacsConfig.objects.first()
+            if not pacs_config:
+                return Response({'error': 'PACS configuration not found'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            orthanc_url = pacs_config.orthancurl
         
         # Find the study
         find_response = requests.post(
@@ -1568,6 +1602,10 @@ def get_study_series_metadata(request, study_uid):
                 api_url = request.build_absolute_uri('/').rstrip('/')
                 first_frame_url = f"{api_url}/api/pacs/instances/{first_instance_id}/frames/1"
                 
+                # Add PACS server ID parameter if provided
+                if pacs_server_id:
+                    first_frame_url += f"?pacs_server_id={pacs_server_id}"
+                
                 # Extract series metadata
                 series_info = {
                     'seriesId': series_id,
@@ -1580,7 +1618,7 @@ def get_study_series_metadata(request, study_uid):
                     'instances': [
                         {
                             'instanceId': instance_id,
-                            'frameUrl': f"{api_url}/api/pacs/instances/{instance_id}/frames/1"
+                            'frameUrl': f"{api_url}/api/pacs/instances/{instance_id}/frames/1" + (f"?pacs_server_id={pacs_server_id}" if pacs_server_id else "")
                         } for instance_id in instances
                     ]
                 }

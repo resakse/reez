@@ -580,8 +580,9 @@ export default function PacsBrowserPage() {
   };
 
   const viewStudy = (study: LegacyStudy) => {
-    // Navigate to DICOM viewer with study UID
-    router.push(`/pacs-browser/${study.StudyInstanceUID}`);
+    // Navigate to DICOM viewer with study UID and PACS server info
+    const pacsParam = study.pacsServerId ? `?pacs_server_id=${study.pacsServerId}` : '';
+    router.push(`/pacs-browser/${study.StudyInstanceUID}${pacsParam}`);
   };
 
   const importStudy = async (study: LegacyStudy) => {

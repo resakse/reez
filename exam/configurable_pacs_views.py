@@ -42,12 +42,23 @@ def configurable_dicom_metadata(request, orthanc_id):
         return JsonResponse({'error': 'Authentication required'}, status=401)
         
     try:
-        # Get Orthanc URL from configuration
-        pacs_config = PacsConfig.objects.first()
-        if not pacs_config:
-            return JsonResponse({'error': 'PACS configuration not found'}, status=500)
+        # Check if specific PACS server requested
+        pacs_server_id = request.GET.get('pacs_server_id')
         
-        orthanc_url = pacs_config.orthancurl
+        if pacs_server_id:
+            # Use specific PACS server
+            from .models import PacsServer
+            try:
+                pacs_server = PacsServer.objects.get(id=pacs_server_id, is_active=True, is_deleted=False)
+                orthanc_url = pacs_server.orthancurl
+            except PacsServer.DoesNotExist:
+                return JsonResponse({'error': f'PACS server {pacs_server_id} not found or inactive'}, status=404)
+        else:
+            # Fall back to primary PACS configuration (legacy behavior)
+            pacs_config = PacsConfig.objects.first()
+            if not pacs_config:
+                return JsonResponse({'error': 'PACS configuration not found'}, status=500)
+            orthanc_url = pacs_config.orthancurl
         
         
         # Get metadata from Orthanc in standard DICOM tag format
@@ -411,12 +422,23 @@ def configurable_dicom_frames(request, orthanc_id, frame_number):
         return JsonResponse({'error': 'Authentication required'}, status=401)
         
     try:
-        # Get Orthanc URL from configuration
-        pacs_config = PacsConfig.objects.first()
-        if not pacs_config:
-            return JsonResponse({'error': 'PACS configuration not found'}, status=500)
+        # Check if specific PACS server requested
+        pacs_server_id = request.GET.get('pacs_server_id')
         
-        orthanc_url = pacs_config.orthancurl
+        if pacs_server_id:
+            # Use specific PACS server
+            from .models import PacsServer
+            try:
+                pacs_server = PacsServer.objects.get(id=pacs_server_id, is_active=True, is_deleted=False)
+                orthanc_url = pacs_server.orthancurl
+            except PacsServer.DoesNotExist:
+                return JsonResponse({'error': f'PACS server {pacs_server_id} not found or inactive'}, status=404)
+        else:
+            # Fall back to primary PACS configuration (legacy behavior)
+            pacs_config = PacsConfig.objects.first()
+            if not pacs_config:
+                return JsonResponse({'error': 'PACS configuration not found'}, status=500)
+            orthanc_url = pacs_config.orthancurl
         
         
         # First check if this is a multi-frame image and get image dimensions

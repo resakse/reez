@@ -37,7 +37,7 @@ const { ViewportType } = CoreEnums;
 const { MouseBindings } = ToolsEnums;
 
 // Fixed WADO-RS metadata pre-registration for proper image loading
-async function preRegisterWadorsMetadata(imageIds: string[]): Promise<void> {
+async function preRegisterWadorsMetadata(imageIds: string[], pacsServerId?: string | null): Promise<void> {
   try {
     // Get the DICOM image loader from window or import
     const dicomImageLoader = (window as any).cornerstoneDICOMImageLoader || cornerstoneDICOMImageLoader;
@@ -66,7 +66,13 @@ async function preRegisterWadorsMetadata(imageIds: string[]): Promise<void> {
         try {
           // Extract frames URL and convert to metadata URL
           const framesUrl = imageId.replace('wadors:', '');
-          const metadataUrl = framesUrl.replace('/frames/1', '/metadata');
+          let metadataUrl = framesUrl.replace('/frames/1', '/metadata');
+          
+          // Add PACS server ID parameter if provided
+          if (pacsServerId) {
+            const separator = metadataUrl.includes('?') ? '&' : '?';
+            metadataUrl += `${separator}pacs_server_id=${pacsServerId}`;
+          }
           
           // Fetch metadata from our endpoint
           const response = await AuthService.authenticatedFetch(metadataUrl);
@@ -247,6 +253,7 @@ interface SimpleDicomViewerProps {
     modality: string;
     studyInstanceUID?: string;
   };
+  pacsServerId?: string | null;
   // DICOM overlay props
   showOverlay?: boolean;
   setShowOverlay?: (show: boolean) => void;
@@ -296,6 +303,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({
   imageIds: initialImageIds, 
   seriesInfo = [], 
   studyMetadata,
+  pacsServerId,
   showOverlay = false,
   setShowOverlay,
   examinations = [],
@@ -528,7 +536,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({
               if (batchImageUrls.length === 0) return [];
               
               const wadorsImageIds = batchImageUrls.map((url: string) => `wadors:${url}`);
-              await preRegisterWadorsMetadata(wadorsImageIds);
+              await preRegisterWadorsMetadata(wadorsImageIds, pacsServerId);
               
               // Load images in this batch
               const { imageLoader } = await import('@cornerstonejs/core');
@@ -626,7 +634,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({
           
           // Convert to WADORS format and register metadata
           const wadorsImageIds = batchImageUrls.map((url: string) => `wadors:${url}`);
-          await preRegisterWadorsMetadata(wadorsImageIds);
+          await preRegisterWadorsMetadata(wadorsImageIds, pacsServerId);
           
           // Load all images in first batch
           const imageLoadPromises = wadorsImageIds.map(async (imageId) => {
@@ -700,7 +708,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({
             if (batchImageUrls.length === 0) return [];
             
             const wadorsImageIds = batchImageUrls.map((url: string) => `wadors:${url}`);
-            await preRegisterWadorsMetadata(wadorsImageIds);
+            await preRegisterWadorsMetadata(wadorsImageIds, pacsServerId);
             
             // Load images in this batch
             const imageLoadPromises = wadorsImageIds.map(async (imageId) => {
@@ -1125,7 +1133,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({
         
         try {
           // Pre-register WADO-RS metadata for the limited images only
-          await preRegisterWadorsMetadata(imageIds);
+          await preRegisterWadorsMetadata(imageIds, pacsServerId);
           
           // Check PhotometricInterpretation from metadata BEFORE loading image
           let shouldInvert = false;

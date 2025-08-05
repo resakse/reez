@@ -179,24 +179,35 @@ export async function getStudyImageIds(studyInstanceUID: string): Promise<StudyI
  * @param studyInstanceUID The DICOM Study Instance UID.
  * @returns A promise that resolves to study metadata object.
  */
-export async function getStudyMetadata(studyInstanceUID: string): Promise<StudyMetadata> {
-  const requestKey = `metadata-${studyInstanceUID}`;
+export async function getStudyMetadata(studyInstanceUID: string, pacsServerId?: string | null): Promise<StudyMetadata> {
+  const requestKey = `metadata-${studyInstanceUID}-${pacsServerId || 'primary'}`;
   
   return throttleRequest(requestKey, async () => {
     // Use Django API proxy to avoid CORS issues
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
     try {
+    // Choose the appropriate search endpoint based on whether PACS server ID is provided
+    const searchUrl = pacsServerId 
+      ? `${API_URL}/api/pacs/search-multiple/`
+      : `${API_URL}/api/pacs/search/`;
+    
+    const searchBody = pacsServerId 
+      ? {
+          studyInstanceUid: studyInstanceUID,
+          server_ids: [parseInt(pacsServerId)]
+        }
+      : {
+          studyInstanceUid: studyInstanceUID
+        };
+
     // Search for the study using Django PACS search API
-    const response = await AuthService.authenticatedFetch(`${API_URL}/api/pacs/search/`, {
+    const response = await AuthService.authenticatedFetch(searchUrl, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        // Search by exact Study Instance UID
-        studyInstanceUid: studyInstanceUID
-      }),
+      body: JSON.stringify(searchBody),
     });
 
     if (!response.ok) {

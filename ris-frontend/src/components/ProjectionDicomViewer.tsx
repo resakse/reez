@@ -34,7 +34,7 @@ const { ViewportType } = CoreEnums;
 const { MouseBindings } = ToolsEnums;
 
 // WADO-RS metadata pre-registration
-async function preRegisterWadorsMetadata(imageIds: string[]): Promise<void> {
+async function preRegisterWadorsMetadata(imageIds: string[], pacsServerId?: string | null): Promise<void> {
   try {
     const dicomImageLoader = (window as any).cornerstoneDICOMImageLoader || cornerstoneDICOMImageLoader;
     
@@ -58,7 +58,13 @@ async function preRegisterWadorsMetadata(imageIds: string[]): Promise<void> {
         
         try {
           const framesUrl = imageId.replace('wadors:', '');
-          const metadataUrl = framesUrl.replace('/frames/1', '/metadata');
+          let metadataUrl = framesUrl.replace('/frames/1', '/metadata');
+          
+          // Add PACS server ID parameter if provided
+          if (pacsServerId) {
+            const separator = metadataUrl.includes('?') ? '&' : '?';
+            metadataUrl += `${separator}pacs_server_id=${pacsServerId}`;
+          }
           
           const response = await AuthService.authenticatedFetch(metadataUrl);
           
@@ -213,6 +219,7 @@ interface ProjectionDicomViewerProps {
     modality: string;
     studyInstanceUID?: string;
   };
+  pacsServerId?: string | null;
   // DICOM overlay props
   showOverlay?: boolean;
   setShowOverlay?: (show: boolean) => void;
@@ -236,6 +243,7 @@ interface ImageSettings {
 const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({ 
   imageIds: initialImageIds, 
   studyMetadata,
+  pacsServerId,
   showOverlay = false,
   setShowOverlay,
   examinations = [],
@@ -408,7 +416,7 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
         const startIndex = Math.min(currentImageIndex, imageIds.length - 1);
         
         try {
-          await preRegisterWadorsMetadata(imageIds);
+          await preRegisterWadorsMetadata(imageIds, pacsServerId);
           
           // Check PhotometricInterpretation
           let shouldInvert = false;

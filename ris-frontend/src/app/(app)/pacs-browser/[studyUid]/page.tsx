@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 
 // Module-level cache to prevent duplicate API calls across component remounts
@@ -115,7 +115,22 @@ interface StudyMetadata {
 export default function LegacyStudyViewerPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
+  
+  // Get PACS server ID from URL parameters
+  const pacsServerId = searchParams.get('pacs_server_id');
+  
+  // Debug logging
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('StudyViewer Debug:', {
+        studyUid: params?.studyUid,
+        pacsServerId,
+        searchParamsAll: searchParams.toString()
+      });
+    }
+  }, [params?.studyUid, pacsServerId, searchParams]);
   
   const [metadata, setMetadata] = useState<StudyMetadata | null>(null);
   const [imageIds, setImageIds] = useState<string[]>([]);
@@ -211,18 +226,27 @@ export default function LegacyStudyViewerPage() {
     
     try {
       // Fetch detailed metadata from our enhanced endpoint
-      const response = await AuthService.authenticatedFetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/pacs/studies/${studyUid}/enhanced-metadata/`
-      );
+      const pacsParam = pacsServerId ? `?pacs_server_id=${pacsServerId}` : '';
+      const url = `${process.env.NEXT_PUBLIC_API_URL}/api/pacs/studies/${studyUid}/enhanced-metadata/${pacsParam}`;
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Fetching enhanced DICOM data:', { studyUid, pacsServerId, url });
+      }
+      
+      const response = await AuthService.authenticatedFetch(url);
       
       if (response.ok) {
         const data = await response.json();
         setEnhancedDicomData(data.series || []);
+      } else if (process.env.NODE_ENV === 'development') {
+        console.error('Enhanced metadata fetch failed:', response.status, response.statusText);
       }
     } catch (err) {
-      // Error fetching enhanced DICOM data
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error fetching enhanced DICOM data:', err);
+      }
     }
-  }, [studyUid]);
+  }, [studyUid, pacsServerId]);
 
   const fetchStudyData = useCallback(async () => {
     if (!studyUid) return;
@@ -251,12 +275,17 @@ export default function LegacyStudyViewerPage() {
       setError(null);
 
       // First fetch study metadata to determine if it's a large CT/MRI study
-      const studyMetadata = await getStudyMetadata(studyUid);
+      const studyMetadata = await getStudyMetadata(studyUid, pacsServerId);
 
       // ONLY use series endpoint - NO FALLBACKS
-      const seriesResponse = await AuthService.authenticatedFetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/pacs/studies/${studyUid}/series/`
-      );
+      const pacsParam = pacsServerId ? `?pacs_server_id=${pacsServerId}` : '';
+      const seriesUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/pacs/studies/${studyUid}/series/${pacsParam}`;
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Fetching series data:', { studyUid, pacsServerId, seriesUrl });
+      }
+      
+      const seriesResponse = await AuthService.authenticatedFetch(seriesUrl);
       
       if (!seriesResponse.ok) {
         throw new Error(`Series endpoint failed with status ${seriesResponse.status}`);
@@ -321,7 +350,7 @@ export default function LegacyStudyViewerPage() {
       // Remove from fetching set after completion (success or failure)
       fetchedStudiesRef.current.delete(studyUid);
     }
-  }, [studyUid]);
+  }, [studyUid, pacsServerId]);
 
   useEffect(() => {
     if (studyUid && user) {
@@ -550,6 +579,7 @@ export default function LegacyStudyViewerPage() {
                   setShowOverlay={setShowOverlay}
                   examinations={risExaminations}
                   enhancedDicomData={enhancedDicomData}
+                  pacsServerId={pacsServerId}
                 />
               );
             } else {
@@ -563,6 +593,7 @@ export default function LegacyStudyViewerPage() {
                   setShowOverlay={setShowOverlay}
                   examinations={risExaminations}
                   enhancedDicomData={enhancedDicomData}
+                  pacsServerId={pacsServerId}
                 />
               );
             }
@@ -660,6 +691,7 @@ export default function LegacyStudyViewerPage() {
                 setShowOverlay={setShowOverlay}
                 examinations={risExaminations}
                 enhancedDicomData={enhancedDicomData}
+                pacsServerId={pacsServerId}
               />
             );
           } else {
@@ -673,6 +705,7 @@ export default function LegacyStudyViewerPage() {
                 setShowOverlay={setShowOverlay}
                 examinations={risExaminations}
                 enhancedDicomData={enhancedDicomData}
+                pacsServerId={pacsServerId}
               />
             );
           }
