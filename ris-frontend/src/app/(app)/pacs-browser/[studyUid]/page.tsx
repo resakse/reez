@@ -71,7 +71,8 @@ import {
   Maximize2,
   FileText,
   Edit,
-  CheckCircle
+  CheckCircle,
+  Info
 } from 'lucide-react';
 
 const ReportingPanel = dynamic(() => import('@/components/ReportingPanel'), {
@@ -91,6 +92,7 @@ const ReportingModal = dynamic(() => import('@/components/ReportingModal'), {
   ssr: false,
 });
 
+
 interface StudyMetadata {
   PatientName?: string;
   PatientID?: string;
@@ -106,6 +108,8 @@ interface StudyMetadata {
   AccessionNumber?: string;
   ReferringPhysicianName?: string;
   OperatorsName?: string;
+  Manufacturer?: string;
+  ManufacturerModelName?: string;
 }
 
 export default function LegacyStudyViewerPage() {
@@ -136,11 +140,19 @@ export default function LegacyStudyViewerPage() {
   }, [currentReport]);
   const [reportLoading, setReportLoading] = useState(false);
   const [reportFunctions, setReportFunctions] = useState<any>(null);
+  const [showOverlay, setShowOverlay] = useState(true);
   
   // Debug report functions changes
   useEffect(() => {
     console.log('Report functions changed:', reportFunctions);
   }, [reportFunctions]);
+
+  // Function to trigger report reload
+  const handleReportUpdate = () => {
+    if (reportFunctions && reportFunctions.loadReports) {
+      reportFunctions.loadReports();
+    }
+  };
   
   // Track fetched studies to prevent duplicate API calls
   const fetchedStudiesRef = useRef(new Set<string>());
@@ -514,7 +526,18 @@ export default function LegacyStudyViewerPage() {
               studyDate: metadata.StudyDate || '',
               studyDescription: metadata.StudyDescription || '',
               modality: metadata.Modality || 'Unknown',
-              studyInstanceUID: studyUid
+              studyInstanceUID: studyUid,
+              // For DicomOverlay - PascalCase format
+              PatientName: metadata.PatientName,
+              PatientID: metadata.PatientID,
+              StudyDate: metadata.StudyDate,
+              StudyTime: metadata.StudyTime,
+              StudyDescription: metadata.StudyDescription,
+              Modality: metadata.Modality,
+              InstitutionName: metadata.InstitutionName,
+              Manufacturer: metadata.Manufacturer,
+              ManufacturerModelName: metadata.ManufacturerModelName,
+              OperatorsName: metadata.OperatorsName
             };
 
             if (isProjectionModality) {
@@ -523,6 +546,9 @@ export default function LegacyStudyViewerPage() {
                 <ProjectionDicomViewer 
                   imageIds={imageIds}
                   studyMetadata={studyMetadata}
+                  showOverlay={showOverlay}
+                  examinations={risExaminations}
+                  enhancedDicomData={enhancedDicomData}
                 />
               );
             } else {
@@ -532,6 +558,9 @@ export default function LegacyStudyViewerPage() {
                   imageIds={imageIds}
                   seriesInfo={seriesInfo}
                   studyMetadata={studyMetadata}
+                  showOverlay={showOverlay}
+                  examinations={risExaminations}
+                  enhancedDicomData={enhancedDicomData}
                 />
               );
             }
@@ -598,6 +627,16 @@ export default function LegacyStudyViewerPage() {
             )}
             
             <Button
+              onClick={() => setShowOverlay(!showOverlay)}
+              className={`${showOverlay ? 'bg-blue-500/90 hover:bg-blue-600/90' : 'bg-gray-500/90 hover:bg-gray-600/90'} text-white`}
+              size="sm"
+              title={showOverlay ? "Hide Overlay" : "Show Overlay"}
+            >
+              <Info className="h-4 w-4 mr-2" />
+              {showOverlay ? "Hide" : "Show"} Info
+            </Button>
+            
+            <Button
               onClick={() => setIsFullWindow(false)}
               className="bg-white/90 hover:bg-white text-black"
               size="sm"
@@ -614,6 +653,8 @@ export default function LegacyStudyViewerPage() {
           studyInstanceUID={studyUid}
           examinations={risExaminations}
           studyMetadata={metadata}
+          currentReport={currentReport}
+          onReportUpdate={handleReportUpdate}
         />
       </div>
     );
@@ -634,7 +675,18 @@ export default function LegacyStudyViewerPage() {
             studyDate: metadata.StudyDate || '',
             studyDescription: metadata.StudyDescription || '',
             modality: metadata.Modality || 'Unknown',
-            studyInstanceUID: studyUid
+            studyInstanceUID: studyUid,
+            // For DicomOverlay - PascalCase format
+            PatientName: metadata.PatientName,
+            PatientID: metadata.PatientID,
+            StudyDate: metadata.StudyDate,
+            StudyTime: metadata.StudyTime,
+            StudyDescription: metadata.StudyDescription,
+            Modality: metadata.Modality,
+            InstitutionName: metadata.InstitutionName,
+            Manufacturer: metadata.Manufacturer,
+            ManufacturerModelName: metadata.ManufacturerModelName,
+            OperatorsName: metadata.OperatorsName
           };
 
           if (isProjectionModality) {
@@ -643,6 +695,9 @@ export default function LegacyStudyViewerPage() {
               <ProjectionDicomViewer 
                 imageIds={imageIds}
                 studyMetadata={studyMetadata}
+                showOverlay={showOverlay}
+                examinations={risExaminations}
+                enhancedDicomData={enhancedDicomData}
               />
             );
           } else {
@@ -652,6 +707,9 @@ export default function LegacyStudyViewerPage() {
                 imageIds={imageIds}
                 seriesInfo={seriesInfo}
                 studyMetadata={studyMetadata}
+                showOverlay={showOverlay}
+                examinations={risExaminations}
+                enhancedDicomData={enhancedDicomData}
               />
             );
           }
@@ -691,6 +749,16 @@ export default function LegacyStudyViewerPage() {
               Report
             </Button>
           )}
+          
+          <Button
+            onClick={() => setShowOverlay(!showOverlay)}
+            size="sm"
+            variant={showOverlay ? "default" : "secondary"}
+            title={showOverlay ? "Hide Overlay" : "Show Overlay"}
+          >
+            <Info className="h-4 w-4 mr-2" />
+            {showOverlay ? "Hide" : "Show"} Info
+          </Button>
           
           <Button
             onClick={() => setIsFullWindow(true)}
@@ -752,7 +820,7 @@ export default function LegacyStudyViewerPage() {
                     {currentReport && (
                       <Badge 
                         variant={currentReport.report_status === 'completed' ? 'default' : 'secondary'}
-                        className="text-xs"
+                        className={`text-xs ${currentReport.report_status === 'completed' ? 'bg-green-500 hover:bg-green-600' : ''}`}
                       >
                         {currentReport.report_status === 'completed' ? (
                           <CheckCircle className="h-3 w-3 mr-1" />
@@ -1088,6 +1156,8 @@ export default function LegacyStudyViewerPage() {
         studyInstanceUID={studyUid}
         examinations={risExaminations}
         studyMetadata={metadata}
+        currentReport={currentReport}
+        onReportUpdate={handleReportUpdate}
       />
     </div>
   );

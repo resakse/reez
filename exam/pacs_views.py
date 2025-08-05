@@ -137,6 +137,7 @@ class PacsSearchView(APIView):
                 protocol_name = None
                 acquisition_device_processing_description = None
                 manufacturer = None
+                manufacturer_model_name = None
                 
                 series_list = study.get('Series', [])
                 
@@ -179,10 +180,11 @@ class PacsSearchView(APIView):
                             protocol_name = series_tags.get('ProtocolName')
                             acquisition_device_processing_description = series_tags.get('AcquisitionDeviceProcessingDescription')
                             manufacturer = series_tags.get('Manufacturer')
+                            manufacturer_model_name = series_tags.get('ManufacturerModelName')
                             
                             # If not found at series level, try instance level
                             instances = series_data.get('Instances', [])
-                            if instances and (not body_part_examined or not protocol_name or not acquisition_device_processing_description or not manufacturer):
+                            if instances and (not body_part_examined or not protocol_name or not acquisition_device_processing_description or not manufacturer or not manufacturer_model_name):
                                 try:
                                     first_instance_id = instances[0]
                                     instance_response = requests.get(
@@ -202,6 +204,8 @@ class PacsSearchView(APIView):
                                             acquisition_device_processing_description = instance_tags.get('AcquisitionDeviceProcessingDescription')
                                         if not manufacturer:
                                             manufacturer = instance_tags.get('Manufacturer')
+                                        if not manufacturer_model_name:
+                                            manufacturer_model_name = instance_tags.get('ManufacturerModelName')
                                 except Exception as e:
                                     print(f"Failed to fetch instance tags for DICOM fields: {e}")
                     except Exception as e:
@@ -228,7 +232,8 @@ class PacsSearchView(APIView):
                     'bodyPartExamined': body_part_examined,
                     'protocolName': protocol_name,
                     'acquisitionDeviceProcessingDescription': acquisition_device_processing_description,
-                    'manufacturer': manufacturer
+                    'manufacturer': manufacturer,
+                    'manufacturerModelName': manufacturer_model_name
                 }
                 formatted_studies.append(formatted_study)
             

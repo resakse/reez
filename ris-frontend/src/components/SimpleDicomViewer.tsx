@@ -9,12 +9,13 @@ import {
   ZoomIn, ZoomOut, RotateCw, Move, Square, Circle, 
   Ruler, MousePointer, RotateCcw, Maximize, Settings,
   Play, Pause, SkipBack, SkipForward, Trash2,
-  FlipHorizontal, Palette
+  FlipHorizontal, Palette, Eye, EyeOff
 } from 'lucide-react';
 import AuthService from '@/lib/auth';
+import DicomOverlay from './DicomOverlay';
 
 // Modern Cornerstone3D imports
-import { init as coreInit, RenderingEngine, Enums as CoreEnums, type Types } from '@cornerstonejs/core';
+import { init as coreInit, RenderingEngine, Enums as CoreEnums, type Types, eventTarget } from '@cornerstonejs/core';
 import { 
   init as toolsInit,
   ToolGroupManager,
@@ -246,6 +247,10 @@ interface SimpleDicomViewerProps {
     modality: string;
     studyInstanceUID?: string;
   };
+  // DICOM overlay props
+  showOverlay?: boolean;
+  examinations?: any[];
+  enhancedDicomData?: any[];
 }
 
 type Tool = 'wwwc' | 'zoom' | 'pan' | 'length' | 'rectangle' | 'ellipse';
@@ -286,7 +291,14 @@ interface SeriesLoadingState {
   isActive: boolean;
 }
 
-const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initialImageIds, seriesInfo = [], studyMetadata }) => {
+const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ 
+  imageIds: initialImageIds, 
+  seriesInfo = [], 
+  studyMetadata,
+  showOverlay = false,
+  examinations = [],
+  enhancedDicomData = []
+}) => {
   // Debug re-renders with detailed prop change tracking
   const renderCountRef = useRef(0);
   const prevPropsRef = useRef({ imageIds: initialImageIds, seriesInfo, studyMetadata });
@@ -335,6 +347,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
   const [isPlaying, setIsPlayingRaw] = useState<boolean>(false);
   const [isInverted, setIsInvertedRaw] = useState<boolean>(false);  // Will be set automatically based on PhotometricInterpretation
   const [isFlippedHorizontal, setIsFlippedHorizontalRaw] = useState<boolean>(false);
+  const [annotationsVisible, setAnnotationsVisibleRaw] = useState<boolean>(true);
   const [isToolbarMinimized, setIsToolbarMinimizedRaw] = useState<boolean>(false);
   const [toolbarPosition, setToolbarPositionRaw] = useState({ x: 0, y: 16 }); // Initial position
   const [loadingSeries, setLoadingSeriesRaw] = useState<Set<string>>(new Set());
@@ -392,6 +405,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
   const setIsPlaying = createDebugSetter('isPlaying', setIsPlayingRaw);
   const setIsInverted = createDebugSetter('isInverted', setIsInvertedRaw);
   const setIsFlippedHorizontal = createDebugSetter('isFlippedHorizontal', setIsFlippedHorizontalRaw);
+  const setAnnotationsVisible = createDebugSetter('annotationsVisible', setAnnotationsVisibleRaw);
   const setIsToolbarMinimized = createDebugSetter('isToolbarMinimized', setIsToolbarMinimizedRaw);
   const setToolbarPosition = createDebugSetter('toolbarPosition', setToolbarPositionRaw);
   const setLoadingSeries = createDebugSetter('loadingSeries', setLoadingSeriesRaw);
@@ -1684,6 +1698,44 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
     }
   }, [viewport]);
 
+  const toggleAnnotationsVisibility = useCallback(() => {
+    if (viewport) {
+      try {
+        const newVisibility = !annotationsVisible;
+        setAnnotationsVisible(newVisibility);
+        
+        const frameOfReferenceUID = viewport.getFrameOfReferenceUID();
+        
+        if (frameOfReferenceUID) {
+          const allAnnotations = annotation.state.getAnnotationsByFrameOfReference(frameOfReferenceUID);
+          
+          if (newVisibility) {
+            // Show all annotations using the official Cornerstone3D API
+            annotation.visibility.showAllAnnotations();
+          } else {
+            // Hide each annotation individually using the official API
+            Object.keys(allAnnotations).forEach(toolName => {
+              const toolAnnotations = allAnnotations[toolName];
+              if (Array.isArray(toolAnnotations)) {
+                toolAnnotations.forEach(ann => {
+                  if (ann && ann.annotationUID) {
+                    annotation.visibility.setAnnotationVisibility(ann.annotationUID, false);
+                  }
+                });
+              }
+            });
+          }
+        }
+        
+        // Trigger viewport re-render
+        safeRender(viewport);
+        
+      } catch (error) {
+        console.error('Error in toggleAnnotationsVisibility:', error);
+      }
+    }
+  }, [viewport, annotationsVisible, safeRender]);
+
   
   // Mouse wheel navigation for scrollbar - only works when there are multiple images
   useEffect(() => {
@@ -2026,6 +2078,14 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
             <Button
               variant="ghost"
               size="sm"
+              onClick={toggleAnnotationsVisibility}
+              title={annotationsVisible ? "Hide Annotations" : "Show Annotations"}
+            >
+              {annotationsVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={clearAnnotations}
               title="Clear All Annotations"
             >
@@ -2183,6 +2243,14 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({ imageIds: initial
                 </Card>
               </div>
             )}
+            
+            {/* DICOM Overlay - Positioned within viewport */}
+            <DicomOverlay
+              isVisible={showOverlay}
+              studyMetadata={studyMetadata}
+              examinations={examinations}
+              enhancedDicomData={enhancedDicomData}
+            />
           </div>
           
           {/* Vertical Scrollbar for Series Navigation */}

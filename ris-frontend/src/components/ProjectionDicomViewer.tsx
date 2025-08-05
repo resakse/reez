@@ -6,12 +6,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
   ZoomIn, ZoomOut, RotateCw, Move, Square, Circle, 
   Ruler, MousePointer, RotateCcw, Maximize, Settings,
-  FlipHorizontal, Palette, Trash2, ArrowLeft, ArrowRight
+  FlipHorizontal, Palette, Trash2, ArrowLeft, ArrowRight,
+  Eye, EyeOff
 } from 'lucide-react';
 import AuthService from '@/lib/auth';
+import DicomOverlay from './DicomOverlay';
 
 // Modern Cornerstone3D imports
-import { init as coreInit, RenderingEngine, Enums as CoreEnums, type Types } from '@cornerstonejs/core';
+import { init as coreInit, RenderingEngine, Enums as CoreEnums, type Types, eventTarget } from '@cornerstonejs/core';
 import { 
   init as toolsInit,
   ToolGroupManager,
@@ -211,6 +213,10 @@ interface ProjectionDicomViewerProps {
     modality: string;
     studyInstanceUID?: string;
   };
+  // DICOM overlay props
+  showOverlay?: boolean;
+  examinations?: any[];
+  enhancedDicomData?: any[];
 }
 
 type Tool = 'wwwc' | 'zoom' | 'pan' | 'length' | 'rectangle' | 'ellipse';
@@ -226,7 +232,13 @@ interface ImageSettings {
   pan?: { x: number; y: number };
 }
 
-const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({ imageIds: initialImageIds, studyMetadata }) => {
+const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({ 
+  imageIds: initialImageIds, 
+  studyMetadata,
+  showOverlay = false,
+  examinations = [],
+  enhancedDicomData = []
+}) => {
   const mainViewportRef = useRef<HTMLDivElement>(null);
   const renderingEngineRef = useRef<RenderingEngine | null>(null);
   const viewportRef = useRef<any>(null);
@@ -239,6 +251,7 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({ imageIds:
   const [activeTool, setActiveTool] = useState<Tool>('wwwc');
   const [isInverted, setIsInverted] = useState<boolean>(false);
   const [isFlippedHorizontal, setIsFlippedHorizontal] = useState<boolean>(false);
+  const [annotationsVisible, setAnnotationsVisible] = useState<boolean>(true);
   
   const initializationRef = useRef(false);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
@@ -797,6 +810,95 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({ imageIds:
     }
   }, [safeRender]);
 
+  const toggleAnnotationsVisibility = useCallback(() => {
+    console.log('=== ANNOTATION TOGGLE DEBUG ===');
+    console.log('Current annotationsVisible state:', annotationsVisible);
+    console.log('viewportRef.current:', viewportRef.current);
+    
+    if (viewportRef.current) {
+      try {
+        const newVisibility = !annotationsVisible;
+        console.log('Setting new visibility to:', newVisibility);
+        setAnnotationsVisible(newVisibility);
+        
+        const frameOfReferenceUID = viewportRef.current.getFrameOfReferenceUID();
+        console.log('Frame of reference UID:', frameOfReferenceUID);
+        
+        if (frameOfReferenceUID) {
+          const allAnnotations = annotation.state.getAnnotationsByFrameOfReference(frameOfReferenceUID);
+          console.log('All annotations found:', allAnnotations);
+          console.log('Annotation object keys:', Object.keys(allAnnotations));
+          
+          // Check if annotation.visibility exists
+          console.log('annotation.visibility exists:', !!annotation.visibility);
+          console.log('annotation.visibility methods:', annotation.visibility ? Object.keys(annotation.visibility) : 'N/A');
+          
+          // Let's try every possible approach
+          console.log('=== TRYING DIFFERENT APPROACHES ===');
+          
+          // Approach 1: Direct DOM manipulation
+          const element = viewportRef.current.element;
+          if (element) {
+            console.log('Viewport element:', element);
+            const svgLayers = element.querySelectorAll('svg');
+            console.log('Found SVG elements:', svgLayers.length);
+            svgLayers.forEach((svg, i) => {
+              console.log(`SVG ${i}:`, svg.className, svg.style.display, svg.style.visibility);
+              svg.style.display = newVisibility ? '' : 'none';
+              console.log(`SVG ${i} after change:`, svg.style.display);
+            });
+            
+            // Try other selectors
+            const allSvgElements = element.querySelectorAll('*');
+            console.log('All child elements:', allSvgElements.length);
+            let svgCount = 0;
+            allSvgElements.forEach((el, i) => {
+              if (el.tagName.toLowerCase() === 'svg' || el.className.includes('svg') || el.className.includes('annotation')) {
+                console.log(`Potential annotation element ${svgCount}:`, el.tagName, el.className);
+                svgCount++;
+              }
+            });
+          }
+          
+          // Approach 2: Try the official API if it exists
+          if (annotation.visibility) {
+            console.log('Using official annotation.visibility API');
+            if (newVisibility) {
+              console.log('Calling showAllAnnotations');
+              annotation.visibility.showAllAnnotations();
+            } else {
+              console.log('Hiding individual annotations');
+              Object.keys(allAnnotations).forEach(toolName => {
+                const toolAnnotations = allAnnotations[toolName];
+                console.log(`Tool ${toolName} has ${toolAnnotations?.length || 0} annotations`);
+                if (Array.isArray(toolAnnotations)) {
+                  toolAnnotations.forEach((ann, i) => {
+                    console.log(`Annotation ${i}:`, ann.annotationUID, ann);
+                    if (ann && ann.annotationUID) {
+                      annotation.visibility.setAnnotationVisibility(ann.annotationUID, false);
+                      console.log(`Set ${ann.annotationUID} visibility to false`);
+                    }
+                  });
+                }
+              });
+            }
+          } else {
+            console.log('annotation.visibility API not available');
+          }
+        }
+        
+        console.log('Triggering viewport re-render');
+        safeRender(viewportRef.current);
+        console.log('=== END DEBUG ===');
+        
+      } catch (error) {
+        console.error('Error in toggleAnnotationsVisibility:', error);
+      }
+    } else {
+      console.log('No viewport reference available');
+    }
+  }, [annotationsVisible, safeRender]);
+
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -991,6 +1093,14 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({ imageIds:
             <Button
               variant="ghost"
               size="sm"
+              onClick={toggleAnnotationsVisibility}
+              title={annotationsVisible ? "Hide Annotations" : "Show Annotations"}
+            >
+              {annotationsVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={clearAnnotations}
               title="Clear All Annotations"
             >
@@ -1031,6 +1141,14 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({ imageIds:
               </Card>
             </div>
           )}
+          
+          {/* DICOM Overlay - Positioned within viewport */}
+          <DicomOverlay
+            isVisible={showOverlay}
+            studyMetadata={studyMetadata}
+            examinations={examinations}
+            enhancedDicomData={enhancedDicomData}
+          />
         </div>
       </div>
 

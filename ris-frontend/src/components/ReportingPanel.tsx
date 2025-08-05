@@ -41,6 +41,7 @@ interface ReportingPanelProps {
   onFunctionsReady?: (functions: {
     startNewReport: () => void;
     editReport: (report: Report) => void;
+    loadReports: () => void;
     isEditing: boolean;
     canReport: boolean;
   }) => void;
@@ -88,6 +89,7 @@ export default function ReportingPanel({
     onFunctionsReady?.({
       startNewReport,
       editReport,
+      loadReports,
       isEditing,
       canReport
     });
@@ -364,7 +366,7 @@ export default function ReportingPanel({
               </div>
               <Badge 
                 variant={currentReport.report_status === 'completed' ? 'default' : 'secondary'}
-                className="text-xs"
+                className={`text-xs ${currentReport.report_status === 'completed' ? 'bg-green-500 hover:bg-green-600' : ''}`}
               >
                 {currentReport.report_status === 'completed' ? (
                   <CheckCircle className="h-3 w-3 mr-1" />

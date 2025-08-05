@@ -48,6 +48,8 @@ interface ReportingModalProps {
     StudyDescription?: string;
     Modality?: string;
   };
+  currentReport?: Report | null;
+  onReportUpdate?: () => void;
 }
 
 export default function ReportingModal({ 
@@ -55,11 +57,13 @@ export default function ReportingModal({
   onClose, 
   studyInstanceUID, 
   examinations,
-  studyMetadata 
+  studyMetadata,
+  currentReport: propCurrentReport,
+  onReportUpdate
 }: ReportingModalProps) {
   const { user } = useAuth();
   const [reports, setReports] = useState<Report[]>([]);
-  const [currentReport, setCurrentReport] = useState<Report | null>(null);
+  const [currentReport, setCurrentReport] = useState<Report | null>(propCurrentReport || null);
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -96,6 +100,16 @@ export default function ReportingModal({
       setTimeout(setBottomRightPosition, 100);
     }
   }, [isOpen, hasInitialPosition, isMinimized]);
+
+  // Sync with prop-provided current report
+  useEffect(() => {
+    if (propCurrentReport) {
+      setCurrentReport(propCurrentReport);
+      setFindings(propCurrentReport.findings || '');
+      setImpression(propCurrentReport.impression || '');
+      setRecommendations(propCurrentReport.recommendations || '');
+    }
+  }, [propCurrentReport]);
 
   // Check if user can report or view reports
   const canReport = user?.can_report || user?.is_staff || user?.is_superuser;
@@ -219,6 +233,9 @@ export default function ReportingModal({
         setCurrentReport(savedReport);
         setIsEditing(false);
         await loadReports();
+        
+        // Notify parent component of the update
+        onReportUpdate?.();
       } else {
         const error = await response.json();
         toast.error(error.error || 'Failed to save report');
@@ -246,9 +263,19 @@ export default function ReportingModal({
       );
 
       if (response.ok) {
+        const completedReportData = await response.json();
         toast.success('Report completed successfully');
+        
+        // Update current report with completed data
+        if (completedReportData.report) {
+          setCurrentReport(completedReportData.report);
+        }
+        
         await loadReports();
         setIsEditing(false);
+        
+        // Notify parent component of the update
+        onReportUpdate?.();
       } else {
         const error = await response.json();
         toast.error(error.error || 'Failed to complete report');
@@ -418,7 +445,7 @@ export default function ReportingModal({
                       </div>
                       <Badge 
                         variant={currentReport.report_status === 'completed' ? 'default' : 'secondary'}
-                        className="text-xs"
+                        className={`text-xs ${currentReport.report_status === 'completed' ? 'bg-green-500 hover:bg-green-600' : ''}`}
                       >
                         {currentReport.report_status === 'completed' ? (
                           <CheckCircle className="h-3 w-3 mr-1" />

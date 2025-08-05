@@ -39,6 +39,8 @@ interface StudyMetadata {
   AccessionNumber?: string;
   ReferringPhysicianName?: string;
   OperatorsName?: string;
+  Manufacturer?: string;
+  ManufacturerModelName?: string;
 }
 
 interface SeriesInfo {
@@ -224,7 +226,9 @@ export async function getStudyMetadata(studyInstanceUID: string): Promise<StudyM
       ImageCount: study.imageCount || 0,
       AccessionNumber: study.accessionNumber || undefined,
       ReferringPhysicianName: decodeDicomText(study.referringPhysicianName || ''),
-      OperatorsName: decodeDicomText(study.operatorsName || '')
+      OperatorsName: decodeDicomText(study.operatorsName || ''),
+      Manufacturer: study.manufacturer || undefined,
+      ManufacturerModelName: study.manufacturerModelName || undefined
     };
 
       return metadata;
