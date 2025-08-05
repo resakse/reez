@@ -576,38 +576,6 @@ export default function LegacyStudyViewerPage() {
             </div>
           )}
           
-          {/* Full Window Overlay Information */}
-          <div className="absolute top-4 left-4 text-white text-sm space-y-1 bg-black/50 p-3 rounded">
-            <div><strong>Patient:</strong> {metadata?.PatientName || 'Unknown'}</div>
-            <div><strong>ID:</strong> {metadata?.PatientID || 'Unknown'}</div>
-            <div><strong>Accession:</strong> {metadata?.AccessionNumber || 'N/A'}</div>
-            <div><strong>Clinic:</strong> {metadata?.InstitutionName || 'N/A'}</div>
-            <div><strong>Date:</strong> {formatDate(metadata?.StudyDate || '')} {formatTime(metadata?.StudyTime || '')}</div>
-            <div><strong>Radiographer:</strong> {
-              (() => {
-                // Get radiographer from RIS data or enhanced DICOM data
-                if (isImportedToRis && risExaminations.length > 0 && risExaminations[0].jxr) {
-                  return `${risExaminations[0].jxr.first_name} ${risExaminations[0].jxr.last_name}`;
-                }
-                if (enhancedDicomData.length > 0 && enhancedDicomData[0].radiographer_name) {
-                  return enhancedDicomData[0].radiographer_name;
-                }
-                return metadata?.OperatorsName || 'N/A';
-              })()
-            }</div>
-            <div><strong>Position:</strong> {
-              (() => {
-                // Get position from RIS data or enhanced DICOM data
-                if (isImportedToRis && risExaminations.length > 0 && risExaminations[0].patient_position) {
-                  return risExaminations[0].patient_position;
-                }
-                if (enhancedDicomData.length > 0 && enhancedDicomData[0].position) {
-                  return enhancedDicomData[0].position;
-                }
-                return 'N/A';
-              })()
-            }</div>
-          </div>
           
           {/* Keyboard shortcuts hint */}
           <div className="absolute bottom-4 right-4 text-white text-xs bg-black/50 p-2 rounded">
