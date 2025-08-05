@@ -113,7 +113,9 @@ class AuthService {
       'Authorization': `Bearer ${token}`,
     };
 
-    let response = await fetch(url, { ...options, headers });
+    // Prepend the API base URL if the URL is relative
+    const fullUrl = url.startsWith('http') ? url : `${process.env.NEXT_PUBLIC_API_URL}${url}`;
+    let response = await fetch(fullUrl, { ...options, headers });
 
     // If token expired, try to refresh
     if (response.status === 401) {
@@ -121,7 +123,7 @@ class AuthService {
       if (refreshed) {
         token = this.getAccessToken();
         headers.Authorization = `Bearer ${token}`;
-        response = await fetch(url, { ...options, headers });
+        response = await fetch(fullUrl, { ...options, headers });
       }
     }
 
