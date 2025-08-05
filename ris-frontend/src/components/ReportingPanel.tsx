@@ -124,12 +124,14 @@ export default function ReportingPanel({
       const flatReports = allReports.flat();
       
       setReports(flatReports);
+      console.log('Loaded reports:', flatReports);
       
       // Set current report to the most recent one
       if (flatReports.length > 0) {
         const mostRecent = flatReports.sort((a, b) => 
           new Date(b.modified).getTime() - new Date(a.modified).getTime()
         )[0];
+        console.log('Setting current report to most recent:', mostRecent);
         setCurrentReport(mostRecent);
         setFindings(mostRecent.findings || '');
         setImpression(mostRecent.impression || '');
@@ -206,6 +208,7 @@ export default function ReportingPanel({
         const savedReport = await response.json();
         toast.success(currentReport ? 'Report updated successfully' : 'Report created successfully');
         
+        // Update current report with the saved data from API response
         setCurrentReport(savedReport);
         setIsEditing(false);
         
@@ -238,9 +241,34 @@ export default function ReportingPanel({
       );
 
       if (response.ok) {
+        const completedReportData = await response.json();
+        console.log('Complete API response:', completedReportData);
         toast.success('Report completed successfully');
-        await loadReports();
+        
         setIsEditing(false);
+        
+        // Update the current report with the completed data from API response
+        if (completedReportData.report) {
+          console.log('Updating current report with:', completedReportData.report);
+          setCurrentReport(completedReportData.report);
+          
+          // Update the reports list as well
+          setReports(prev => prev.map(report => 
+            report.id === completedReportData.report.id 
+              ? completedReportData.report 
+              : report
+          ));
+        } else {
+          console.log('No report in response, updating status locally');
+          // Fallback: update the current report status locally
+          setCurrentReport(prev => {
+            const updated = prev ? { ...prev, report_status: 'completed' } : null;
+            console.log('Updated report locally:', updated);
+            return updated;
+          });
+        }
+        
+        // Don't reload reports to avoid race conditions - we already updated the state above
       } else {
         const error = await response.json();
         toast.error(error.error || 'Failed to complete report');

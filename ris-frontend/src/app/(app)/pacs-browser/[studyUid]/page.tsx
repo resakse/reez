@@ -129,8 +129,18 @@ export default function LegacyStudyViewerPage() {
   const [showReporting, setShowReporting] = useState(false);
   const [showReportingModal, setShowReportingModal] = useState(false);
   const [currentReport, setCurrentReport] = useState<any>(null);
+  
+  // Debug current report changes
+  useEffect(() => {
+    console.log('Current report changed:', currentReport);
+  }, [currentReport]);
   const [reportLoading, setReportLoading] = useState(false);
   const [reportFunctions, setReportFunctions] = useState<any>(null);
+  
+  // Debug report functions changes
+  useEffect(() => {
+    console.log('Report functions changed:', reportFunctions);
+  }, [reportFunctions]);
   
   // Track fetched studies to prevent duplicate API calls
   const fetchedStudiesRef = useRef(new Set<string>());
@@ -589,13 +599,22 @@ export default function LegacyStudyViewerPage() {
             
             <Button
               onClick={() => setIsFullWindow(false)}
-              className="bg-black/50 hover:bg-black/70"
+              className="bg-white/90 hover:bg-white text-black"
               size="sm"
             >
               Exit Full Window
             </Button>
           </div>
         </div>
+        
+        {/* Reporting Modal in Full Window Mode */}
+        <ReportingModal
+          isOpen={showReportingModal}
+          onClose={() => setShowReportingModal(false)}
+          studyInstanceUID={studyUid}
+          examinations={risExaminations}
+          studyMetadata={metadata}
+        />
       </div>
     );
   }
@@ -1062,7 +1081,7 @@ export default function LegacyStudyViewerPage() {
         )}
       </div>
 
-      {/* Reporting Modal */}
+      {/* Reporting Modal - Available in both modes */}
       <ReportingModal
         isOpen={showReportingModal}
         onClose={() => setShowReportingModal(false)}

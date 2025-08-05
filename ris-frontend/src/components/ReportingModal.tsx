@@ -324,7 +324,7 @@ export default function ReportingModal({
   return (
     <div
       ref={modalRef}
-      className="fixed z-50 bg-background border shadow-xl rounded-lg overflow-hidden resize-indicator"
+      className="fixed z-[60] bg-background border shadow-xl rounded-lg overflow-hidden resize-indicator"
       style={modalStyle}
     >
         {/* Header with drag handle and controls */}
