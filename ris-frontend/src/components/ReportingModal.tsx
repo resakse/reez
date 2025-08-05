@@ -82,7 +82,7 @@ export default function ReportingModal({
     if (isOpen && !hasInitialPosition) {
       const setBottomRightPosition = () => {
         const modalWidth = isMinimized ? 350 : 700;
-        const modalHeight = isMinimized ? 200 : 650;
+        const modalHeight = isMinimized ? 200 : 750;
         const padding = 20;
         
         setPosition({
@@ -185,13 +185,16 @@ export default function ReportingModal({
 
       let response;
       if (currentReport) {
-        // Update existing manual report
+        // Update existing manual report - include pemeriksaan field
         response = await AuthService.authenticatedFetch(
           `${process.env.NEXT_PUBLIC_API_URL}/api/manual-reports/${currentReport.id}/`,
           {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(reportData)
+            body: JSON.stringify({
+              ...reportData,
+              pemeriksaan: examinations[0].id // Include pemeriksaan ID
+            })
           }
         );
       } else {
@@ -308,7 +311,7 @@ export default function ReportingModal({
         left: position.x || '20%', 
         transform: position.x === 0 && position.y === 0 ? 'translate(-50%, -50%)' : 'none',
         width: isMinimized ? '350px' : '700px',
-        height: isMinimized ? 'auto' : '650px',
+        height: isMinimized ? 'auto' : '750px',
         resize: 'both',
         minWidth: '300px',
         minHeight: '400px',

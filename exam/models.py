@@ -13,12 +13,7 @@ from decimal import Decimal
 
 User = settings.AUTH_USER_MODEL
 
-# Import manual reporting models
-try:
-    from .manual_report_models import ManualRadiologyReport
-except ImportError:
-    # Handle case where manual_report_models doesn't exist yet
-    pass
+# Manual reporting models are defined at the end of this file
 
 # Create your models here.
 class DashboardConfig(models.Model):

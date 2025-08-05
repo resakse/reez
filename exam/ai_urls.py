@@ -77,7 +77,17 @@ urlpatterns = [
          AIModelPerformanceViewSet.as_view({'get': 'summary_stats'}), 
          name='performance-summary'),
     
-    # Manual reporting endpoints (AI-independent)
+    # Manual reporting endpoints (AI-independent) - direct access
+    path('api/manual-reports/', ManualRadiologyReportViewSet.as_view({
+        'get': 'list',
+        'post': 'create'
+    }), name='manual-reports-list'),
+    path('api/manual-reports/<int:pk>/', ManualRadiologyReportViewSet.as_view({
+        'get': 'retrieve',
+        'put': 'update',
+        'patch': 'partial_update',
+        'delete': 'destroy'
+    }), name='manual-reports-detail'),
     path('api/manual-reports/<int:report_id>/complete/', 
          ManualReportCompleteView.as_view(), 
          name='manual-report-complete'),

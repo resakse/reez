@@ -11,8 +11,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.pagination import PageNumberPagination
 
-from .models import Pemeriksaan
-from .manual_report_models import ManualRadiologyReport
+from .models import Pemeriksaan, ManualRadiologyReport
 from staff.permissions import CanReport, CanViewReport
 
 logger = logging.getLogger(__name__)
@@ -81,7 +80,7 @@ class ManualRadiologyReportViewSet(viewsets.ModelViewSet):
                     'patient_name', 'examination_number', 'modality', 'total_reporting_time',
                     'created', 'modified'
                 ]
-                read_only_fields = ['radiologist', 'report_start_time', 'total_reporting_time']
+                read_only_fields = ['radiologist', 'report_start_time', 'total_reporting_time', 'pemeriksaan']
             
             def get_radiologist_name(self, obj):
                 return f"{obj.radiologist.first_name} {obj.radiologist.last_name}".strip()
@@ -102,7 +101,12 @@ class ManualRadiologyReportViewSet(viewsets.ModelViewSet):
             if pemeriksaan_id:
                 pemeriksaan = get_object_or_404(Pemeriksaan, id=pemeriksaan_id)
             elif examination_number:
-                pemeriksaan = get_object_or_404(Pemeriksaan, no_xray=examination_number)
+                pemeriksaan = Pemeriksaan.objects.filter(no_xray=examination_number).first()
+                if not pemeriksaan:
+                    return Response(
+                        {'error': f'Examination with number {examination_number} not found'},
+                        status=status.HTTP_404_NOT_FOUND
+                    )
             else:
                 return Response(
                     {'error': 'Either pemeriksaan_id or examination_number is required'},
