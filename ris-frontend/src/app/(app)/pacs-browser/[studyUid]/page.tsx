@@ -514,8 +514,8 @@ export default function LegacyStudyViewerPage() {
   if (isFullWindow) {
     return (
       <div className="fixed inset-0 bg-black z-50">
-        {/* Full Window DICOM Viewer */}
-        <div className="relative h-full">
+        {/* Full Window DICOM Viewer - Use absolute positioning for maximum space utilization */}
+        <div className="absolute inset-0">
           {imageIds.length > 0 ? (() => {
             // Determine which viewer to use based on modality
             const modality = metadata.Modality || 'Unknown';
@@ -552,6 +552,7 @@ export default function LegacyStudyViewerPage() {
                   examinations={risExaminations}
                   enhancedDicomData={enhancedDicomData}
                   pacsServerId={pacsServerId}
+                  isFullWindow={isFullWindow}
                 />
               );
             } else {
@@ -562,6 +563,7 @@ export default function LegacyStudyViewerPage() {
                   seriesInfo={seriesInfo}
                   studyMetadata={studyMetadata}
                   showOverlay={showOverlay}
+                  isFullWindow={isFullWindow}
                   setShowOverlay={setShowOverlay}
                   examinations={risExaminations}
                   enhancedDicomData={enhancedDicomData}
@@ -581,7 +583,7 @@ export default function LegacyStudyViewerPage() {
           
           
           {/* Keyboard shortcuts hint */}
-          <div className="absolute bottom-4 right-4 text-white text-xs bg-black/50 p-2 rounded">
+          <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-white text-xs bg-black/50 p-2 rounded">
             Press F to toggle full window • ESC to exit
           </div>
           

@@ -259,6 +259,8 @@ interface SimpleDicomViewerProps {
   setShowOverlay?: (show: boolean) => void;
   examinations?: any[];
   enhancedDicomData?: any[];
+  isFullWindow?: boolean;
+  hideToolbar?: boolean;
 }
 
 type Tool = 'wwwc' | 'zoom' | 'pan' | 'length' | 'rectangle' | 'ellipse';
@@ -307,7 +309,9 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({
   showOverlay = false,
   setShowOverlay,
   examinations = [],
-  enhancedDicomData = []
+  enhancedDicomData = [],
+  isFullWindow = false,
+  hideToolbar = false
 }) => {
   // Debug re-renders with detailed prop change tracking
   const renderCountRef = useRef(0);
@@ -637,6 +641,30 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({
       }
     };
   }, [showOverlay, updateDynamicOverlayData]);
+
+  // Handle full window mode changes - recalculate zoom when layout changes
+  useEffect(() => {
+    if (!viewportRef.current) return;
+    
+    // Small delay to ensure layout has fully updated
+    const timeoutId = setTimeout(() => {
+      const renderingEngine = renderingEngineRef.current;
+      const currentViewport = viewportRef.current;
+      
+      if (renderingEngine && currentViewport) {
+        try {
+          renderingEngine.resize(true, true);
+          currentViewport.render();
+          updateDynamicOverlayData();
+        } catch (error) {
+          // Fallback to just update overlay data
+          updateDynamicOverlayData();
+        }
+      }
+    }, 200); // Slightly longer delay for full window transitions
+    
+    return () => clearTimeout(timeoutId);
+  }, [isFullWindow, updateDynamicOverlayData]);
   
   // Track which series are currently being loaded to avoid duplicates
   const activeSeriesLoaders = useRef<Set<string>>(new Set());

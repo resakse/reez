@@ -225,6 +225,8 @@ interface ProjectionDicomViewerProps {
   setShowOverlay?: (show: boolean) => void;
   examinations?: any[];
   enhancedDicomData?: any[];
+  isFullWindow?: boolean;
+  hideToolbar?: boolean;
 }
 
 type Tool = 'wwwc' | 'zoom' | 'pan' | 'length' | 'rectangle' | 'ellipse';
@@ -247,7 +249,9 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
   showOverlay = false,
   setShowOverlay,
   examinations = [],
-  enhancedDicomData = []
+  enhancedDicomData = [],
+  isFullWindow = false,
+  hideToolbar = false
 }) => {
   const mainViewportRef = useRef<HTMLDivElement>(null);
   const renderingEngineRef = useRef<RenderingEngine | null>(null);
@@ -512,6 +516,30 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
       }
     };
   }, [showOverlay, updateDynamicOverlayData]);
+
+  // Handle full window mode changes - recalculate zoom when layout changes
+  useEffect(() => {
+    if (!viewportRef.current) return;
+    
+    // Small delay to ensure layout has fully updated
+    const timeoutId = setTimeout(() => {
+      const renderingEngine = renderingEngineRef.current;
+      const currentViewport = viewportRef.current;
+      
+      if (renderingEngine && currentViewport) {
+        try {
+          renderingEngine.resize(true, true);
+          currentViewport.render();
+          updateDynamicOverlayData();
+        } catch (error) {
+          // Fallback to just update overlay data
+          updateDynamicOverlayData();
+        }
+      }
+    }, 200); // Slightly longer delay for full window transitions
+    
+    return () => clearTimeout(timeoutId);
+  }, [isFullWindow, updateDynamicOverlayData]);
   
   const initializationRef = useRef(false);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
