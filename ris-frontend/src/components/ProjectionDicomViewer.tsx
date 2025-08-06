@@ -7,7 +7,7 @@ import {
   ZoomIn, ZoomOut, RotateCw, Move, Square, Circle, 
   Ruler, MousePointer, RotateCcw, Maximize, Settings,
   FlipHorizontal, Palette, Trash2, ArrowLeft, ArrowRight,
-  Eye, EyeOff
+  Eye, EyeOff, ArrowUpRight, Crosshair, Triangle
 } from 'lucide-react';
 import AuthService from '@/lib/auth';
 import DicomOverlay from './DicomOverlay';
@@ -23,6 +23,10 @@ import {
   LengthTool,
   RectangleROITool,
   EllipticalROITool,
+  ArrowAnnotateTool,
+  CobbAngleTool,
+  ProbeTool,
+  AngleTool,
   addTool,
   Enums as ToolsEnums,
   annotation
@@ -195,6 +199,10 @@ const initializeCornerstone = async () => {
         addTool(LengthTool);
         addTool(RectangleROITool);
         addTool(EllipticalROITool);
+        addTool(ArrowAnnotateTool);
+        addTool(CobbAngleTool);
+        addTool(ProbeTool);
+        addTool(AngleTool);
       } catch (toolError) {
         throw new Error(`Tool registration failed: ${toolError.message}`);
       }
@@ -229,7 +237,7 @@ interface ProjectionDicomViewerProps {
   hideToolbar?: boolean;
 }
 
-type Tool = 'wwwc' | 'zoom' | 'pan' | 'length' | 'rectangle' | 'ellipse';
+type Tool = 'wwwc' | 'zoom' | 'pan' | 'length' | 'rectangle' | 'ellipse' | 'arrow' | 'cobb' | 'probe' | 'angle';
 
 interface ImageSettings {
   windowLevel?: {
@@ -786,6 +794,10 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
           tg.addTool(LengthTool.toolName);
           tg.addTool(RectangleROITool.toolName);
           tg.addTool(EllipticalROITool.toolName);
+          tg.addTool(ArrowAnnotateTool.toolName);
+          tg.addTool(CobbAngleTool.toolName);
+          tg.addTool(ProbeTool.toolName);
+          tg.addTool(AngleTool.toolName);
         } catch (toolError) {
           throw new Error(`Tool group setup failed: ${toolError.message}`);
         }
@@ -869,6 +881,10 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
       toolGroupRef.current.setToolPassive(LengthTool.toolName);
       toolGroupRef.current.setToolPassive(RectangleROITool.toolName);
       toolGroupRef.current.setToolPassive(EllipticalROITool.toolName);
+      toolGroupRef.current.setToolPassive(ArrowAnnotateTool.toolName);
+      toolGroupRef.current.setToolPassive(CobbAngleTool.toolName);
+      toolGroupRef.current.setToolPassive(ProbeTool.toolName);
+      toolGroupRef.current.setToolPassive(AngleTool.toolName);
       
       // Activate selected tool
       switch (tool) {
@@ -899,6 +915,26 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
           break;
         case 'ellipse':
           toolGroupRef.current.setToolActive(EllipticalROITool.toolName, {
+            bindings: [{ mouseButton: MouseBindings.Primary }],
+          });
+          break;
+        case 'arrow':
+          toolGroupRef.current.setToolActive(ArrowAnnotateTool.toolName, {
+            bindings: [{ mouseButton: MouseBindings.Primary }],
+          });
+          break;
+        case 'cobb':
+          toolGroupRef.current.setToolActive(CobbAngleTool.toolName, {
+            bindings: [{ mouseButton: MouseBindings.Primary }],
+          });
+          break;
+        case 'probe':
+          toolGroupRef.current.setToolActive(ProbeTool.toolName, {
+            bindings: [{ mouseButton: MouseBindings.Primary }],
+          });
+          break;
+        case 'angle':
+          toolGroupRef.current.setToolActive(AngleTool.toolName, {
             bindings: [{ mouseButton: MouseBindings.Primary }],
           });
           break;
@@ -1215,6 +1251,46 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
               title="Rectangle ROI"
             >
               <Square className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={activeTool === 'ellipse' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setToolActive('ellipse')}
+              title="Elliptical ROI"
+            >
+              <Circle className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={activeTool === 'arrow' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setToolActive('arrow')}
+              title="Arrow Annotation"
+            >
+              <ArrowUpRight className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={activeTool === 'angle' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setToolActive('angle')}
+              title="Angle Measurement"
+            >
+              <Triangle className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={activeTool === 'cobb' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setToolActive('cobb')}
+              title="Cobb Angle"
+            >
+              <Triangle className="h-4 w-4 rotate-45" />
+            </Button>
+            <Button
+              variant={activeTool === 'probe' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setToolActive('probe')}
+              title="Probe Tool"
+            >
+              <Crosshair className="h-4 w-4" />
             </Button>
           </div>
 
