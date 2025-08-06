@@ -549,8 +549,25 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({
       const handleResizeOrFullscreen = () => {
         // Small delay to ensure layout has updated
         setTimeout(() => {
+          // Force rendering engine to resize and recalculate
+          const renderingEngine = renderingEngineRef.current;
+          const currentViewport = viewportRef.current;
+          if (renderingEngine && currentViewport) {
+            try {
+              renderingEngine.resize(true, true);
+              // Don't reset camera - that changes zoom level, just render
+              currentViewport.render();
+            } catch (resizeError) {
+              // Fallback to just render
+              try {
+                currentViewport.render();
+              } catch (renderError) {
+                // Ignore render errors
+              }
+            }
+          }
           updateDynamicOverlayData();
-        }, 100);
+        }, 150);
       };
       
       window.addEventListener('resize', handleResizeOrFullscreen);

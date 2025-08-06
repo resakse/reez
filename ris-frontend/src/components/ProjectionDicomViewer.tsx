@@ -322,12 +322,18 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
           
           if (canvas && imageData && imageData.dimensions) {
             // Calculate zoom based on how much of the image fits in the viewport
-            // parallelScale represents half the height of the visible area in world coordinates
-            const imageHeight = imageData.dimensions[1]; // Image height in pixels
+            const imageWidth = imageData.dimensions[0];
+            const imageHeight = imageData.dimensions[1];
+            const canvasWidth = canvas.width;
+            const canvasHeight = canvas.height;
             const currentScale = camera.parallelScale;
             
-            // For a fit-to-window view, parallelScale would be approximately imageHeight/2
-            const fitToWindowScale = imageHeight / 2;
+            // Calculate what the parallelScale would be for a "fit-to-window" view
+            // parallelScale represents half the height of the visible area
+            // For fit-to-window, we want the smaller dimension to determine the scale
+            const scaleToFitWidth = imageWidth * canvasHeight / (2 * canvasWidth);
+            const scaleToFitHeight = imageHeight / 2;
+            const fitToWindowScale = Math.min(scaleToFitWidth, scaleToFitHeight);
             
             // Zoom percentage = (fit-to-window scale / current scale) * 100
             const zoomPercentage = Math.round((fitToWindowScale / currentScale) * 100);
@@ -418,8 +424,25 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
       const handleResizeOrFullscreen = () => {
         // Small delay to ensure layout has updated
         setTimeout(() => {
+          // Force rendering engine to resize and recalculate
+          const renderingEngine = renderingEngineRef.current;
+          const currentViewport = viewportRef.current;
+          if (renderingEngine && currentViewport) {
+            try {
+              renderingEngine.resize(true, true);
+              // Don't reset camera - that changes zoom level, just render
+              currentViewport.render();
+            } catch (resizeError) {
+              // Fallback to just render
+              try {
+                currentViewport.render();
+              } catch (renderError) {
+                // Ignore render errors
+              }
+            }
+          }
           updateDynamicOverlayData();
-        }, 100);
+        }, 150);
       };
       
       window.addEventListener('resize', handleResizeOrFullscreen);
