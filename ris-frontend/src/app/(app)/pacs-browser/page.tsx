@@ -426,16 +426,6 @@ export default function PacsBrowserPage() {
 
       // Map backend response to frontend format - multiple PACS support
       let formattedStudies: LegacyStudy[] = data.studies.map((study: any) => {
-        // Debug: Log the first study to see what fields are available
-        if (formattedStudies.length === 0) {
-          console.log('First study from multiple PACS backend:', study);
-          console.log('PACS server info:', study.pacs_server_id, study.pacs_server_name);
-          console.log('Note: Backend provides DICOM fields:');
-          console.log('- bodyPartExamined (0018,0015)');
-          console.log('- protocolName (0018,1030)'); 
-          console.log('- acquisitionDeviceProcessingDescription (0018,1400)');
-          console.log('- manufacturer (0008,0070)');
-        }
         
         return {
           ID: study.id,

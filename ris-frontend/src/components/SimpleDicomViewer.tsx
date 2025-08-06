@@ -342,6 +342,12 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({
   const renderingEngineRef = useRef<RenderingEngine | null>(null);
   const viewportRef = useRef<any>(null);
   const toolGroupRef = useRef<any>(null);
+  // Store event listeners for cleanup
+  const currentEventListeners = useRef<{
+    handleMouseMove?: EventListener;
+    handleMouseLeave?: EventListener;
+    viewportElement?: Element;
+  } | null>(null);
   
   // Keep only UI-affecting state as actual state
   const [currentImageIndex, setCurrentImageIndexRaw] = useState<number>(0);
@@ -471,6 +477,149 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({
   // Series loading progress tracking - shows loaded/total for each series
   const [seriesLoadingProgress, setSeriesLoadingProgressRaw] = useState<Record<string, {loaded: number, total: number}>>({});
   const setSeriesLoadingProgress = createDebugSetter('seriesLoadingProgress', setSeriesLoadingProgressRaw);
+  
+  // Dynamic overlay data state
+  const [dynamicOverlayData, setDynamicOverlayData] = useState<{
+    windowLevel?: { windowWidth: number; windowCenter: number };
+    aspectRatio?: { width: number; height: number };
+    zoomPercentage?: number;
+    mousePosition?: { x: number; y: number; pixelValue?: number };
+  }>({});
+
+  // Set up event listeners for real-time updates during user interactions
+  React.useEffect(() => {
+    if (!showOverlay) return;
+    
+    // Function to set up listeners once viewport is ready
+    const setupEventListeners = () => {
+      const stackViewport = viewportRef.current;
+      
+      if (!stackViewport) {
+        return false;
+      }
+
+      const viewportElement = stackViewport.element;
+      
+      if (!viewportElement) {
+        return false;
+      }
+
+      // Throttled mouse move handler for real-time updates during drag
+      let lastMouseUpdate = 0;
+      const handleMouseMove = (event: any) => {
+        // Only during mouse button press (active tool interaction)
+        if (event.buttons > 0) {
+          const now = Date.now();
+          // Throttle to max 20 updates per second (50ms)
+          if (now - lastMouseUpdate > 50) {
+            lastMouseUpdate = now;
+            updateDynamicOverlayData();
+          }
+        }
+      };
+
+      // Update when image is rendered (initial load, tool activation changes, etc.)
+      const handleImageRendered = () => {
+        updateDynamicOverlayData();
+      };
+
+      // Update when viewport camera changes (zoom/pan operations complete)
+      const handleCameraModified = () => {
+        updateDynamicOverlayData();
+      };
+
+      // Update when VOI (window/level) changes are applied
+      const handleVoiModified = () => {
+        updateDynamicOverlayData();
+      };
+
+      // Add event listeners for real-time updates during user interactions
+      viewportElement.addEventListener('cornerstoneimagerendered', handleImageRendered);
+      viewportElement.addEventListener('cornerstonecameramodified', handleCameraModified);
+      viewportElement.addEventListener('cornerstonevoimodified', handleVoiModified);
+      
+      // Listen for mouse move events for real-time updates during tool interactions
+      viewportElement.addEventListener('mousemove', handleMouseMove);
+      
+      // Also listen for Cornerstone-specific interaction events
+      viewportElement.addEventListener('cornerstoneviewportcameramodified', handleCameraModified);
+      viewportElement.addEventListener('cornerstoneviewportvoimodified', handleVoiModified);
+
+      // Listen for window resize and fullscreen changes to update zoom percentage
+      const handleResizeOrFullscreen = () => {
+        // Small delay to ensure layout has updated
+        setTimeout(() => {
+          updateDynamicOverlayData();
+        }, 100);
+      };
+      
+      window.addEventListener('resize', handleResizeOrFullscreen);
+      document.addEventListener('fullscreenchange', handleResizeOrFullscreen);
+      document.addEventListener('webkitfullscreenchange', handleResizeOrFullscreen);
+      document.addEventListener('mozfullscreenchange', handleResizeOrFullscreen);
+      document.addEventListener('MSFullscreenChange', handleResizeOrFullscreen);
+
+      // Initial update
+      updateDynamicOverlayData();
+
+      return { 
+        viewportElement, 
+        handleImageRendered, 
+        handleCameraModified, 
+        handleVoiModified,
+        handleMouseMove,
+        handleResizeOrFullscreen
+      };
+    };
+
+    // Try to set up listeners immediately
+    let listenerSetup = setupEventListeners();
+    
+    // If not ready, retry until viewport is available
+    let retryInterval: NodeJS.Timeout | null = null;
+    if (!listenerSetup) {
+      retryInterval = setInterval(() => {
+        listenerSetup = setupEventListeners();
+        if (listenerSetup) {
+          clearInterval(retryInterval!);
+        }
+      }, 100); // Check every 100ms
+    }
+
+    return () => {
+      // Clear retry interval if still running
+      if (retryInterval) {
+        clearInterval(retryInterval);
+      }
+      
+      // Clean up event listeners if they were set up
+      if (listenerSetup && typeof listenerSetup === 'object') {
+        const { 
+          viewportElement, 
+          handleImageRendered, 
+          handleCameraModified,
+          handleVoiModified,
+          handleMouseMove,
+          handleResizeOrFullscreen
+        } = listenerSetup;
+        if (viewportElement) {
+          viewportElement.removeEventListener('cornerstoneimagerendered', handleImageRendered);
+          viewportElement.removeEventListener('cornerstonecameramodified', handleCameraModified);
+          viewportElement.removeEventListener('cornerstonevoimodified', handleVoiModified);
+          viewportElement.removeEventListener('mousemove', handleMouseMove);
+          viewportElement.removeEventListener('cornerstoneviewportcameramodified', handleCameraModified);
+          viewportElement.removeEventListener('cornerstoneviewportvoimodified', handleVoiModified);
+          
+          // Remove window and fullscreen listeners
+          window.removeEventListener('resize', handleResizeOrFullscreen);
+          document.removeEventListener('fullscreenchange', handleResizeOrFullscreen);
+          document.removeEventListener('webkitfullscreenchange', handleResizeOrFullscreen);
+          document.removeEventListener('mozfullscreenchange', handleResizeOrFullscreen);
+          document.removeEventListener('MSFullscreenChange', handleResizeOrFullscreen);
+        }
+      }
+    };
+  }, [showOverlay, updateDynamicOverlayData]);
   
   // Track which series are currently being loaded to avoid duplicates
   const activeSeriesLoaders = useRef<Set<string>>(new Set());
@@ -1009,6 +1158,77 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({
     }
   }, []);
 
+  // Update dynamic overlay data with current W/L and zoom
+  const updateDynamicOverlayData = useCallback(() => {
+    const stackViewport = viewportRef.current;
+    if (!stackViewport) return;
+
+    try {
+      // Get current window/level settings
+      const properties = stackViewport.getProperties();
+      const voiRange = properties?.voiRange;
+      
+      if (voiRange) {
+        const windowWidth = voiRange.upper - voiRange.lower;
+        const windowCenter = (voiRange.upper + voiRange.lower) / 2;
+        
+        setDynamicOverlayData(prev => ({
+          ...prev,
+          windowLevel: { windowWidth, windowCenter }
+        }));
+      } else {
+        // Try fallback approach
+        try {
+          const imageData = stackViewport.getImageData();
+          if (imageData) {
+            const windowWidth = imageData.windowWidth || 400;
+            const windowCenter = imageData.windowCenter || 200;
+            
+            setDynamicOverlayData(prev => ({
+              ...prev,
+              windowLevel: { windowWidth, windowCenter }
+            }));
+          }
+        } catch (fallbackError) {
+          // Ignore fallback errors
+        }
+      }
+      
+      // Get zoom percentage
+      try {
+        const camera = stackViewport.getCamera();
+        if (camera && camera.parallelScale) {
+          const defaultScale = 300; // Approximate default scale for fit-to-window
+          const currentScale = camera.parallelScale;
+          const zoomPercentage = Math.round((defaultScale / currentScale) * 100);
+          
+          setDynamicOverlayData(prev => ({
+            ...prev,
+            zoomPercentage: Math.max(1, Math.min(1000, zoomPercentage))
+          }));
+        }
+      } catch (zoomError) {
+        // If zoom fails, try to get aspect ratio as fallback
+        try {
+          const image = stackViewport.getImageData();
+          if (image && image.dimensions) {
+            const width = image.dimensions[0];
+            const height = image.dimensions[1];
+            
+            setDynamicOverlayData(prev => ({
+              ...prev,
+              aspectRatio: { width, height }
+            }));
+          }
+        } catch (imageError) {
+          // Ignore image data errors
+        }
+      }
+    } catch (error) {
+      // Ignore overlay update errors
+    }
+  }, []);
+
   // Helper function to handle DICOM loading errors, especially buffer overruns
   const handleDicomError = useCallback((error: any, imageId: string, retryCallback?: () => Promise<void>) => {
     const errorMessage = (error?.message?.toLowerCase && error.message.toLowerCase()) || '';
@@ -1292,7 +1512,92 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({
         viewportElement.addEventListener('cornerstoneimagerendered', () => {
           // Save settings immediately
           saveCurrentImageSettings();
+          
+          // Update dynamic overlay data with current W/L and aspect ratio
+          updateDynamicOverlayData();
         });
+
+        // Add mouse move event listener for cursor position tracking
+        const handleMouseMove = (event: MouseEvent) => {
+          if (!stackViewport) return;
+          
+          const rect = viewportElement.getBoundingClientRect();
+          const canvasPos = {
+            x: Math.round(event.clientX - rect.left),
+            y: Math.round(event.clientY - rect.top)
+          };
+          
+          try {
+            // Convert canvas coordinates to image coordinates
+            const worldCoords = stackViewport.canvasToWorld([canvasPos.x, canvasPos.y]);
+            const imageCoords = stackViewport.worldToImage(worldCoords);
+            
+            // Get pixel value at this location
+            let pixelValue: number | undefined;
+            try {
+              const image = stackViewport.getImageData();
+              if (image && imageCoords) {
+                const x = Math.round(imageCoords[0]);
+                const y = Math.round(imageCoords[1]);
+                if (x >= 0 && x < image.dimensions[0] && y >= 0 && y < image.dimensions[1]) {
+                  const index = y * image.dimensions[0] + x;
+                  if (image.getPixelData && typeof image.getPixelData === 'function') {
+                    const pixelData = image.getPixelData();
+                    if (pixelData && index < pixelData.length) {
+                      pixelValue = pixelData[index];
+                    }
+                  }
+                }
+              }
+            } catch (pixelError) {
+              // Ignore pixel value errors
+            }
+            
+            setDynamicOverlayData(prev => ({
+              ...prev,
+              mousePosition: {
+                x: imageCoords ? Math.round(imageCoords[0]) : canvasPos.x,
+                y: imageCoords ? Math.round(imageCoords[1]) : canvasPos.y,
+                pixelValue
+              }
+            }));
+          } catch (coordError) {
+            // Fallback to canvas coordinates if world/image conversion fails
+            setDynamicOverlayData(prev => ({
+              ...prev,
+              mousePosition: {
+                x: canvasPos.x,
+                y: canvasPos.y
+              }
+            }));
+          }
+        };
+
+        // Add mouse leave event listener to clear mouse position
+        const handleMouseLeave = () => {
+          setDynamicOverlayData(prev => ({
+            ...prev,
+            mousePosition: undefined
+          }));
+        };
+
+        viewportElement.addEventListener('mousemove', handleMouseMove);
+        viewportElement.addEventListener('mouseleave', handleMouseLeave);
+
+        // Store event listeners for cleanup
+        currentEventListeners.current = {
+          handleMouseMove,
+          handleMouseLeave,
+          viewportElement
+        };
+
+        // Initial overlay data update
+        updateDynamicOverlayData();
+
+        // Also update after a short delay to ensure viewport is fully rendered
+        setTimeout(() => {
+          updateDynamicOverlayData();
+        }, 500);
 
         // Batch final state updates to reduce re-renders
         setLoading(false);
@@ -1324,6 +1629,18 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({
       if (resizeObserverRef.current) {
         resizeObserverRef.current.disconnect();
         resizeObserverRef.current = null;
+      }
+
+      // Clean up event listeners
+      if (currentEventListeners.current) {
+        const { handleMouseMove, handleMouseLeave, viewportElement } = currentEventListeners.current;
+        if (viewportElement && handleMouseMove) {
+          viewportElement.removeEventListener('mousemove', handleMouseMove as EventListener);
+        }
+        if (viewportElement && handleMouseLeave) {
+          viewportElement.removeEventListener('mouseleave', handleMouseLeave as EventListener);
+        }
+        currentEventListeners.current = null;
       }
       
       // Clean up rendering engine
@@ -2226,6 +2543,10 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({
               studyMetadata={studyMetadata}
               examinations={examinations}
               enhancedDicomData={enhancedDicomData}
+              windowLevel={dynamicOverlayData.windowLevel}
+              aspectRatio={dynamicOverlayData.aspectRatio}
+              zoomPercentage={dynamicOverlayData.zoomPercentage}
+              mousePosition={dynamicOverlayData.mousePosition}
             />
           </div>
           
@@ -2354,14 +2675,6 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({
               {/* Thumbnails - Show individual images for current series, or series thumbnails if multiple series */}
               <div className="flex gap-1 flex-1 overflow-x-auto">
                 {(() => {
-                  // Debug logging
-                  console.log('🔍 THUMBNAIL DEBUG - X-RAY FIX:', {
-                    seriesInfoLength: seriesInfo.length,
-                    imageIdsLength: imageIds.length,
-                    currentSeriesId,
-                    modality: studyMetadata?.modality,
-                    imageIds: imageIds.slice(0, 3) // First 3 for debugging
-                  });
                   
                   // Check if this is an X-ray study (CR, DR, XR) with few series that should show individual images
                   const isXRayStudy = studyMetadata?.modality && ['CR', 'DR', 'XR', 'DX'].includes(studyMetadata.modality);
@@ -2369,31 +2682,17 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({
                   
                   // If we have multiple series but it's an X-ray study with few series, treat each series as individual image
                   if (shouldShowIndividualImages) {
-                    console.log('🔍 X-RAY THUMBNAILS:', {
-                      seriesInfo: seriesInfo.map(s => ({
-                        uid: s.seriesInstanceUID, 
-                        desc: s.seriesDescription,
-                        count: s.instanceCount
-                      })),
-                      representativeImages: Array.from(representativeImages.current.entries())
-                    });
                     
                     return seriesInfo.map((series, seriesIndex) => {
                       // Get representative image for this series  
                       const seriesKey = series.seriesInstanceUID || `series-${seriesIndex}`;
                       let representativeImageId = representativeImages.current.get(seriesKey);
                       
-                      console.log(`🔍 Series ${seriesIndex}:`, {
-                        seriesKey,
-                        representativeImageId,
-                        hasImage: !!representativeImageId
-                      });
                       
                       // If no representative image stored, create one by fetching the first instance of this series
                       if (!representativeImageId) {
                         // For X-ray studies, we need to fetch the first instance ID of this series
                         // For now, show a placeholder and load the actual image asynchronously
-                        console.log(`🔧 Need to load first instance for series ${seriesIndex}: ${series.seriesInstanceUID}`);
                         
                         // Try to fetch the first image of this series asynchronously
                         (async () => {
@@ -2408,14 +2707,12 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({
                               if (firstImage?.imageUrl) {
                                 const representativeImageUrl = `wadors:${firstImage.imageUrl}`;
                                 representativeImages.current.set(seriesKey, representativeImageUrl);
-                                console.log(`✅ Loaded representative image for series ${seriesIndex}:`, representativeImageUrl);
                                 
                                 // Force a re-render to show the new thumbnail
                                 setImageIds(prev => [...prev]); // Trigger re-render
                               }
                             }
                           } catch (error) {
-                            console.log(`❌ Failed to load representative image for series ${seriesIndex}:`, error);
                           }
                         })();
                         

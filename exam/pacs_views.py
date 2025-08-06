@@ -1434,15 +1434,6 @@ def get_enhanced_study_metadata(request, study_uid):
             timeout=30
         )
         
-        # Debug logging for enhanced metadata
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.info(f"Enhanced metadata search - PACS: {orthanc_url}, Study: {study_uid}, Response: {find_response.status_code}")
-        if find_response.ok:
-            result_data = find_response.json()
-            logger.info(f"Enhanced metadata search result count: {len(result_data) if result_data else 0}")
-        else:
-            logger.error(f"Enhanced metadata search failed: {find_response.text}")
         
         if not find_response.ok or not find_response.json():
             return Response({'error': f'Study not found: {study_uid}'}, status=status.HTTP_404_NOT_FOUND)

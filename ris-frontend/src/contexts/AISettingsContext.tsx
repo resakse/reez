@@ -46,7 +46,6 @@ export function AISettingsProvider({ children }: { children: ReactNode }) {
         
         // If AI is disabled in settings, don't make any more AI calls
         if (!data.enable_ai_reporting) {
-          console.log('AI reporting disabled in settings');
           setSettings(prev => ({ ...prev, enabled: false }));
           return;
         }
@@ -63,11 +62,9 @@ export function AISettingsProvider({ children }: { children: ReactNode }) {
         });
       } else if (response.status === 404) {
         // AI reporting endpoints not implemented yet
-        console.log('AI reporting API not available');
         setSettings(prev => ({ ...prev, enabled: false }));
       }
     } catch (error) {
-      console.log('Failed to load AI settings:', error);
       setSettings(prev => ({ ...prev, enabled: false }));
     } finally {
       setIsLoading(false);

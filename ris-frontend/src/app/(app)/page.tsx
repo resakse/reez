@@ -334,7 +334,6 @@ export default function Dashboard() {
     const ws = new WebSocket(wsUrl);
     
     ws.onopen = () => {
-      console.log('WebSocket connected for live dashboard updates');
     };
     
     ws.onmessage = (event) => {
@@ -366,7 +365,6 @@ export default function Dashboard() {
     };
     
     ws.onclose = () => {
-      console.log('WebSocket connection closed');
     };
     
     return () => {
@@ -381,7 +379,6 @@ export default function Dashboard() {
 
       // Use absolute URLs to Django backend API directly
       const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      console.log('API_BASE:', API_BASE);
       
       const [statsRes, demographicsRes, modalityRes, storageRes, bodypartsRes] = await Promise.all([
         fetch(`${API_BASE}/api/dashboard/stats/`, {
@@ -459,16 +456,11 @@ export default function Dashboard() {
       const currentDemographicsStr = JSON.stringify(demographics);
       const newDemographicsStr = JSON.stringify(demographicsWithDefaults);
       
-      console.log('Current demographics:', currentDemographicsStr.substring(0, 100));
-      console.log('New demographics:', newDemographicsStr.substring(0, 100));
-      console.log('Are they equal?', currentDemographicsStr === newDemographicsStr);
       
       // Only update if the stringified data is actually different
       if (currentDemographicsStr !== newDemographicsStr) {
-        console.log('Demographics data ACTUALLY changed, updating charts');
         setDemographics(demographicsWithDefaults);
       } else {
-        console.log('Demographics data is SAME, NOT updating');
       }
       
       // Handle modality stats data structure  
@@ -481,10 +473,8 @@ export default function Dashboard() {
       const newModalityStr = JSON.stringify(modalityWithDefaults);
       
       if (currentModalityStr !== newModalityStr) {
-        console.log('Modality data ACTUALLY changed, updating charts');
         setModalityStats(modalityWithDefaults);
       } else {
-        console.log('Modality data is SAME, NOT updating');
       }
 
       // Handle bodyparts and exam types data structure
@@ -497,10 +487,8 @@ export default function Dashboard() {
       const newBodypartsStr = JSON.stringify(bodypartsWithDefaults);
       
       if (currentBodypartsStr !== newBodypartsStr) {
-        console.log('Bodyparts data ACTUALLY changed, updating charts');
         setBodypartsExamTypes(bodypartsWithDefaults);
       } else {
-        console.log('Bodyparts data is SAME, NOT updating');
       }
       
       // ALWAYS set storage info (but only non-system-resources parts on initial load)
@@ -600,7 +588,6 @@ export default function Dashboard() {
             variant="outline" 
             size="sm" 
             onClick={() => {
-              console.log('Manual refresh clicked');
               fetchDashboardData();
             }}
             className="ml-2"

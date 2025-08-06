@@ -262,6 +262,234 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
   const [isInverted, setIsInverted] = useState<boolean>(false);
   const [isFlippedHorizontal, setIsFlippedHorizontal] = useState<boolean>(false);
   
+  // Dynamic overlay data state
+  const [dynamicOverlayData, setDynamicOverlayData] = useState<{
+    windowLevel?: { windowWidth: number; windowCenter: number };
+    zoomPercentage?: number;
+    mousePosition?: { x: number; y: number; pixelValue?: number };
+  }>({});
+
+  // Update dynamic overlay data with current W/L and zoom
+  const updateDynamicOverlayData = useCallback(() => {
+    const stackViewport = viewportRef.current;
+    if (!stackViewport) {
+      return;
+    }
+
+    try {
+      // Get current window/level settings
+      const properties = stackViewport.getProperties();
+      const voiRange = properties?.voiRange;
+      
+      if (voiRange) {
+        const windowWidth = voiRange.upper - voiRange.lower;
+        const windowCenter = (voiRange.upper + voiRange.lower) / 2;
+        
+        setDynamicOverlayData(prev => ({
+          ...prev,
+          windowLevel: { windowWidth, windowCenter }
+        }));
+      } else {
+        // Try to get W/L from image metadata or viewport settings
+        try {
+          // Method 1: Try viewport's current transfer function
+          const transferFunction = stackViewport.getTransferFunction();
+          
+          // Method 2: Try to get from image data
+          const imageData = stackViewport.getImageData();
+          
+          if (imageData && (imageData.windowWidth || imageData.windowCenter)) {
+            const windowWidth = imageData.windowWidth || 400;
+            const windowCenter = imageData.windowCenter || 200;
+            
+            setDynamicOverlayData(prev => ({
+              ...prev,
+              windowLevel: { windowWidth, windowCenter }
+            }));
+          }
+        } catch (altError) {
+          // Continue without W/L data
+        }
+      }
+      
+      // Get zoom percentage instead of aspect ratio
+      try {
+        const camera = stackViewport.getCamera();
+        if (camera && camera.parallelScale) {
+          // Get the canvas/viewport size to calculate proper zoom
+          const canvas = stackViewport.canvas;
+          const imageData = stackViewport.getImageData();
+          
+          if (canvas && imageData && imageData.dimensions) {
+            // Calculate zoom based on how much of the image fits in the viewport
+            // parallelScale represents half the height of the visible area in world coordinates
+            const imageHeight = imageData.dimensions[1]; // Image height in pixels
+            const currentScale = camera.parallelScale;
+            
+            // For a fit-to-window view, parallelScale would be approximately imageHeight/2
+            const fitToWindowScale = imageHeight / 2;
+            
+            // Zoom percentage = (fit-to-window scale / current scale) * 100
+            const zoomPercentage = Math.round((fitToWindowScale / currentScale) * 100);
+            
+            setDynamicOverlayData(prev => ({
+              ...prev,
+              zoomPercentage: Math.max(1, Math.min(2000, zoomPercentage)) // Clamp between 1% and 2000%
+            }));
+          } else {
+            // Fallback to simpler calculation if we can't get dimensions
+            const estimatedFitScale = 200; // Fallback estimate
+            const zoomPercentage = Math.round((estimatedFitScale / camera.parallelScale) * 100);
+            
+            setDynamicOverlayData(prev => ({
+              ...prev,
+              zoomPercentage: Math.max(10, Math.min(1000, zoomPercentage))
+            }));
+          }
+        }
+      } catch (zoomError) {
+        // Continue without zoom data
+      }
+    } catch (error) {
+      // Continue without overlay updates
+    }
+  }, []);
+
+  // Set up event listeners for real-time updates during user interactions
+  React.useEffect(() => {
+    if (!showOverlay) return;
+    
+    // Function to set up listeners once viewport is ready
+    const setupEventListeners = () => {
+      const stackViewport = viewportRef.current;
+      
+      if (!stackViewport) {
+        return false;
+      }
+
+      const viewportElement = stackViewport.element;
+      
+      if (!viewportElement) {
+        return false;
+      }
+
+      // Throttled mouse move handler for real-time updates during drag
+      let lastMouseUpdate = 0;
+      const handleMouseMove = (event: any) => {
+        // Only during mouse button press (active tool interaction)
+        if (event.buttons > 0) {
+          const now = Date.now();
+          // Throttle to max 20 updates per second (50ms)
+          if (now - lastMouseUpdate > 50) {
+            lastMouseUpdate = now;
+            updateDynamicOverlayData();
+          }
+        }
+      };
+
+      // Update when image is rendered (initial load, tool activation changes, etc.)
+      const handleImageRendered = () => {
+        updateDynamicOverlayData();
+      };
+
+      // Update when viewport camera changes (zoom/pan operations complete)
+      const handleCameraModified = () => {
+        updateDynamicOverlayData();
+      };
+
+      // Update when VOI (window/level) changes are applied
+      const handleVoiModified = () => {
+        updateDynamicOverlayData();
+      };
+
+      // Add event listeners for real-time updates during user interactions
+      viewportElement.addEventListener('cornerstoneimagerendered', handleImageRendered);
+      viewportElement.addEventListener('cornerstonecameramodified', handleCameraModified);
+      viewportElement.addEventListener('cornerstonevoimodified', handleVoiModified);
+      
+      // Listen for mouse move events for real-time updates during tool interactions
+      viewportElement.addEventListener('mousemove', handleMouseMove);
+      
+      // Also listen for Cornerstone-specific interaction events
+      viewportElement.addEventListener('cornerstoneviewportcameramodified', handleCameraModified);
+      viewportElement.addEventListener('cornerstoneviewportvoimodified', handleVoiModified);
+
+      // Listen for window resize and fullscreen changes to update zoom percentage
+      const handleResizeOrFullscreen = () => {
+        // Small delay to ensure layout has updated
+        setTimeout(() => {
+          updateDynamicOverlayData();
+        }, 100);
+      };
+      
+      window.addEventListener('resize', handleResizeOrFullscreen);
+      document.addEventListener('fullscreenchange', handleResizeOrFullscreen);
+      document.addEventListener('webkitfullscreenchange', handleResizeOrFullscreen);
+      document.addEventListener('mozfullscreenchange', handleResizeOrFullscreen);
+      document.addEventListener('MSFullscreenChange', handleResizeOrFullscreen);
+
+      // Initial update
+      updateDynamicOverlayData();
+
+      return { 
+        viewportElement, 
+        handleImageRendered, 
+        handleCameraModified, 
+        handleVoiModified,
+        handleMouseMove,
+        handleResizeOrFullscreen
+      };
+    };
+
+    // Try to set up listeners immediately
+    let listenerSetup = setupEventListeners();
+    
+    // If not ready, retry until viewport is available
+    let retryInterval: NodeJS.Timeout | null = null;
+    if (!listenerSetup) {
+      retryInterval = setInterval(() => {
+        listenerSetup = setupEventListeners();
+        if (listenerSetup) {
+          clearInterval(retryInterval!);
+        }
+      }, 100); // Check every 100ms
+    }
+
+    return () => {
+      // Clear retry interval if still running
+      if (retryInterval) {
+        clearInterval(retryInterval);
+      }
+      
+      // Clean up event listeners if they were set up
+      if (listenerSetup && typeof listenerSetup === 'object') {
+        const { 
+          viewportElement, 
+          handleImageRendered, 
+          handleCameraModified,
+          handleVoiModified,
+          handleMouseMove,
+          handleResizeOrFullscreen
+        } = listenerSetup;
+        if (viewportElement) {
+          viewportElement.removeEventListener('cornerstoneimagerendered', handleImageRendered);
+          viewportElement.removeEventListener('cornerstonecameramodified', handleCameraModified);
+          viewportElement.removeEventListener('cornerstonevoimodified', handleVoiModified);
+          viewportElement.removeEventListener('mousemove', handleMouseMove);
+          viewportElement.removeEventListener('cornerstoneviewportcameramodified', handleCameraModified);
+          viewportElement.removeEventListener('cornerstoneviewportvoimodified', handleVoiModified);
+          
+          // Remove window and fullscreen listeners
+          window.removeEventListener('resize', handleResizeOrFullscreen);
+          document.removeEventListener('fullscreenchange', handleResizeOrFullscreen);
+          document.removeEventListener('webkitfullscreenchange', handleResizeOrFullscreen);
+          document.removeEventListener('mozfullscreenchange', handleResizeOrFullscreen);
+          document.removeEventListener('MSFullscreenChange', handleResizeOrFullscreen);
+        }
+      }
+    };
+  }, [showOverlay, updateDynamicOverlayData]);
+  
   const initializationRef = useRef(false);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const imageSettingsRef = useRef<Map<number, ImageSettings>>(new Map());
@@ -1074,6 +1302,9 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
             studyMetadata={studyMetadata}
             examinations={examinations}
             enhancedDicomData={enhancedDicomData}
+            windowLevel={dynamicOverlayData.windowLevel}
+            zoomPercentage={dynamicOverlayData.zoomPercentage}
+            mousePosition={dynamicOverlayData.mousePosition}
           />
         </div>
       </div>

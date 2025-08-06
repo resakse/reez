@@ -322,13 +322,11 @@ export default function RejectIncidentForm({
     try {
       setSaving(true);
       
-      console.log('Submitting form data:', formData);
 
       const savedIncident = incidentId
         ? await rejectAnalysisApi.incidents.updateIncident(incidentId, formData)
         : await rejectAnalysisApi.incidents.createIncident(formData);
       
-      console.log('Saved incident:', savedIncident);
 
       if (onSave) {
         onSave(savedIncident);

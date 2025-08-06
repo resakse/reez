@@ -20,6 +20,21 @@ interface DicomOverlayProps {
   examinations?: any[];
   enhancedDicomData?: any[];
   className?: string;
+  // Dynamic overlay data
+  windowLevel?: {
+    windowWidth: number;
+    windowCenter: number;
+  };
+  aspectRatio?: {
+    width: number;
+    height: number;
+  };
+  zoomPercentage?: number;
+  mousePosition?: {
+    x: number;
+    y: number;
+    pixelValue?: number;
+  };
 }
 
 export default function DicomOverlay({ 
@@ -27,7 +42,11 @@ export default function DicomOverlay({
   studyMetadata, 
   examinations = [], 
   enhancedDicomData = [],
-  className = ""
+  className = "",
+  windowLevel,
+  aspectRatio,
+  zoomPercentage,
+  mousePosition
 }: DicomOverlayProps) {
   if (!isVisible) return null;
 
@@ -184,7 +203,22 @@ export default function DicomOverlay({
         {examDetails.machine && (
           <div>{examDetails.machine}</div>
         )}
-        <div>W/L: Auto</div>
+        {/* Dynamic W/L Display - Always show */}
+        <div>
+          {windowLevel ? 
+            `W/L: ${Math.round(windowLevel.windowWidth)}/${Math.round(windowLevel.windowCenter)}` 
+            : 'W/L: Auto (400/200)'
+          }
+        </div>
+        {/* Zoom Display - Prefer zoomPercentage, fallback to aspectRatio */}
+        <div>
+          {zoomPercentage ? 
+            `Zoom: ${zoomPercentage}%` 
+            : aspectRatio ? 
+              `Ratio: ${aspectRatio.width}x${aspectRatio.height}` 
+              : 'Zoom: Calculating...'
+          }
+        </div>
         {studyMetadata?.Modality === 'CT' && (
           <>
             <div>Slice: 1.0mm</div>
@@ -192,6 +226,16 @@ export default function DicomOverlay({
           </>
         )}
       </div>
+
+      {/* Bottom Center - Mouse Position and Pixel Value */}
+      {mousePosition && (
+        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-white text-sm font-mono bg-black/20 p-2 rounded text-center">
+          <div>X: {mousePosition.x}, Y: {mousePosition.y}</div>
+          {mousePosition.pixelValue !== undefined && (
+            <div>Pixel: {Math.round(mousePosition.pixelValue)}</div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

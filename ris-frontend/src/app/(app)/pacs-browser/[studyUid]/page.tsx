@@ -121,16 +121,6 @@ export default function LegacyStudyViewerPage() {
   // Get PACS server ID from URL parameters
   const pacsServerId = searchParams.get('pacs_server_id');
   
-  // Debug logging
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('StudyViewer Debug:', {
-        studyUid: params?.studyUid,
-        pacsServerId,
-        searchParamsAll: searchParams.toString()
-      });
-    }
-  }, [params?.studyUid, pacsServerId, searchParams]);
   
   const [metadata, setMetadata] = useState<StudyMetadata | null>(null);
   const [imageIds, setImageIds] = useState<string[]>([]);
@@ -149,18 +139,10 @@ export default function LegacyStudyViewerPage() {
   const [showReportingModal, setShowReportingModal] = useState(false);
   const [currentReport, setCurrentReport] = useState<any>(null);
   
-  // Debug current report changes
-  useEffect(() => {
-    console.log('Current report changed:', currentReport);
-  }, [currentReport]);
   const [reportLoading, setReportLoading] = useState(false);
   const [reportFunctions, setReportFunctions] = useState<any>(null);
   const [showOverlay, setShowOverlay] = useState(true);
   
-  // Debug report functions changes
-  useEffect(() => {
-    console.log('Report functions changed:', reportFunctions);
-  }, [reportFunctions]);
 
   // Function to trigger report reload
   const handleReportUpdate = () => {
@@ -229,22 +211,15 @@ export default function LegacyStudyViewerPage() {
       const pacsParam = pacsServerId ? `?pacs_server_id=${pacsServerId}` : '';
       const url = `${process.env.NEXT_PUBLIC_API_URL}/api/pacs/studies/${studyUid}/enhanced-metadata/${pacsParam}`;
       
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Fetching enhanced DICOM data:', { studyUid, pacsServerId, url });
-      }
       
       const response = await AuthService.authenticatedFetch(url);
       
       if (response.ok) {
         const data = await response.json();
         setEnhancedDicomData(data.series || []);
-      } else if (process.env.NODE_ENV === 'development') {
-        console.error('Enhanced metadata fetch failed:', response.status, response.statusText);
       }
     } catch (err) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('Error fetching enhanced DICOM data:', err);
-      }
+      // Error fetching enhanced DICOM data
     }
   }, [studyUid, pacsServerId]);
 
@@ -281,9 +256,6 @@ export default function LegacyStudyViewerPage() {
       const pacsParam = pacsServerId ? `?pacs_server_id=${pacsServerId}` : '';
       const seriesUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/pacs/studies/${studyUid}/series/${pacsParam}`;
       
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Fetching series data:', { studyUid, pacsServerId, seriesUrl });
-      }
       
       const seriesResponse = await AuthService.authenticatedFetch(seriesUrl);
       

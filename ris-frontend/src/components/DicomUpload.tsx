@@ -295,7 +295,6 @@ const DicomUpload: React.FC<DicomUploadProps> = ({
       );
       if (response.ok) {
         const data = await response.json();
-        console.log('PACS servers API response:', data); // Debug log
         
         const servers = data.servers || [];
         setPacsServers(servers);
@@ -304,7 +303,6 @@ const DicomUpload: React.FC<DicomUploadProps> = ({
           console.warn('No PACS servers returned from API');
           toast.warning('No PACS servers configured. Contact your administrator to set up PACS servers.');
         } else {
-          console.log(`Found ${servers.length} PACS server(s):`, servers.map(s => s.name));
         }
         
         // Auto-select primary server if available
@@ -314,14 +312,12 @@ const DicomUpload: React.FC<DicomUploadProps> = ({
             value: primaryServer.id.toString(),
             label: `${primaryServer.name} (Primary)`
           });
-          console.log('Auto-selected primary server:', primaryServer.name);
         } else if (servers.length === 1) {
           // Auto-select if only one server available
           setSelectedPacsServer({
             value: servers[0].id.toString(),
             label: servers[0].name
           });
-          console.log('Auto-selected only available server:', servers[0].name);
         }
       } else {
         console.error('PACS servers API error:', response.status, response.statusText);

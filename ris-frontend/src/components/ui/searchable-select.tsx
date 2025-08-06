@@ -51,10 +51,6 @@ export function SearchableSelect({
                labelLower.includes(word)
              )
       
-      // Debug logging
-      if (searchLower.includes('chest')) {
-        console.log(`Searching "${searchLower}" in "${option.label}" (${labelLower}): ${matches}`)
-      }
       
       return matches
     })

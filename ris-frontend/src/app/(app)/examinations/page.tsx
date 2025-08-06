@@ -171,12 +171,10 @@ export default function ExaminationsPage() {
 
         if (examTypesRes.ok) {
           const examTypesData = await examTypesRes.json();
-          console.log('Exam Types Data:', examTypesData);
           
           // Handle paginated response
           const examTypesArray = examTypesData.results || examTypesData;
           if (Array.isArray(examTypesArray)) {
-            console.log('Exam Names:', examTypesArray.map(exam => exam.exam));
             setExamTypes(examTypesArray);
           } else {
             console.error('Exam Types API did not return an array:', examTypesData);
@@ -259,7 +257,6 @@ export default function ExaminationsPage() {
 
   const fetchExaminationsWithFilters = async (filtersToUse: FilterParams = filters) => {
     try {
-      console.log('fetchExaminations called with filters:', filtersToUse);
       setLoading(true);
       
       // Build query parameters with proper pagination
@@ -299,28 +296,21 @@ export default function ExaminationsPage() {
       }
 
       const data = await res.json();
-      console.log('Raw API response:', data);
       
       const results = data.results || data;
-      console.log('Results array length:', results.length);
-      console.log('First few results:', results.slice(0, 3));
       
       setExaminations(results);
       
       // Update pagination info from API response
       if (data.count !== undefined) {
-        console.log('Server-side pagination - API returned count:', data.count, 'pageSize:', pageSize);
-        console.log('Setting examinations to', results.length, 'items');
         setTotalCount(data.count);
         setTotalPages(Math.ceil(data.count / pageSize));
       } else {
         // Fallback if API doesn't provide count
-        console.log('No count in API response, using results length:', results.length);
         setTotalCount(results.length);
         setTotalPages(1);
       }
       
-      console.log('Final state - examinations:', results.length, 'totalCount:', data.count || results.length, 'totalPages:', Math.ceil((data.count || results.length) / pageSize));
       
       // Extract unique pemohon values from current page results
       const pemohonSet = new Set<string>();
@@ -357,13 +347,11 @@ export default function ExaminationsPage() {
 
   const handleSearch = (e?: React.MouseEvent) => {
     e?.preventDefault();
-    console.log('Apply Filters clicked, current filters:', filters);
     fetchExaminations();
   };
 
   const clearFilters = (e?: React.MouseEvent) => {
     e?.preventDefault();
-    console.log('Clear Filters clicked');
     const clearedFilters = {
       search: '',
       date_range: [],
@@ -855,7 +843,6 @@ export default function ExaminationsPage() {
                           size="sm"
                           className="w-8 h-8 p-0"
                           onClick={() => {
-                            console.log('Clicking page:', page);
                             setCurrentPage(page as number);
                           }}
                         >
@@ -870,7 +857,6 @@ export default function ExaminationsPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    console.log('Next clicked - currentPage:', currentPage, 'totalPages:', totalPages);
                     setCurrentPage(currentPage + 1);
                   }}
                   disabled={currentPage === totalPages}

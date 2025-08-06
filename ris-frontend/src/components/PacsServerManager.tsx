@@ -66,23 +66,15 @@ export default function PacsServerManager() {
       if (response.ok) {
         const data = await response.json();
         
-        // Debug: log the response structure
-        console.log('PACS servers response:', data);
-        console.log('Is array?', Array.isArray(data));
-        console.log('Type:', typeof data);
-        console.log('Keys:', Object.keys(data || {}));
         
         // Handle both direct array and paginated response
         if (Array.isArray(data)) {
-          console.log('Setting servers from direct array, length:', data.length);
           setServers(data);
         } else if (data.results && Array.isArray(data.results)) {
           // Django REST framework paginated response
-          console.log('Setting servers from paginated response, length:', data.results.length);
           setServers(data.results);
         } else if (data && typeof data === 'object') {
           // Handle case where data might be a single object instead of array
-          console.log('Converting single object to array');
           setServers([data]);
         } else {
           console.error('Unexpected response format:', data);

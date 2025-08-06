@@ -250,10 +250,8 @@ export default function CollaborativeViewerPage() {
         }
       } else if (response.status === 404) {
         // AI reporting endpoint not available - this is expected
-        console.log('AI reporting endpoint not available');
       }
     } catch (err) {
-      console.log('AI reporting not available:', err);
     }
   };
 
@@ -264,10 +262,8 @@ export default function CollaborativeViewerPage() {
         const data = await response.json();
         setAiReport(data);
       } else if (response.status === 404) {
-        console.log('AI report not found');
       }
     } catch (error) {
-      console.log('AI reporting not available:', error);
     }
   };
 
@@ -278,10 +274,8 @@ export default function CollaborativeViewerPage() {
         const data = await response.json();
         setAiSuggestions(data.ai_suggestions || []);
       } else if (response.status === 404) {
-        console.log('AI suggestions not found');
       }
     } catch (error) {
-      console.log('AI suggestions not available:', error);
     }
   };
 
@@ -346,7 +340,6 @@ export default function CollaborativeViewerPage() {
         })
       }).catch(() => {
         // Ignore API errors for collaboration tracking
-        console.log('Collaboration tracking not available');
       });
     } catch (error) {
       // Ignore errors

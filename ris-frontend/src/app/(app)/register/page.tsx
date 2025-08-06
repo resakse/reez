@@ -159,29 +159,24 @@ export default function RegistrationWorkflowPage() {
 
       if (wardsRes.ok) {
         const wardsData = await wardsRes.json();
-        console.log('Wards data:', wardsData);
         setWards(Array.isArray(wardsData) ? wardsData : wardsData.results || []);
       }
       if (disciplinesRes.ok) {
         const disciplinesData = await disciplinesRes.json();
-        console.log('Disciplines data:', disciplinesData);
         setDisciplines(Array.isArray(disciplinesData) ? disciplinesData : disciplinesData.results || []);
       }
       if (examsRes.ok) {
         const examsData = await examsRes.json();
-        console.log('Exams data:', examsData);
         const examsArray = Array.isArray(examsData) ? examsData : examsData.results || [];
         setExams(examsArray);
         setFilteredExams(examsArray);
       }
       if (modalitiesRes.ok) {
         const modalitiesData = await modalitiesRes.json();
-        console.log('Modalities data:', modalitiesData);
         setModalities(Array.isArray(modalitiesData) ? modalitiesData : modalitiesData.results || []);
       }
       if (bodyPartsRes.ok) {
         const bodyPartsData = await bodyPartsRes.json();
-        console.log('Body parts data:', bodyPartsData);
         setBodyParts(Array.isArray(bodyPartsData) ? bodyPartsData : bodyPartsData.results || []);
       }
     } catch (error) {
@@ -360,7 +355,6 @@ export default function RegistrationWorkflowPage() {
         catatan: newPatientData.catatan
       };
 
-      console.log('Creating patient with payload:', payload);
 
       const res = await AuthService.authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/patients/`, {
         method: 'POST',
