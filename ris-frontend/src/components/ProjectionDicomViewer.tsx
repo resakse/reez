@@ -235,6 +235,7 @@ interface ProjectionDicomViewerProps {
   enhancedDicomData?: any[];
   isFullWindow?: boolean;
   hideToolbar?: boolean;
+  viewportIdSuffix?: string; // Unique suffix for viewport IDs in multi-viewport mode
 }
 
 type Tool = 'wwwc' | 'zoom' | 'pan' | 'length' | 'rectangle' | 'ellipse' | 'arrow' | 'cobb' | 'probe' | 'angle';
@@ -259,7 +260,8 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
   examinations = [],
   enhancedDicomData = [],
   isFullWindow = false,
-  hideToolbar = false
+  hideToolbar = false,
+  viewportIdSuffix = ''
 }) => {
   const mainViewportRef = useRef<HTMLDivElement>(null);
   const renderingEngineRef = useRef<RenderingEngine | null>(null);
@@ -685,11 +687,11 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
         const element = await waitForElement();
         
         await initializeCornerstone();
-        const renderingEngineId = `projectionDicomViewer-${Date.now()}`;
+        const renderingEngineId = `projectionDicomViewer-${Date.now()}${viewportIdSuffix}`;
         const engine = new RenderingEngine(renderingEngineId);
         renderingEngineRef.current = engine;
 
-        const viewportId = `projectionViewport-${Date.now()}`;
+        const viewportId = `projectionViewport-${Date.now()}${viewportIdSuffix}`;
         const viewportInput = {
           viewportId,
           element: element,
@@ -776,7 +778,7 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
           resizeObserverRef.current.observe(element);
         }
 
-        const toolGroupId = `projectionDicomViewerToolGroup-${Date.now()}`;
+        const toolGroupId = `projectionDicomViewerToolGroup-${Date.now()}${viewportIdSuffix}`;
         
         try {
           ToolGroupManager.destroyToolGroup(toolGroupId);
@@ -1454,6 +1456,7 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
                   index={index}
                   isActive={index === currentImageIndex}
                   onClick={() => goToImage(index)}
+                  viewportIdSuffix={viewportIdSuffix}
                 />
                 
                 {/* Image number below thumbnail */}
@@ -1517,9 +1520,10 @@ interface ThumbnailImageProps {
   index: number;
   isActive: boolean;
   onClick: () => void;
+  viewportIdSuffix?: string;
 }
 
-const ThumbnailImage: React.FC<ThumbnailImageProps> = ({ imageId, index, isActive, onClick }) => {
+const ThumbnailImage: React.FC<ThumbnailImageProps> = ({ imageId, index, isActive, onClick, viewportIdSuffix = '' }) => {
   const thumbRef = useRef<HTMLDivElement>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState(false);
@@ -1564,7 +1568,7 @@ const ThumbnailImage: React.FC<ThumbnailImageProps> = ({ imageId, index, isActiv
         
         if (!mounted) return;
         
-        const thumbViewportId = `thumbViewport-${index}-persistent`;
+        const thumbViewportId = `thumbViewport-${index}-persistent${viewportIdSuffix || ''}`;
         viewportIdRef.current = thumbViewportId;
         
         const thumbViewportInput = {

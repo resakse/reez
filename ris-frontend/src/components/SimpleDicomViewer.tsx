@@ -9,7 +9,7 @@ import {
   ZoomIn, ZoomOut, RotateCw, Move, Square, Circle, 
   Ruler, MousePointer, RotateCcw, Maximize, Settings,
   Play, Pause, SkipBack, SkipForward, Trash2,
-  FlipHorizontal, Palette, Eye, EyeOff
+  FlipHorizontal, Palette, Eye, EyeOff, ArrowUpRight, Crosshair, Triangle
 } from 'lucide-react';
 import AuthService from '@/lib/auth';
 import DicomOverlay from './DicomOverlay';
@@ -25,6 +25,10 @@ import {
   LengthTool,
   RectangleROITool,
   EllipticalROITool,
+  ArrowAnnotateTool,
+  CobbAngleTool,
+  ProbeTool,
+  AngleTool,
   StackScrollTool,
   addTool,
   Enums as ToolsEnums,
@@ -219,6 +223,10 @@ const initializeCornerstone = async () => {
         addTool(LengthTool);
         addTool(RectangleROITool);
         addTool(EllipticalROITool);
+        addTool(ArrowAnnotateTool);
+        addTool(CobbAngleTool);
+        addTool(ProbeTool);
+        addTool(AngleTool);
         addTool(StackScrollTool);
       } catch (toolError) {
         throw new Error(`Tool registration failed: ${toolError.message}`);
@@ -263,7 +271,7 @@ interface SimpleDicomViewerProps {
   hideToolbar?: boolean;
 }
 
-type Tool = 'wwwc' | 'zoom' | 'pan' | 'length' | 'rectangle' | 'ellipse';
+type Tool = 'wwwc' | 'zoom' | 'pan' | 'length' | 'rectangle' | 'ellipse' | 'arrow' | 'cobb' | 'probe' | 'angle';
 
 // Interface for per-image settings
 interface ImageSettings {
@@ -479,6 +487,77 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({
   // Removed idle expansion refs - no longer needed
   
   // Series loading progress tracking - shows loaded/total for each series
+
+  // Update dynamic overlay data with current W/L and zoom
+  const updateDynamicOverlayData = useCallback(() => {
+    const stackViewport = viewportRef.current;
+    if (!stackViewport) return;
+
+    try {
+      // Get current window/level settings
+      const properties = stackViewport.getProperties();
+      const voiRange = properties?.voiRange;
+      
+      if (voiRange) {
+        const windowWidth = voiRange.upper - voiRange.lower;
+        const windowCenter = (voiRange.upper + voiRange.lower) / 2;
+        
+        setDynamicOverlayData(prev => ({
+          ...prev,
+          windowLevel: { windowWidth, windowCenter }
+        }));
+      } else {
+        // Try fallback approach
+        try {
+          const imageData = stackViewport.getImageData();
+          if (imageData) {
+            const windowWidth = imageData.windowWidth || 400;
+            const windowCenter = imageData.windowCenter || 200;
+            
+            setDynamicOverlayData(prev => ({
+              ...prev,
+              windowLevel: { windowWidth, windowCenter }
+            }));
+          }
+        } catch (fallbackError) {
+          // Ignore fallback errors
+        }
+      }
+      
+      // Get zoom percentage
+      try {
+        const camera = stackViewport.getCamera();
+        if (camera && camera.parallelScale) {
+          const defaultScale = 300; // Approximate default scale for fit-to-window
+          const currentScale = camera.parallelScale;
+          const zoomPercentage = Math.round((defaultScale / currentScale) * 100);
+          
+          setDynamicOverlayData(prev => ({
+            ...prev,
+            zoomPercentage: Math.max(1, Math.min(1000, zoomPercentage))
+          }));
+        }
+      } catch (zoomError) {
+        // If zoom fails, try to get aspect ratio as fallback
+        try {
+          const image = stackViewport.getImageData();
+          if (image && image.dimensions) {
+            const width = image.dimensions[0];
+            const height = image.dimensions[1];
+            
+            setDynamicOverlayData(prev => ({
+              ...prev,
+              aspectRatio: { width, height }
+            }));
+          }
+        } catch (imageError) {
+          // Ignore image data errors
+        }
+      }
+    } catch (error) {
+      // Ignore overlay update errors
+    }
+  }, []);
   const [seriesLoadingProgress, setSeriesLoadingProgressRaw] = useState<Record<string, {loaded: number, total: number}>>({});
   const setSeriesLoadingProgress = createDebugSetter('seriesLoadingProgress', setSeriesLoadingProgressRaw);
   
@@ -1204,75 +1283,6 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({
   }, []);
 
   // Update dynamic overlay data with current W/L and zoom
-  const updateDynamicOverlayData = useCallback(() => {
-    const stackViewport = viewportRef.current;
-    if (!stackViewport) return;
-
-    try {
-      // Get current window/level settings
-      const properties = stackViewport.getProperties();
-      const voiRange = properties?.voiRange;
-      
-      if (voiRange) {
-        const windowWidth = voiRange.upper - voiRange.lower;
-        const windowCenter = (voiRange.upper + voiRange.lower) / 2;
-        
-        setDynamicOverlayData(prev => ({
-          ...prev,
-          windowLevel: { windowWidth, windowCenter }
-        }));
-      } else {
-        // Try fallback approach
-        try {
-          const imageData = stackViewport.getImageData();
-          if (imageData) {
-            const windowWidth = imageData.windowWidth || 400;
-            const windowCenter = imageData.windowCenter || 200;
-            
-            setDynamicOverlayData(prev => ({
-              ...prev,
-              windowLevel: { windowWidth, windowCenter }
-            }));
-          }
-        } catch (fallbackError) {
-          // Ignore fallback errors
-        }
-      }
-      
-      // Get zoom percentage
-      try {
-        const camera = stackViewport.getCamera();
-        if (camera && camera.parallelScale) {
-          const defaultScale = 300; // Approximate default scale for fit-to-window
-          const currentScale = camera.parallelScale;
-          const zoomPercentage = Math.round((defaultScale / currentScale) * 100);
-          
-          setDynamicOverlayData(prev => ({
-            ...prev,
-            zoomPercentage: Math.max(1, Math.min(1000, zoomPercentage))
-          }));
-        }
-      } catch (zoomError) {
-        // If zoom fails, try to get aspect ratio as fallback
-        try {
-          const image = stackViewport.getImageData();
-          if (image && image.dimensions) {
-            const width = image.dimensions[0];
-            const height = image.dimensions[1];
-            
-            setDynamicOverlayData(prev => ({
-              ...prev,
-              aspectRatio: { width, height }
-            }));
-          }
-        } catch (imageError) {
-          // Ignore image data errors
-        }
-      }
-    } catch (error) {
-      // Ignore overlay update errors
-    }
-  }, []);
 
   // Helper function to handle DICOM loading errors, especially buffer overruns
   const handleDicomError = useCallback((error: any, imageId: string, retryCallback?: () => Promise<void>) => {
@@ -1519,6 +1529,10 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({
           tg.addTool(LengthTool.toolName);
           tg.addTool(RectangleROITool.toolName);
           tg.addTool(EllipticalROITool.toolName);
+          tg.addTool(ArrowAnnotateTool.toolName);
+          tg.addTool(CobbAngleTool.toolName);
+          tg.addTool(ProbeTool.toolName);
+          tg.addTool(AngleTool.toolName);
           tg.addTool(StackScrollTool.toolName);
         } catch (toolError) {
           throw new Error(`Tool group setup failed: ${toolError.message}`);
@@ -1720,6 +1734,10 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({
       toolGroup.setToolPassive(LengthTool.toolName);
       toolGroup.setToolPassive(RectangleROITool.toolName);
       toolGroup.setToolPassive(EllipticalROITool.toolName);
+      toolGroup.setToolPassive(ArrowAnnotateTool.toolName);
+      toolGroup.setToolPassive(CobbAngleTool.toolName);
+      toolGroup.setToolPassive(ProbeTool.toolName);
+      toolGroup.setToolPassive(AngleTool.toolName);
       
       // Activate selected tool
       switch (tool) {
@@ -1750,6 +1768,26 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({
           break;
         case 'ellipse':
           toolGroup.setToolActive(EllipticalROITool.toolName, {
+            bindings: [{ mouseButton: MouseBindings.Primary }],
+          });
+          break;
+        case 'arrow':
+          toolGroup.setToolActive(ArrowAnnotateTool.toolName, {
+            bindings: [{ mouseButton: MouseBindings.Primary }],
+          });
+          break;
+        case 'cobb':
+          toolGroup.setToolActive(CobbAngleTool.toolName, {
+            bindings: [{ mouseButton: MouseBindings.Primary }],
+          });
+          break;
+        case 'probe':
+          toolGroup.setToolActive(ProbeTool.toolName, {
+            bindings: [{ mouseButton: MouseBindings.Primary }],
+          });
+          break;
+        case 'angle':
+          toolGroup.setToolActive(AngleTool.toolName, {
             bindings: [{ mouseButton: MouseBindings.Primary }],
           });
           break;
@@ -2370,6 +2408,46 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({
               title="Rectangle ROI"
             >
               <Square className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={activeTool === 'ellipse' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setToolActive('ellipse')}
+              title="Elliptical ROI"
+            >
+              <Circle className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={activeTool === 'arrow' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setToolActive('arrow')}
+              title="Arrow Annotation"
+            >
+              <ArrowUpRight className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={activeTool === 'angle' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setToolActive('angle')}
+              title="Angle Measurement"
+            >
+              <Triangle className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={activeTool === 'cobb' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setToolActive('cobb')}
+              title="Cobb Angle"
+            >
+              <Triangle className="h-4 w-4 rotate-45" />
+            </Button>
+            <Button
+              variant={activeTool === 'probe' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setToolActive('probe')}
+              title="Probe Tool"
+            >
+              <Crosshair className="h-4 w-4" />
             </Button>
             <div className="w-px h-6 bg-border mx-1" />
             <Button
