@@ -37,7 +37,7 @@ export class ToastService {
     const toast = document.createElement('div');
     
     // Base styles
-    let baseClasses = 'max-w-md w-96 bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden';
+    const baseClasses = 'max-w-md w-96 bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden';
     
     // Type-specific styles
     let typeClasses = '';

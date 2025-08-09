@@ -19,154 +19,6 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import dynamic from 'next/dynamic';
 
-// Global Cornerstone initialization state
-let cornerstoneInitialized = false;
-
-// Initialize Cornerstone.js once globally 
-const initializeCornerstone = async () => {
-  if (cornerstoneInitialized) return;
-
-  try {
-    // Import required modules
-    const [
-      { init: coreInit },
-      { init: dicomImageLoaderInit },
-      cornerstoneDICOMImageLoader
-    ] = await Promise.all([
-      import('@cornerstonejs/core'),
-      import('@cornerstonejs/dicom-image-loader'),
-      import('@cornerstonejs/dicom-image-loader')
-    ]);
-
-    // Initialize Cornerstone core
-    await coreInit();
-    
-    // Initialize DICOM image loader
-    await dicomImageLoaderInit();
-
-    // Configure authentication for all DICOM requests
-    cornerstoneDICOMImageLoader.configure({
-      beforeSend: function(xhr) {
-        // Add JWT Bearer token to all DICOM image requests
-        const token = AuthService.getAccessToken();
-        if (token) {
-          xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-        }
-      }
-    });
-
-    cornerstoneInitialized = true;
-    console.log('Cornerstone.js initialized with authentication');
-  } catch (error) {
-    console.error('Failed to initialize Cornerstone:', error);
-    throw error;
-  }
-};
-
-// DICOM Thumbnail component using Cornerstone.js for proper DICOM rendering
-const DicomThumbnail: React.FC<{
-  imageId: string;
-  alt: string;
-  fallback: string;
-}> = ({ imageId, alt, fallback }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-
-  useEffect(() => {
-    if (!imageId || !canvasRef.current) return;
-
-    const loadDicomThumbnail = async () => {
-      try {
-        setLoading(true);
-        setError(false);
-
-        // Ensure Cornerstone is initialized
-        await initializeCornerstone();
-
-        // Import Cornerstone.js 
-        const cornerstone = await import('@cornerstonejs/core');
-        
-        // Load the DICOM image using Cornerstone
-        const image = await cornerstone.imageLoader.loadAndCacheImage(imageId);
-        
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-
-        // Set canvas size
-        canvas.width = 128; // Thumbnail size
-        canvas.height = 128;
-        
-        const context = canvas.getContext('2d');
-        if (!context) return;
-
-        // Create a temporary canvas for the full image
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = image.width;
-        tempCanvas.height = image.height;
-        const tempContext = tempCanvas.getContext('2d');
-        if (!tempContext) return;
-
-        // Get pixel data and convert to ImageData
-        const pixelData = image.getPixelData();
-        const imageData = tempContext.createImageData(image.width, image.height);
-        
-        // Convert DICOM pixel data to RGBA
-        for (let i = 0; i < pixelData.length; i++) {
-          const pixelValue = pixelData[i];
-          // Apply window/level for proper display
-          let normalizedValue = (pixelValue - image.intercept) * image.slope;
-          normalizedValue = Math.max(0, Math.min(255, normalizedValue));
-          
-          const index = i * 4;
-          imageData.data[index] = normalizedValue;     // R
-          imageData.data[index + 1] = normalizedValue; // G
-          imageData.data[index + 2] = normalizedValue; // B
-          imageData.data[index + 3] = 255;             // A
-        }
-
-        // Draw to temp canvas
-        tempContext.putImageData(imageData, 0, 0);
-
-        // Scale down to thumbnail size
-        context.drawImage(tempCanvas, 0, 0, image.width, image.height, 0, 0, 128, 128);
-        
-        setLoading(false);
-      } catch (err) {
-        console.error('Failed to load DICOM thumbnail:', err);
-        setError(true);
-        setLoading(false);
-      }
-    };
-
-    loadDicomThumbnail();
-  }, [imageId]);
-
-  if (loading) {
-    return (
-      <div className="w-full h-full flex items-center justify-center">
-        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400"></div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="w-full h-full flex items-center justify-center">
-        <span className="text-gray-400 text-xs">{fallback}</span>
-      </div>
-    );
-  }
-
-  return (
-    <canvas 
-      ref={canvasRef}
-      className="w-full h-full object-cover"
-      style={{ maxWidth: '100%', maxHeight: '100%' }}
-    />
-  );
-};
-
 const SimpleDicomViewer = dynamic(() => import('@/components/SimpleDicomViewer'), {
   ssr: false,
   loading: () => (
@@ -267,6 +119,22 @@ const ComparisonViewDicomViewer = dynamic(() => import('@/components/ComparisonV
   ),
 });
 
+const OHIFMultiViewport = dynamic(() => import('@/components/OHIFMultiViewport'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-full">
+      <Card className="w-96">
+        <CardHeader>
+          <CardTitle>Loading OHIF Multi-Viewport...</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="text-center mt-2">Initializing OHIF-style viewer</p>
+        </CardContent>
+      </Card>
+    </div>
+  ),
+});
 
 
 interface StudyMetadata {
@@ -304,8 +172,7 @@ export default function LegacyStudyViewerPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
-  const [isPanelCollapsed, setIsPanelCollapsed] = useState(true); // Right panel starts collapsed
-  const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] = useState(false); // Left sidebar starts expanded
+  const [isPanelCollapsed, setIsPanelCollapsed] = useState(true);
   const [isFullWindow, setIsFullWindow] = useState(false);
   const [isImportedToRis, setIsImportedToRis] = useState(false);
   const [risStudyId, setRisStudyId] = useState<number | null>(null);
@@ -319,16 +186,92 @@ export default function LegacyStudyViewerPage() {
   const [reportLoading, setReportLoading] = useState(false);
   const [reportFunctions, setReportFunctions] = useState<any>(null);
   const [showOverlay, setShowOverlay] = useState(true);
-  const [viewMode, setViewMode] = useState<'single' | 'comparison'>('single');
+  const [viewMode, setViewMode] = useState<'single' | 'comparison' | 'multiview'>('single');
   const [layoutHover, setLayoutHover] = useState<{cols: number, rows: number} | null>(null);
   const [currentLayout, setCurrentLayout] = useState<{cols: number, rows: number}>({cols: 1, rows: 1});
-  
-  // Debug layout changes
-  useEffect(() => {
-    console.log('page.tsx currentLayout changed:', currentLayout);
-  }, [currentLayout]);
+  const [activeViewportIndex, setActiveViewportIndex] = useState<number>(0);
+  const [viewportContent, setViewportContent] = useState<{[key: number]: {imageIds: string[], currentImageIndex: number}}>({});
+  const [sidebarCollapsedByMultiViewport, setSidebarCollapsedByMultiViewport] = useState(false);
 
-  // Multi-viewport functionality is handled by SimpleDicomViewer and ProjectionDicomViewer components
+  // Initialize viewport content when imageIds are loaded
+  useEffect(() => {
+    if (imageIds && imageIds.length > 0 && Object.keys(viewportContent).length === 0) {
+      setViewportContent({
+        0: { imageIds: imageIds, currentImageIndex: 0 }
+      });
+    }
+  }, [imageIds, viewportContent]);
+
+  // Auto-collapse sidebar when entering multi-viewport mode
+  useEffect(() => {
+    const totalViewports = currentLayout.cols * currentLayout.rows;
+    const isMultiViewport = totalViewports > 1;
+    
+    if (isMultiViewport && !isPanelCollapsed) {
+      // Entering multi-viewport mode - collapse sidebar
+      setSidebarCollapsedByMultiViewport(true);
+      setIsPanelCollapsed(true);
+    } else if (!isMultiViewport && sidebarCollapsedByMultiViewport) {
+      // Exiting multi-viewport mode - restore sidebar if we collapsed it
+      setSidebarCollapsedByMultiViewport(false);
+      setIsPanelCollapsed(false);
+    }
+  }, [currentLayout, isPanelCollapsed, sidebarCollapsedByMultiViewport]);
+
+  // Function to load a specific image into the active viewport
+  const loadImageIntoActiveViewport = (imageIndex: number) => {
+    const currentViewportContent = viewportContent[activeViewportIndex];
+    if (currentViewportContent) {
+      setViewportContent(prev => ({
+        ...prev,
+        [activeViewportIndex]: {
+          ...currentViewportContent,
+          currentImageIndex: imageIndex
+        }
+      }));
+    } else {
+      // Initialize this viewport with the selected image
+      setViewportContent(prev => ({
+        ...prev,
+        [activeViewportIndex]: {
+          imageIds: imageIds,
+          currentImageIndex: imageIndex
+        }
+      }));
+    }
+  };
+
+  // Get current active viewport content
+  const getActiveViewportContent = () => {
+    const content = viewportContent[activeViewportIndex];
+    if (!content || !content.imageIds.length || !metadata) return null;
+    
+    const studyMetadata = {
+      patientName: metadata.PatientName || 'Unknown',
+      patientId: metadata.PatientID || 'Unknown',
+      studyDate: metadata.StudyDate || '',
+      studyDescription: metadata.StudyDescription || '',
+      modality: metadata.Modality || 'Unknown',
+      studyInstanceUID: studyUid,
+      // For DicomOverlay - PascalCase format
+      PatientName: metadata.PatientName,
+      PatientID: metadata.PatientID,
+      StudyDate: metadata.StudyDate,
+      StudyTime: metadata.StudyTime,
+      StudyDescription: metadata.StudyDescription,
+      Modality: metadata.Modality,
+      InstitutionName: metadata.InstitutionName,
+      Manufacturer: metadata.Manufacturer,
+      ManufacturerModelName: metadata.ManufacturerModelName,
+      OperatorsName: metadata.OperatorsName
+    };
+    
+    return {
+      imageIds: [content.imageIds[content.currentImageIndex]], // Single image for current viewport
+      studyMetadata,
+      currentImageIndex: content.currentImageIndex
+    };
+  };
 
   // Function to trigger report reload
   const handleReportUpdate = () => {
@@ -702,84 +645,247 @@ export default function LegacyStudyViewerPage() {
       <div className="fixed inset-0 bg-black z-50">
         {/* Full Window DICOM Viewer - Use absolute positioning for maximum space utilization */}
         <div className="absolute inset-0">
-          {(() => {
-            const renderViewer = (isFullWindow: boolean) => {
-              if (imageIds.length === 0) {
-                const textColor = isFullWindow ? "text-white" : "text-muted-foreground";
-                const bgColor = isFullWindow ? "" : "bg-background";
-                
+          {imageIds.length > 0 ? (() => {
+            // Determine which viewer to use based on modality
+            const modality = metadata.Modality || 'Unknown';
+            const isProjectionModality = ['CR', 'DR', 'XR', 'DX', 'RG', 'RF'].includes(modality);
+            
+            const studyMetadata = {
+              patientName: metadata.PatientName || 'Unknown',
+              patientId: metadata.PatientID || 'Unknown',
+              studyDate: metadata.StudyDate || '',
+              studyDescription: metadata.StudyDescription || '',
+              modality: metadata.Modality || 'Unknown',
+              studyInstanceUID: studyUid,
+              // For DicomOverlay - PascalCase format
+              PatientName: metadata.PatientName,
+              PatientID: metadata.PatientID,
+              StudyDate: metadata.StudyDate,
+              StudyTime: metadata.StudyTime,
+              StudyDescription: metadata.StudyDescription,
+              Modality: metadata.Modality,
+              InstitutionName: metadata.InstitutionName,
+              Manufacturer: metadata.Manufacturer,
+              ManufacturerModelName: metadata.ManufacturerModelName,
+              OperatorsName: metadata.OperatorsName
+            };
+
+            if (isProjectionModality) {
+              // Use ProjectionDicomViewer for X-ray studies (CR/DR/XR/etc)
+              const totalViewports = currentLayout.cols * currentLayout.rows;
+              console.log('X-RAY PATH - Layout:', currentLayout, 'Total viewports:', totalViewports, 'Should render multi:', totalViewports > 1);
+              
+              if (totalViewports === 1) {
+                console.log('X-RAY PATH - Rendering single viewport');
                 return (
-                  <div className={`h-full flex items-center justify-center ${bgColor}`}>
-                    <div className="text-center max-w-md">
-                      <Eye className={`mx-auto h-12 w-12 mb-4 ${textColor}`} />
-                      <h3 className="text-lg font-semibold mb-2">No Images Available</h3>
-                      <p className={isFullWindow ? "text-white" : "text-muted-foreground mb-4"}>
-                        This study contains no viewable images{isFullWindow ? "" : ". This may be due to:"}
-                      </p>
-                      {!isFullWindow && (
-                        <>
-                          <ul className="text-sm text-muted-foreground text-left space-y-1">
-                            <li>• PACS server storage configuration issues</li>
-                            <li>• DICOM files were deleted from storage</li>
-                            <li>• Network connectivity problems</li>
-                            <li>• Corrupted or invalid DICOM data</li>
-                            <li>• Orthanc database inconsistency</li>
-                          </ul>
-                          <p className="text-xs text-muted-foreground mt-4">
-                            Contact your system administrator if this problem persists.
-                          </p>
-                        </>
-                      )}
+                  <ProjectionDicomViewer 
+                    imageIds={imageIds}
+                    studyMetadata={studyMetadata}
+                    showOverlay={showOverlay}
+                    setShowOverlay={setShowOverlay}
+                    examinations={risExaminations}
+                    enhancedDicomData={enhancedDicomData}
+                    pacsServerId={pacsServerId}
+                    isFullWindow={isFullWindow}
+                  />
+                );
+              } else {
+                // Multi-viewport layout for X-ray studies  
+                console.log('X-RAY PATH - RENDERING MULTI-VIEWPORT with', totalViewports, 'viewports');
+                return (
+                  <div className="flex h-full">
+                    {/* Left Thumbnail Panel - Shared across all viewports */}
+                    <div className="w-48 bg-gray-900 border-r border-gray-700 flex flex-col">
+                      <div className="p-3 border-b border-gray-700">
+                        <h3 className="text-white text-sm font-medium">Images</h3>
+                        <div className="text-xs text-gray-400 mt-1">
+                          Active: Viewport {activeViewportIndex + 1}
+                        </div>
+                      </div>
+                      
+                      {/* Thumbnail list */}
+                      <div className="flex-1 overflow-y-auto">
+                        {imageIds.map((imageId, index) => (
+                          <div
+                            key={`thumb-${index}`}
+                            className={`p-3 border-b border-gray-800 cursor-pointer hover:bg-gray-800 transition-colors`}
+                            onClick={() => {
+                              loadImageIntoActiveViewport(index);
+                            }}
+                          >
+                            <div className="w-full aspect-square bg-gray-800 rounded mb-2 flex items-center justify-center overflow-hidden relative">
+                              {(() => {
+                                try {
+                                  // Extract instance ID from WADO URI format
+                                  const match = imageId.match(/\/api\/pacs\/instances\/([^\/]+)\/file/);
+                                  if (match && match[1]) {
+                                    const instanceId = match[1];
+                                    const params = pacsServerId ? `?pacs_server_id=${pacsServerId}` : '';
+                                    const previewUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/pacs/instances/${instanceId}/preview${params}`;
+                                    
+                                    return (
+                                      <>
+                                        <img 
+                                          src={previewUrl}
+                                          alt={`Image ${index + 1}`}
+                                          className="w-full h-full object-cover"
+                                          onError={(e) => {
+                                            const target = e.currentTarget as HTMLImageElement;
+                                            const parent = target.parentElement;
+                                            if (parent) {
+                                              target.style.display = 'none';
+                                              const fallback = parent.querySelector('.thumbnail-fallback') as HTMLElement;
+                                              if (fallback) fallback.style.display = 'flex';
+                                            }
+                                          }}
+                                        />
+                                        <div className="thumbnail-fallback absolute inset-0 items-center justify-center hidden">
+                                          <span className="text-gray-400 text-xs">#{index + 1}</span>
+                                        </div>
+                                      </>
+                                    );
+                                  }
+                                } catch (error) {
+                                  console.warn('Failed to extract instance ID from imageId:', imageId, error);
+                                }
+                                return <span className="text-gray-400 text-xs">#{index + 1}</span>;
+                              })()}
+                            </div>
+                            <div className="text-white text-xs">
+                              <div className="font-medium truncate">Image {index + 1}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Viewport Grid */}
+                    <div 
+                      className={`flex-1 grid gap-1 bg-black`}
+                      style={{ 
+                        gridTemplateColumns: `repeat(${currentLayout.cols}, 1fr)`,
+                        gridTemplateRows: `repeat(${currentLayout.rows}, 1fr)`
+                      }}
+                    >
+                      {Array.from({ length: totalViewports }, (_, index) => (
+                        <div 
+                          key={`xray-viewport-${index}`} 
+                          className={`bg-black border relative cursor-pointer transition-colors ${
+                            activeViewportIndex === index ? 'border-blue-400' : 'border-gray-700 hover:border-gray-500'
+                          }`}
+                          onClick={() => setActiveViewportIndex(index)}
+                        >
+                          {index === activeViewportIndex ? (
+                            // Only show ProjectionDicomViewer in active viewport
+                            (() => {
+                              const activeContent = getActiveViewportContent();
+                              return activeContent ? (
+                                <ProjectionDicomViewer 
+                                  key={`projection-viewer-${activeViewportIndex}-${activeContent.currentImageIndex}`}
+                                  imageIds={activeContent.imageIds}
+                                  studyMetadata={activeContent.studyMetadata}
+                                  showOverlay={showOverlay}
+                                  setShowOverlay={setShowOverlay}
+                                  examinations={risExaminations}
+                                  enhancedDicomData={enhancedDicomData}
+                                  pacsServerId={pacsServerId}
+                                  isFullWindow={false}
+                                  hideToolbar={false}
+                                />
+                              ) : (
+                                <div className="h-full w-full bg-gray-900 flex items-center justify-center">
+                                  <div className="text-center text-gray-400">
+                                    <div className="mb-2 text-lg">📋</div>
+                                    <div className="text-xs">Click thumbnail to load</div>
+                                  </div>
+                                </div>
+                              );
+                            })()
+                          ) : (
+                            // Inactive viewports show placeholder
+                            <div className="h-full w-full bg-gray-900 flex items-center justify-center">
+                              <div className="text-center text-gray-400">
+                                <div className="mb-2 text-lg">📋</div>
+                                <div className="text-xs">Viewport {index + 1}</div>
+                                <div className="text-xs opacity-60">Click to activate</div>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Viewport label */}
+                          <div className={`absolute top-2 left-2 text-white text-xs px-2 py-1 rounded z-10 ${
+                            activeViewportIndex === index ? 'bg-blue-600' : 'bg-black/50'
+                          }`}>
+                            {index + 1} {activeViewportIndex === index && '(Active)'}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 );
               }
-
-              // Determine which viewer to use based on modality
-              const modality = metadata.Modality || 'Unknown';
-              const isProjectionModality = ['CR', 'DR', 'XR', 'DX', 'RG', 'RF'].includes(modality);
+            } else {
+              // Use SimpleDicomViewer for stack-based studies (CT/MRI/USG/etc)  
+              const totalViewports = currentLayout.cols * currentLayout.rows;
+              console.log('PATH 1 - Layout:', currentLayout, 'Total viewports:', totalViewports, 'Should render multi:', totalViewports > 1);
               
-              const studyMetadata = {
-                patientName: metadata.PatientName || 'Unknown',
-                patientId: metadata.PatientID || 'Unknown',
-                studyDate: metadata.StudyDate || '',
-                studyDescription: metadata.StudyDescription || '',
-                modality: metadata.Modality || 'Unknown',
-                studyInstanceUID: studyUid,
-                // For DicomOverlay - PascalCase format
-                PatientName: metadata.PatientName,
-                PatientID: metadata.PatientID,
-                StudyDate: metadata.StudyDate,
-                StudyTime: metadata.StudyTime,
-                StudyDescription: metadata.StudyDescription,
-                Modality: metadata.Modality,
-                InstitutionName: metadata.InstitutionName,
-                Manufacturer: metadata.Manufacturer,
-                ManufacturerModelName: metadata.ManufacturerModelName,
-                OperatorsName: metadata.OperatorsName
-              };
-
-              // Single viewer component - handles all modes internally
-              const ViewerComponent = isProjectionModality ? ProjectionDicomViewer : SimpleDicomViewer;
-              const viewerProps = {
-                key: `layout-${currentLayout.cols}x${currentLayout.rows}`,
-                imageIds,
-                studyMetadata,
-                showOverlay,
-                setShowOverlay,
-                examinations: risExaminations,
-                enhancedDicomData,
-                pacsServerId,
-                isFullWindow,
-                currentLayout,
-                ...(isProjectionModality ? {} : { seriesInfo })
-              };
-
-              return <ViewerComponent {...viewerProps} />;
-            };
-
-            return renderViewer(true); // Full-window mode
-          })()}
+              if (totalViewports === 1) {
+                return (
+                  <SimpleDicomViewer 
+                    imageIds={imageIds}
+                    seriesInfo={seriesInfo}
+                    studyMetadata={studyMetadata}
+                    showOverlay={showOverlay}
+                    isFullWindow={isFullWindow}
+                    setShowOverlay={setShowOverlay}
+                    examinations={risExaminations}
+                    enhancedDicomData={enhancedDicomData}
+                    pacsServerId={pacsServerId}
+                  />
+                );
+              } else {
+                // Multi-viewport layout within current view
+                console.log('RENDERING MULTI-VIEWPORT with', totalViewports, 'viewports');
+                return (
+                  <div 
+                    className={`grid gap-1 h-full w-full bg-black`}
+                    style={{ 
+                      gridTemplateColumns: `repeat(${currentLayout.cols}, 1fr)`,
+                      gridTemplateRows: `repeat(${currentLayout.rows}, 1fr)`
+                    }}
+                  >
+                    {Array.from({ length: totalViewports }, (_, index) => (
+                      <div key={`viewport-${index}`} className="bg-black border border-gray-700 relative">
+                        <SimpleDicomViewer 
+                          imageIds={imageIds}
+                          seriesInfo={seriesInfo}
+                          studyMetadata={studyMetadata}
+                          showOverlay={showOverlay && index === 0} // Only show overlay on first viewport
+                          isFullWindow={isFullWindow}
+                          setShowOverlay={setShowOverlay}
+                          examinations={risExaminations}
+                          enhancedDicomData={enhancedDicomData}
+                          pacsServerId={pacsServerId}
+                        />
+                        {/* Viewport label */}
+                        <div className="absolute top-2 left-2 text-white text-xs bg-black/50 px-2 py-1 rounded">
+                          {index + 1}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              }
+            }
+          })() : (
+            <div className="h-full flex items-center justify-center">
+              <div className="text-center text-white">
+                <Eye className="mx-auto h-12 w-12 mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No Images Available</h3>
+                <p>This study contains no viewable images</p>
+              </div>
+            </div>
+          )}
           
           
           {/* Keyboard shortcuts hint */}
@@ -836,81 +942,276 @@ export default function LegacyStudyViewerPage() {
             initialStudyUID={studyUid}
             pacsServerId={pacsServerId}
           />
+        ) : viewMode === 'multiview' ? (
+          // OHIF Multi-Viewport Mode
+          <OHIFMultiViewport
+            initialStudyUID={studyUid}
+            pacsServerId={pacsServerId}
+          />
         ) : (
           // Single Viewer Mode
           <>
-            {/* Use the same rendering logic - create a helper function to avoid duplication */}
-            {(() => {
-              const renderViewer = (isFullWindow: boolean) => {
-                if (imageIds.length === 0) {
-                  return (
-                    <div className="h-full flex items-center justify-center bg-background">
-                      <div className="text-center max-w-md">
-                        <Eye className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                        <h3 className="text-lg font-semibold mb-2">No Images Available</h3>
-                        <p className="text-muted-foreground mb-4">
-                          This study contains no viewable images. This may be due to:
-                        </p>
-                        <ul className="text-sm text-muted-foreground text-left space-y-1">
-                          <li>• PACS server storage configuration issues</li>
-                          <li>• DICOM files were deleted from storage</li>
-                          <li>• Network connectivity problems</li>
-                          <li>• Corrupted or invalid DICOM data</li>
-                          <li>• Orthanc database inconsistency</li>
-                        </ul>
-                        <p className="text-xs text-muted-foreground mt-4">
-                          Contact your system administrator if this problem persists.
-                        </p>
+            {/* Debug info */}
+            <div className="absolute top-0 right-0 z-50 bg-red-500 text-white p-2 text-xs">
+              Layout: {currentLayout.cols}x{currentLayout.rows} = {currentLayout.cols * currentLayout.rows} viewports
+            </div>
+            
+            {imageIds.length > 0 ? (() => {
+            // Determine which viewer to use based on modality
+            const modality = metadata.Modality || 'Unknown';
+            const isProjectionModality = ['CR', 'DR', 'XR', 'DX', 'RG', 'RF'].includes(modality);
+            
+            const studyMetadata = {
+              patientName: metadata.PatientName || 'Unknown',
+              patientId: metadata.PatientID || 'Unknown',
+              studyDate: metadata.StudyDate || '',
+              studyDescription: metadata.StudyDescription || '',
+              modality: metadata.Modality || 'Unknown',
+              studyInstanceUID: studyUid,
+              // For DicomOverlay - PascalCase format
+              PatientName: metadata.PatientName,
+              PatientID: metadata.PatientID,
+              StudyDate: metadata.StudyDate,
+              StudyTime: metadata.StudyTime,
+              StudyDescription: metadata.StudyDescription,
+              Modality: metadata.Modality,
+              InstitutionName: metadata.InstitutionName,
+              Manufacturer: metadata.Manufacturer,
+              ManufacturerModelName: metadata.ManufacturerModelName,
+              OperatorsName: metadata.OperatorsName
+            };
+
+            if (isProjectionModality) {
+              // Use ProjectionDicomViewer for X-ray studies (CR/DR/XR/etc)
+              const totalViewports = currentLayout.cols * currentLayout.rows;
+              console.log('X-RAY PATH 2 - Layout:', currentLayout, 'Total viewports:', totalViewports, 'Should render multi:', totalViewports > 1);
+              
+              if (totalViewports === 1) {
+                console.log('X-RAY PATH 2 - Rendering single viewport');
+                return (
+                  <ProjectionDicomViewer 
+                    imageIds={imageIds}
+                    studyMetadata={studyMetadata}
+                    showOverlay={showOverlay}
+                    setShowOverlay={setShowOverlay}
+                    examinations={risExaminations}
+                    enhancedDicomData={enhancedDicomData}
+                    pacsServerId={pacsServerId}
+                  />
+                );
+              } else {
+                // Multi-viewport layout for X-ray studies - copy the working full-window logic
+                console.log('X-RAY PATH 2 - RENDERING MULTI-VIEWPORT with', totalViewports, 'viewports');
+                console.log('DEBUG: Available imageIds:', imageIds);
+                return (
+                  <div className="flex h-full">
+                    {/* Left Thumbnail Panel - Shared across all viewports */}
+                    <div className="w-48 bg-gray-900 border-r border-gray-700 flex flex-col">
+                      <div className="p-3 border-b border-gray-700">
+                        <h3 className="text-white text-sm font-medium">Images</h3>
+                        <div className="text-xs text-gray-400 mt-1">
+                          Active: Viewport {activeViewportIndex + 1}
+                        </div>
+                      </div>
+                      
+                      {/* Thumbnail list */}
+                      <div className="flex-1 overflow-y-auto">
+                        {imageIds.map((imageId, index) => (
+                          <div
+                            key={`thumb-${index}`}
+                            className={`p-3 border-b border-gray-800 cursor-pointer hover:bg-gray-800 transition-colors`}
+                            onClick={() => {
+                              loadImageIntoActiveViewport(index);
+                            }}
+                          >
+                            <div className="w-full aspect-square bg-gray-800 rounded mb-2 flex items-center justify-center overflow-hidden relative">
+                              {(() => {
+                                try {
+                                  // Extract instance ID from WADO URI format
+                                  const match = imageId.match(/\/api\/pacs\/instances\/([^\/]+)\/file/);
+                                  if (match && match[1]) {
+                                    const instanceId = match[1];
+                                    const params = pacsServerId ? `?pacs_server_id=${pacsServerId}` : '';
+                                    const previewUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/pacs/instances/${instanceId}/preview${params}`;
+                                    
+                                    return (
+                                      <>
+                                        <img 
+                                          src={previewUrl}
+                                          alt={`Image ${index + 1}`}
+                                          className="w-full h-full object-cover"
+                                          onError={(e) => {
+                                            const target = e.currentTarget as HTMLImageElement;
+                                            const parent = target.parentElement;
+                                            if (parent) {
+                                              target.style.display = 'none';
+                                              const fallback = parent.querySelector('.thumbnail-fallback') as HTMLElement;
+                                              if (fallback) fallback.style.display = 'flex';
+                                            }
+                                          }}
+                                        />
+                                        <div className="thumbnail-fallback absolute inset-0 items-center justify-center hidden">
+                                          <span className="text-gray-400 text-xs">#{index + 1}</span>
+                                        </div>
+                                      </>
+                                    );
+                                  }
+                                } catch (error) {
+                                  console.warn('Failed to extract instance ID from imageId:', imageId, error);
+                                }
+                                return <span className="text-gray-400 text-xs">#{index + 1}</span>;
+                              })()}
+                            </div>
+                            <div className="text-white text-xs">
+                              <div className="font-medium truncate">Image {index + 1}</div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                  );
-                }
 
-                // Determine which viewer to use based on modality
-                const modality = metadata.Modality || 'Unknown';
-                const isProjectionModality = ['CR', 'DR', 'XR', 'DX', 'RG', 'RF'].includes(modality);
-                
-                const studyMetadata = {
-                  patientName: metadata.PatientName || 'Unknown',
-                  patientId: metadata.PatientID || 'Unknown',
-                  studyDate: metadata.StudyDate || '',
-                  studyDescription: metadata.StudyDescription || '',
-                  modality: metadata.Modality || 'Unknown',
-                  studyInstanceUID: studyUid,
-                  // For DicomOverlay - PascalCase format
-                  PatientName: metadata.PatientName,
-                  PatientID: metadata.PatientID,
-                  StudyDate: metadata.StudyDate,
-                  StudyTime: metadata.StudyTime,
-                  StudyDescription: metadata.StudyDescription,
-                  Modality: metadata.Modality,
-                  InstitutionName: metadata.InstitutionName,
-                  Manufacturer: metadata.Manufacturer,
-                  ManufacturerModelName: metadata.ManufacturerModelName,
-                  OperatorsName: metadata.OperatorsName
-                };
-
-                // Single viewer component - handles all modes internally
-                const ViewerComponent = isProjectionModality ? ProjectionDicomViewer : SimpleDicomViewer;
-                const viewerProps = {
-                  key: `layout-${currentLayout.cols}x${currentLayout.rows}`,
-                  imageIds,
-                  studyMetadata,
-                  showOverlay,
-                  setShowOverlay,
-                  examinations: risExaminations,
-                  enhancedDicomData,
-                  pacsServerId,
-                  isFullWindow,
-                  currentLayout,
-                  ...(isProjectionModality ? {} : { seriesInfo })
-                };
-
-                return <ViewerComponent {...viewerProps} />;
-              };
-
-              return renderViewer(false); // Regular windowed mode
-            })()}
+                    {/* Viewport Grid - using exact same logic as working full-window mode */}
+                    <div 
+                      className={`flex-1 grid gap-1 bg-black`}
+                      style={{ 
+                        gridTemplateColumns: `repeat(${currentLayout.cols}, 1fr)`,
+                        gridTemplateRows: `repeat(${currentLayout.rows}, 1fr)`
+                      }}
+                    >
+                      {Array.from({ length: totalViewports }, (_, index) => (
+                        <div 
+                          key={`xray-viewport-${index}`} 
+                          className={`bg-black border relative cursor-pointer transition-colors ${
+                            activeViewportIndex === index ? 'border-blue-400' : 'border-gray-700 hover:border-gray-500'
+                          }`}
+                          onClick={() => setActiveViewportIndex(index)}
+                        >
+                          {(() => {
+                            // Each viewport shows a different image from the imageIds array
+                            const viewportImageIndex = index % imageIds.length;
+                            const viewportImageIds = [imageIds[viewportImageIndex]];
+                            
+                            if (viewportImageIds[0]) {
+                              console.log(`DEBUG: Viewport ${index + 1} showing image ${viewportImageIndex + 1}:`, viewportImageIds[0]);
+                              return (
+                                <ProjectionDicomViewer 
+                                  key={`projection-viewer-${index}-${viewportImageIndex}`}
+                                  imageIds={viewportImageIds}
+                                  studyMetadata={{
+                                    patientName: metadata.PatientName || 'Unknown',
+                                    patientId: metadata.PatientID || 'Unknown',
+                                    studyDate: metadata.StudyDate || '',
+                                    studyDescription: metadata.StudyDescription || '',
+                                    modality: metadata.Modality || 'Unknown',
+                                    studyInstanceUID: studyUid
+                                  }}
+                                  showOverlay={showOverlay && index === activeViewportIndex}
+                                  setShowOverlay={setShowOverlay}
+                                  examinations={risExaminations}
+                                  enhancedDicomData={enhancedDicomData}
+                                  pacsServerId={pacsServerId}
+                                  isFullWindow={false}
+                                  hideToolbar={index !== activeViewportIndex}
+                                  viewportIdSuffix={`-multi-${index}`}
+                                />
+                              );
+                            } else {
+                              return (
+                                <div className="h-full w-full bg-gray-900 flex items-center justify-center">
+                                  <div className="text-center text-gray-400">
+                                    <div className="mb-2 text-lg">📋</div>
+                                    <div className="text-xs">Viewport {index + 1}</div>
+                                    <div className="text-xs opacity-60">No image</div>
+                                  </div>
+                                </div>
+                              );
+                            }
+                          })()}
+                          
+                          {/* Viewport label */}
+                          <div className={`absolute top-2 left-2 text-white text-xs px-2 py-1 rounded z-10 ${
+                            activeViewportIndex === index ? 'bg-blue-600' : 'bg-black/50'
+                          }`}>
+                            {index + 1} {activeViewportIndex === index && '(Active)'}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              }
+            } else {
+              // Use SimpleDicomViewer for stack-based studies (CT/MRI/USG/etc)  
+              const totalViewports = currentLayout.cols * currentLayout.rows;
+              console.log('PATH 1 - Layout:', currentLayout, 'Total viewports:', totalViewports, 'Should render multi:', totalViewports > 1);
+              
+              if (totalViewports === 1) {
+                return (
+                  <SimpleDicomViewer 
+                    imageIds={imageIds}
+                    seriesInfo={seriesInfo}
+                    studyMetadata={studyMetadata}
+                    showOverlay={showOverlay}
+                    setShowOverlay={setShowOverlay}
+                    examinations={risExaminations}
+                    enhancedDicomData={enhancedDicomData}
+                    pacsServerId={pacsServerId}
+                  />
+                );
+              } else {
+                // Multi-viewport layout within current view
+                console.log('RENDERING MULTI-VIEWPORT with', totalViewports, 'viewports');
+                return (
+                  <div 
+                    className={`grid gap-1 h-full w-full bg-black`}
+                    style={{ 
+                      gridTemplateColumns: `repeat(${currentLayout.cols}, 1fr)`,
+                      gridTemplateRows: `repeat(${currentLayout.rows}, 1fr)`
+                    }}
+                  >
+                    {Array.from({ length: totalViewports }, (_, index) => (
+                      <div key={`viewport-${index}`} className="bg-black border border-gray-700 relative">
+                        <SimpleDicomViewer 
+                          imageIds={imageIds}
+                          seriesInfo={seriesInfo}
+                          studyMetadata={studyMetadata}
+                          showOverlay={showOverlay && index === 0} // Only show overlay on first viewport
+                          setShowOverlay={setShowOverlay}
+                          examinations={risExaminations}
+                          enhancedDicomData={enhancedDicomData}
+                          pacsServerId={pacsServerId}
+                        />
+                        {/* Viewport label */}
+                        <div className="absolute top-2 left-2 text-white text-xs bg-black/50 px-2 py-1 rounded">
+                          {index + 1}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              }
+            }
+          })() : (
+            <div className="h-full flex items-center justify-center bg-background">
+              <div className="text-center max-w-md">
+                <Eye className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No Images Available</h3>
+                <p className="text-muted-foreground mb-4">
+                  This study contains no viewable images. This may be due to:
+                </p>
+                <ul className="text-sm text-muted-foreground text-left space-y-1">
+                  <li>• PACS server storage configuration issues</li>
+                  <li>• DICOM files were deleted from storage</li>
+                  <li>• Network connectivity problems</li>
+                  <li>• Corrupted or invalid DICOM data</li>
+                  <li>• Orthanc database inconsistency</li>
+                </ul>
+                <p className="text-xs text-muted-foreground mt-4">
+                  Contact your system administrator if this problem persists.
+                </p>
+              </div>
+            </div>
+          )}
           </>
         )}
         
@@ -959,12 +1260,11 @@ export default function LegacyStudyViewerPage() {
                       onMouseEnter={() => {
                         setLayoutHover({ cols: col, rows: row });
                       }}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
+                      onClick={() => {
                         if (layoutHover) {
-                          console.log('Setting layout to:', layoutHover);
+                          console.log(`Applying ${layoutHover.cols}x${layoutHover.rows} layout to current viewport`);
                           setCurrentLayout({ cols: layoutHover.cols, rows: layoutHover.rows });
+                          console.log('Layout state set to:', { cols: layoutHover.cols, rows: layoutHover.rows });
                         }
                         setLayoutHover(null);
                       }}

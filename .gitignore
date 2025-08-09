@@ -67,3 +67,6 @@ ris-frontend/public/
 .env.test.local
 .env.production.local
 ris-frontend/.env.local
+
+
+temp/

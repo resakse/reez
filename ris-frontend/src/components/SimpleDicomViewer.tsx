@@ -269,6 +269,8 @@ interface SimpleDicomViewerProps {
   enhancedDicomData?: any[];
   isFullWindow?: boolean;
   hideToolbar?: boolean;
+  // Multi-viewport layout props
+  currentLayout?: {cols: number, rows: number};
 }
 
 type Tool = 'wwwc' | 'zoom' | 'pan' | 'length' | 'rectangle' | 'ellipse' | 'arrow' | 'cobb' | 'probe' | 'angle';
@@ -319,15 +321,22 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({
   examinations = [],
   enhancedDicomData = [],
   isFullWindow = false,
-  hideToolbar = false
+  hideToolbar = false,
+  currentLayout = {cols: 1, rows: 1}
 }) => {
   // Debug re-renders with detailed prop change tracking
   const renderCountRef = useRef(0);
-  const prevPropsRef = useRef({ imageIds: initialImageIds, seriesInfo, studyMetadata });
+  const prevPropsRef = useRef({ imageIds: initialImageIds, seriesInfo, studyMetadata, currentLayout });
   
   renderCountRef.current++;
-  const currentProps = { imageIds: initialImageIds, seriesInfo, studyMetadata };
+  const currentProps = { imageIds: initialImageIds, seriesInfo, studyMetadata, currentLayout };
   const prevProps = prevPropsRef.current;
+  
+  // Debug layout changes  
+  console.log('SimpleDicomViewer render - currentLayout:', currentLayout);
+  useEffect(() => {
+    console.log('SimpleDicomViewer layout useEffect:', currentLayout);
+  }, [currentLayout]);
   
   const propsChanged = {
     imageIds: JSON.stringify(prevProps.imageIds) !== JSON.stringify(currentProps.imageIds),
@@ -2313,16 +2322,17 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({
     <div className="w-full h-full flex flex-col bg-background">
       {/* Main Content - Full height */}
       <div className="flex-1 flex flex-col relative">
-        {/* Toolbar - Draggable and minimizable */}
-        <div 
-          ref={toolbarRef}
-          className="absolute z-10 bg-background/90 border rounded-lg shadow-lg transition-all duration-200"
-          style={{
-            left: toolbarPosition.x === 0 ? '50%' : `${toolbarPosition.x}px`,
-            top: `${toolbarPosition.y}px`,
-            transform: toolbarPosition.x === 0 ? 'translateX(-50%)' : 'none',
-            cursor: isDraggingRef.current ? 'grabbing' : 'grab'
-          }}
+        {/* Toolbar - Draggable and minimizable - Hidden when hideToolbar is true */}
+        {!hideToolbar && (
+          <div 
+            ref={toolbarRef}
+            className="absolute z-10 bg-background/90 border rounded-lg shadow-lg transition-all duration-200"
+            style={{
+              left: toolbarPosition.x === 0 ? '50%' : `${toolbarPosition.x}px`,
+              top: `${toolbarPosition.y}px`,
+              transform: toolbarPosition.x === 0 ? 'translateX(-50%)' : 'none',
+              cursor: isDraggingRef.current ? 'grabbing' : 'grab'
+            }}
           onMouseDown={(e) => {
             if (e.target === e.currentTarget || (e.target as Element).closest('.toolbar-handle')) {
               isDraggingRef.current = true;
@@ -2511,25 +2521,55 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({
             )}
           </div>
         </div>
-
-
+        )}
 
         {/* Main Viewport - Full size */}
         <div className="flex-1 relative flex">
-          {/* DICOM Viewport */}
-          <div
-            ref={mainViewportRef}
-            className="flex-1 bg-black"
-            style={{ 
-              minHeight: '400px',
-              position: 'relative',
-              overflow: 'hidden',
-              // Force the canvas to maintain aspect ratio
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
+          {currentLayout.cols * currentLayout.rows > 1 ? (
+            // Multi-viewport grid layout
+            <div className="flex-1 bg-black">
+              <div 
+                className={`grid gap-[1px] bg-gray-800 h-full p-[1px]`}
+                style={{
+                  gridTemplateColumns: `repeat(${currentLayout.cols}, 1fr)`,
+                  gridTemplateRows: `repeat(${currentLayout.rows}, 1fr)`
+                }}
+              >
+                {Array.from({ length: currentLayout.cols * currentLayout.rows }, (_, index) => (
+                  <div
+                    key={`viewport-${index}`}
+                    className="relative bg-black cursor-pointer transition-colors hover:ring-1 hover:ring-gray-500"
+                  >
+                    <div className="flex items-center justify-center h-full bg-gray-900">
+                      <div className="text-center text-gray-500">
+                        <div className="mb-2 text-lg">🖼️</div>
+                        <div className="text-xs">Viewport {index + 1}</div>
+                        <div className="text-xs opacity-60">Ready</div>
+                      </div>
+                    </div>
+                    
+                    <div className="absolute top-2 left-2 text-white text-xs px-2 py-1 rounded z-10 bg-black/50">
+                      {index + 1}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            // Single DICOM Viewport
+            <div
+              ref={mainViewportRef}
+              className="flex-1 bg-black"
+              style={{ 
+                minHeight: '400px',
+                position: 'relative',
+                overflow: 'hidden',
+                // Force the canvas to maintain aspect ratio
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
             {/* Loading Overlay - Only for initial viewport setup */}
             {showBlockingLoading && (
               <div className="absolute inset-0 flex items-center justify-center bg-background/80">
@@ -2671,94 +2711,95 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({
               zoomPercentage={dynamicOverlayData.zoomPercentage}
               mousePosition={dynamicOverlayData.mousePosition}
             />
-          </div>
-          
-          {/* Vertical Scrollbar for Series Navigation */}
-          {!showBlockingLoading && !showNoImages && imageIds.length > 1 && (
-            <div className="w-6 bg-muted/5 border-l flex flex-col">
-              {/* Series Image Counter */}
-              <div className="px-1 py-1 border-b bg-background/90 text-center">
-                <div className="text-xs font-medium text-muted-foreground">
-                  {currentImageIndex + 1}/{imageIds.length}
-                </div>
-              </div>
-              
-              {/* Vertical Scrollbar */}
-              <div className="flex-1 relative px-1 py-2">
-                <div 
-                  className="w-3 h-full bg-muted/30 rounded-sm relative mx-auto cursor-pointer"
-                  onClick={(e) => {
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    const clickY = e.clientY - rect.top;
-                    const percentage = clickY / rect.height;
-                    const newIndex = Math.floor(percentage * imageIds.length);
-                    const clampedIndex = Math.max(0, Math.min(newIndex, imageIds.length - 1));
-                    
-                    if (clampedIndex !== currentImageIndex && imageIds[clampedIndex]) {
-                      setCurrentImageIndex(clampedIndex);
-                      if (viewport) {
-                        viewport.setStack([imageIds[clampedIndex]], 0).then(() => {
-                          viewport.render();
-                        }).catch(() => {
-                          // Ignore navigation errors
-                        });
-                      }
-                    }
-                  }}
-                >
-                  {/* Scrollbar Thumb */}
-                  <div 
-                    className="absolute w-full bg-primary rounded-sm transition-all duration-200 hover:bg-primary/80 cursor-grab active:cursor-grabbing"
-                    style={{
-                      height: Math.max(16, (1 / imageIds.length) * 100) + '%',
-                      top: (currentImageIndex / Math.max(1, imageIds.length - 1)) * (100 - Math.max(16, (1 / imageIds.length) * 100)) + '%'
-                    }}
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      const scrollbarRect = e.currentTarget.parentElement!.getBoundingClientRect();
-                      const thumbHeight = e.currentTarget.offsetHeight;
-                      const trackHeight = scrollbarRect.height;
-                      const usableHeight = trackHeight - thumbHeight;
-                      
-                      // Calculate where on the thumb the user clicked
-                      const thumbRect = e.currentTarget.getBoundingClientRect();
-                      const clickOffsetY = e.clientY - thumbRect.top;
-                      
-                      const handleMouseMove = (moveEvent: MouseEvent) => {
-                        // Calculate new thumb position based on mouse position minus the click offset
-                        const mouseRelativeToTrack = moveEvent.clientY - scrollbarRect.top - clickOffsetY;
-                        const newThumbTop = Math.max(0, Math.min(mouseRelativeToTrack, usableHeight));
-                        
-                        // Convert thumb position to image index
-                        const percentage = usableHeight > 0 ? newThumbTop / usableHeight : 0;
-                        const newIndex = Math.round(percentage * (imageIds.length - 1));
-                        const clampedIndex = Math.max(0, Math.min(newIndex, imageIds.length - 1));
-                        
-                        if (clampedIndex !== currentImageIndex && imageIds[clampedIndex]) {
-                          setCurrentImageIndex(clampedIndex);
-                          if (viewport) {
-                            viewport.setStack([imageIds[clampedIndex]], 0).then(() => {
-                              viewport.render();
-                            }).catch(() => {
-                              // Ignore navigation errors
-                            });
-                          }
-                        }
-                      };
-                      
-                      const handleMouseUp = () => {
-                        document.removeEventListener('mousemove', handleMouseMove);
-                        document.removeEventListener('mouseup', handleMouseUp);
-                      };
-                      
-                      document.addEventListener('mousemove', handleMouseMove);
-                      document.addEventListener('mouseup', handleMouseUp);
-                    }}
-                  />
-                </div>
-              </div>
             </div>
           )}
+          
+          {/* Vertical Scrollbar for Series Navigation - Only for single viewport */}
+          {currentLayout.cols * currentLayout.rows === 1 && !showBlockingLoading && !showNoImages && imageIds.length > 1 && (
+            <div className="w-6 bg-muted/5 border-l flex flex-col">
+                {/* Series Image Counter */}
+                <div className="px-1 py-1 border-b bg-background/90 text-center">
+                  <div className="text-xs font-medium text-muted-foreground">
+                    {currentImageIndex + 1}/{imageIds.length}
+                  </div>
+                </div>
+                
+                {/* Vertical Scrollbar */}
+                <div className="flex-1 relative px-1 py-2">
+                  <div 
+                    className="w-3 h-full bg-muted/30 rounded-sm relative mx-auto cursor-pointer"
+                    onClick={(e) => {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const clickY = e.clientY - rect.top;
+                      const percentage = clickY / rect.height;
+                      const newIndex = Math.floor(percentage * imageIds.length);
+                      const clampedIndex = Math.max(0, Math.min(newIndex, imageIds.length - 1));
+                      
+                      if (clampedIndex !== currentImageIndex && imageIds[clampedIndex]) {
+                        setCurrentImageIndex(clampedIndex);
+                        if (viewport) {
+                          viewport.setStack([imageIds[clampedIndex]], 0).then(() => {
+                            viewport.render();
+                          }).catch(() => {
+                            // Ignore navigation errors
+                          });
+                        }
+                      }
+                    }}
+                  >
+                    {/* Scrollbar Thumb */}
+                    <div 
+                      className="absolute w-full bg-primary rounded-sm transition-all duration-200 hover:bg-primary/80 cursor-grab active:cursor-grabbing"
+                      style={{
+                        height: Math.max(16, (1 / imageIds.length) * 100) + '%',
+                        top: (currentImageIndex / Math.max(1, imageIds.length - 1)) * (100 - Math.max(16, (1 / imageIds.length) * 100)) + '%'
+                      }}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        const scrollbarRect = e.currentTarget.parentElement!.getBoundingClientRect();
+                        const thumbHeight = e.currentTarget.offsetHeight;
+                        const trackHeight = scrollbarRect.height;
+                        const usableHeight = trackHeight - thumbHeight;
+                        
+                        // Calculate where on the thumb the user clicked
+                        const thumbRect = e.currentTarget.getBoundingClientRect();
+                        const clickOffsetY = e.clientY - thumbRect.top;
+                        
+                        const handleMouseMove = (moveEvent: MouseEvent) => {
+                          // Calculate new thumb position based on mouse position minus the click offset
+                          const mouseRelativeToTrack = moveEvent.clientY - scrollbarRect.top - clickOffsetY;
+                          const newThumbTop = Math.max(0, Math.min(mouseRelativeToTrack, usableHeight));
+                          
+                          // Convert thumb position to image index
+                          const percentage = usableHeight > 0 ? newThumbTop / usableHeight : 0;
+                          const newIndex = Math.round(percentage * (imageIds.length - 1));
+                          const clampedIndex = Math.max(0, Math.min(newIndex, imageIds.length - 1));
+                          
+                          if (clampedIndex !== currentImageIndex && imageIds[clampedIndex]) {
+                            setCurrentImageIndex(clampedIndex);
+                            if (viewport) {
+                              viewport.setStack([imageIds[clampedIndex]], 0).then(() => {
+                                viewport.render();
+                              }).catch(() => {
+                                // Ignore navigation errors
+                              });
+                            }
+                          }
+                        };
+                        
+                        const handleMouseUp = () => {
+                          document.removeEventListener('mousemove', handleMouseMove);
+                          document.removeEventListener('mouseup', handleMouseUp);
+                        };
+                        
+                        document.addEventListener('mousemove', handleMouseMove);
+                        document.addEventListener('mouseup', handleMouseUp);
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
         </div>
 
         {/* Thumbnails Strip - Bottom */}
@@ -2809,7 +2850,7 @@ const SimpleDicomViewer: React.FC<SimpleDicomViewerProps> = ({
                     return seriesInfo.map((series, seriesIndex) => {
                       // Get representative image for this series  
                       const seriesKey = series.seriesInstanceUID || `series-${seriesIndex}`;
-                      let representativeImageId = representativeImages.current.get(seriesKey);
+                      const representativeImageId = representativeImages.current.get(seriesKey);
                       
                       
                       // If no representative image stored, create one by fetching the first instance of this series

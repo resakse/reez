@@ -17,6 +17,14 @@ export default function AppLayout({
   const router = useRouter();
   const pathname = usePathname();
 
+  // Make sidebar state available globally for PACS browser multi-viewport auto-collapse
+  useEffect(() => {
+    (window as any).__sidebarState = {
+      isCollapsed: isSidebarCollapsed,
+      setCollapsed: setIsSidebarCollapsed
+    };
+  }, [isSidebarCollapsed]);
+
   const toggleSidebar = () => {
     setIsSidebarCollapsed(!isSidebarCollapsed);
   };

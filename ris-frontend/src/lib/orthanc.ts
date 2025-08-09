@@ -85,20 +85,39 @@ function decodeDicomText(text: string): string {
  * This function uses the Django proxy API to avoid CORS issues.
  *
  * @param studyInstanceUID The DICOM Study Instance UID.
+ * @param pacsServerId Optional PACS server ID for multi-server setups.
+ * @param seriesInstanceUID Optional Series Instance UID to filter to specific series.
  * @returns A promise that resolves to study image data with imageIds and series information.
  */
-export async function getStudyImageIds(studyInstanceUID: string): Promise<StudyImageData> {
-  const requestKey = `image-ids-${studyInstanceUID}`;
+export async function getStudyImageIds(
+  studyInstanceUID: string, 
+  pacsServerId?: string | null, 
+  seriesInstanceUID?: string
+): Promise<StudyImageData> {
+  const requestKey = `image-ids-${studyInstanceUID}-${pacsServerId || 'primary'}-${seriesInstanceUID || 'all'}`;
   
   return throttleRequest(requestKey, async () => {
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       
+      // Build URL with optional parameters
+      let url = `${API_URL}/api/pacs/studies/${studyInstanceUID}/image-ids/`;
+      const params = new URLSearchParams();
+      
+      if (pacsServerId) {
+        params.append('pacs_server_id', pacsServerId);
+      }
+      if (seriesInstanceUID) {
+        params.append('series_instance_uid', seriesInstanceUID);
+      }
+      
+      if (params.toString()) {
+        url += `?${params.toString()}`;
+      }
+      
       // Fetching image IDs for study
       
-      const response = await AuthService.authenticatedFetch(
-        `${API_URL}/api/pacs/studies/${studyInstanceUID}/image-ids/`
-      );
+      const response = await AuthService.authenticatedFetch(url);
 
     if (!response.ok) {
       // API endpoint not available, returning empty data

@@ -236,6 +236,8 @@ interface ProjectionDicomViewerProps {
   isFullWindow?: boolean;
   hideToolbar?: boolean;
   viewportIdSuffix?: string; // Unique suffix for viewport IDs in multi-viewport mode
+  // Multi-viewport layout props
+  currentLayout?: {cols: number, rows: number};
 }
 
 type Tool = 'wwwc' | 'zoom' | 'pan' | 'length' | 'rectangle' | 'ellipse' | 'arrow' | 'cobb' | 'probe' | 'angle';
@@ -261,12 +263,20 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
   enhancedDicomData = [],
   isFullWindow = false,
   hideToolbar = false,
-  viewportIdSuffix = ''
+  viewportIdSuffix = '',
+  currentLayout = {cols: 1, rows: 1}
 }) => {
   const mainViewportRef = useRef<HTMLDivElement>(null);
   const renderingEngineRef = useRef<RenderingEngine | null>(null);
   const viewportRef = useRef<any>(null);
   const toolGroupRef = useRef<any>(null);
+  
+  // Multi-viewport state
+  const [activeViewportIndex, setActiveViewportIndex] = useState<number>(0);
+  const multiViewportRefs = useRef<Map<number, HTMLDivElement | null>>(new Map());
+  const multiViewports = useRef<Map<number, any>>(new Map());
+  const isMultiViewport = currentLayout.cols * currentLayout.rows > 1;
+  
   
   const [imageIds, setImageIds] = useState<string[]>(initialImageIds);
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
@@ -283,9 +293,17 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
     mousePosition?: { x: number; y: number; pixelValue?: number };
   }>({});
 
+  // Get active viewport helper
+  const getActiveViewport = useCallback(() => {
+    if (currentLayout.cols * currentLayout.rows > 1) {
+      return multiViewports.current.get(activeViewportIndex);
+    }
+    return viewportRef.current;
+  }, [activeViewportIndex, currentLayout]);
+
   // Update dynamic overlay data with current W/L and zoom
   const updateDynamicOverlayData = useCallback(() => {
-    const stackViewport = viewportRef.current;
+    const stackViewport = getActiveViewport();
     if (!stackViewport) {
       return;
     }
@@ -373,7 +391,7 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
     } catch (error) {
       // Continue without overlay updates
     }
-  }, []);
+  }, [getActiveViewport]);
 
   // Set up event listeners for real-time updates during user interactions
   React.useEffect(() => {
@@ -381,7 +399,7 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
     
     // Function to set up listeners once viewport is ready
     const setupEventListeners = () => {
-      const stackViewport = viewportRef.current;
+      const stackViewport = getActiveViewport();
       
       if (!stackViewport) {
         return false;
@@ -562,11 +580,12 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
 
   // Save/restore per-image settings
   const saveCurrentImageSettings = useCallback(() => {
-    if (!viewportRef.current) return;
+    const activeViewport = getActiveViewport();
+    if (!activeViewport) return;
     
     try {
-      const properties = viewportRef.current.getProperties();
-      const camera = viewportRef.current.getCamera();
+      const properties = activeViewport.getProperties();
+      const camera = activeViewport.getCamera();
       
       const settings: ImageSettings = {
         windowLevel: {
@@ -586,10 +605,11 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
     } catch (error) {
       // Ignore save errors
     }
-  }, [currentImageIndex, isInverted, isFlippedHorizontal]);
+  }, [currentImageIndex, isInverted, isFlippedHorizontal, getActiveViewport]);
   
   const restoreImageSettings = useCallback((imageIndex: number) => {
-    if (!viewportRef.current) return;
+    const activeViewport = getActiveViewport();
+    if (!activeViewport) return;
     
     const settings = imageSettingsRef.current.get(imageIndex);
     if (!settings) return;
@@ -597,11 +617,11 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
     try {
       // Restore window/level
       if (settings.windowLevel) {
-        const properties = viewportRef.current.getProperties();
+        const properties = activeViewport.getProperties();
         const lowerBound = settings.windowLevel.windowCenter - settings.windowLevel.windowWidth / 2;
         const upperBound = settings.windowLevel.windowCenter + settings.windowLevel.windowWidth / 2;
         
-        viewportRef.current.setProperties({
+        activeViewport.setProperties({
           ...properties,
           voiRange: { lower: lowerBound, upper: upperBound },
           invert: settings.isInverted
@@ -610,8 +630,8 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
       
       // Restore zoom and pan
       if (settings.zoom && settings.pan) {
-        const camera = viewportRef.current.getCamera();
-        viewportRef.current.setCamera({
+        const camera = activeViewport.getCamera();
+        activeViewport.setCamera({
           ...camera,
           parallelScale: settings.zoom,
           focalPoint: [settings.pan.x, settings.pan.y, camera.focalPoint[2]]
@@ -619,7 +639,7 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
       }
       
       // Restore flip state
-      const element = viewportRef.current.element;
+      const element = activeViewport.element;
       const canvas = element.querySelector('canvas');
       if (canvas) {
         canvas.style.transform = settings.isFlippedHorizontal ? 'scaleX(-1)' : 'scaleX(1)';
@@ -629,12 +649,12 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
       setIsInverted(settings.isInverted);
       setIsFlippedHorizontal(settings.isFlippedHorizontal);
       
-      viewportRef.current.render();
+      activeViewport.render();
       
     } catch (error) {
       // Ignore restore errors
     }
-  }, []);
+  }, [getActiveViewport]);
 
   // Safe render function
   const safeRender = useCallback((viewport: any) => {
@@ -702,6 +722,7 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
         const stackViewport = engine.getViewport(viewportId);
         viewportRef.current = stackViewport;
 
+        // Determine start index 
         const startIndex = Math.min(currentImageIndex, imageIds.length - 1);
         
         try {
@@ -871,6 +892,208 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
     };
   }, [imageIds]);
 
+  // Multi-viewport initialization
+  useEffect(() => {
+    const totalViewports = currentLayout.cols * currentLayout.rows;
+    
+    if (totalViewports <= 1 || !imageIds.length) return;
+    
+    let isMounted = true;
+    
+    const initMultiViewports = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Wait for all viewport elements to be ready
+        const waitForElements = async () => {
+          const maxRetries = 50;
+          for (let retry = 0; retry < maxRetries; retry++) {
+            if (!isMounted) {
+              console.log('Component unmounted while waiting for elements');
+              return false;
+            }
+            
+            let allReady = true;
+            for (let i = 0; i < totalViewports; i++) {
+              const element = multiViewportRefs.current.get(i);
+              if (!element || element.offsetParent === null) {
+                allReady = false;
+                break;
+              }
+            }
+            if (allReady) return true;
+            await new Promise(resolve => requestAnimationFrame(() => resolve(undefined)));
+          }
+          console.warn('Timed out waiting for viewport elements');
+          return false;
+        };
+        
+        const elementsReady = await waitForElements();
+        if (!elementsReady || !isMounted) {
+          console.log('Elements not ready or component unmounted');
+          return;
+        }
+        
+        await initializeCornerstone();
+        
+        
+        const renderingEngineId = `multiViewportEngine-${Date.now()}${viewportIdSuffix}`;
+        const engine = new RenderingEngine(renderingEngineId);
+        renderingEngineRef.current = engine;
+        
+        // Create viewport specs for setViewports
+        const viewportSpecs: any[] = [];
+        for (let i = 0; i < totalViewports; i++) {
+          const element = multiViewportRefs.current.get(i);
+          if (element && element.offsetParent !== null && isMounted) {
+            viewportSpecs.push({
+              viewportId: `multiViewport-${i}-${Date.now()}${viewportIdSuffix}`,
+              element: element,
+              type: ViewportType.STACK,
+            });
+          }
+        }
+        
+        if (!isMounted || viewportSpecs.length === 0) {
+          console.log('No valid viewport specs created:', { isMounted, specsLength: viewportSpecs.length });
+          return;
+        }
+        
+        // Enable all viewports at once
+        engine.setViewports(viewportSpecs);
+        
+        // Setup each viewport with the same image
+        const imageIndex = Math.min(currentImageIndex, imageIds.length - 1);
+        await preRegisterWadorsMetadata(imageIds, pacsServerId);
+        
+        for (let i = 0; i < viewportSpecs.length; i++) {
+          if (!isMounted) {
+            console.log(`Component unmounted during viewport ${i} setup`);
+            break;
+          }
+          
+          const spec = viewportSpecs[i];
+          try {
+            const viewport = engine.getViewport(spec.viewportId);
+            if (!viewport) {
+              console.warn(`Failed to get viewport ${i} with ID ${spec.viewportId}`);
+              continue;
+            }
+            
+            multiViewports.current.set(i, viewport);
+            
+            // Load same image to all viewports (no extra API calls)
+            await viewport.setStack([imageIds[imageIndex]], 0);
+            viewport.resetCamera();
+            viewport.render();
+            
+            // Apply canvas styling
+            const canvas = viewport.canvas;
+            if (canvas) {
+              canvas.style.objectFit = 'contain';
+              canvas.style.width = '100%';
+              canvas.style.height = '100%';
+            }
+          } catch (viewportError) {
+            console.warn(`Failed to setup viewport ${i}:`, viewportError);
+            // Don't break the loop, try to setup other viewports
+          }
+        }
+        
+        // Setup tools for multi-viewport
+        const toolGroupId = `multiViewportToolGroup-${Date.now()}${viewportIdSuffix}`;
+        
+        try {
+          ToolGroupManager.destroyToolGroup(toolGroupId);
+        } catch (e) {
+          // Tool group doesn't exist
+        }
+        
+        const tg = ToolGroupManager.createToolGroup(toolGroupId);
+        toolGroupRef.current = tg;
+        
+        // Add tools to group
+        tg.addTool(WindowLevelTool.toolName);
+        tg.addTool(ZoomTool.toolName);
+        tg.addTool(PanTool.toolName);
+        tg.addTool(LengthTool.toolName);
+        tg.addTool(RectangleROITool.toolName);
+        tg.addTool(EllipticalROITool.toolName);
+        tg.addTool(ArrowAnnotateTool.toolName);
+        tg.addTool(CobbAngleTool.toolName);
+        tg.addTool(ProbeTool.toolName);
+        tg.addTool(AngleTool.toolName);
+        
+        // Add all viewports to tool group
+        for (const spec of viewportSpecs) {
+          tg.addViewport(spec.viewportId, renderingEngineId);
+        }
+        
+        // Set default tools
+        tg.setToolActive(WindowLevelTool.toolName, {
+          bindings: [{ mouseButton: MouseBindings.Primary }],
+        });
+        tg.setToolActive(ZoomTool.toolName, {
+          bindings: [{ mouseButton: MouseBindings.Secondary }],
+        });
+        tg.setToolActive(PanTool.toolName, {
+          bindings: [{ mouseButton: MouseBindings.Auxiliary }],
+        });
+        
+        if (isMounted) {
+          setLoading(false);
+        }
+        
+      } catch (error) {
+        console.error('Multi-viewport initialization failed:', error);
+        if (isMounted) {
+          setError(error instanceof Error ? error.message : 'Failed to initialize multi-viewport');
+          setLoading(false);
+        }
+      }
+    };
+    
+    // Clean up previous single viewport if switching to multi-viewport
+    if (viewportRef.current && renderingEngineRef.current) {
+      try {
+        renderingEngineRef.current.destroy();
+        renderingEngineRef.current = null;
+        viewportRef.current = null;
+      } catch (e) {
+        // Ignore cleanup errors
+      }
+    }
+    
+    const timeoutId = setTimeout(() => {
+      initMultiViewports();
+    }, 100);
+    
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
+      
+      // Clean up multi-viewports
+      multiViewports.current.clear();
+      
+      if (renderingEngineRef.current) {
+        try {
+          renderingEngineRef.current.destroy();
+        } catch (e) {
+          // Ignore
+        }
+      }
+      
+      if (toolGroupRef.current) {
+        try {
+          ToolGroupManager.destroyToolGroup(toolGroupRef.current.id);
+        } catch (e) {
+          // Ignore
+        }
+      }
+    };
+  }, [currentLayout, imageIds, pacsServerId, currentImageIndex, viewportIdSuffix]);
+
   // Tool management
   const setToolActive = useCallback((tool: Tool) => {
     if (!toolGroupRef.current) return;
@@ -950,7 +1173,8 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
 
   // Navigation functions
   const goToImage = useCallback(async (index: number) => {
-    if (!viewportRef.current || index < 0 || index >= imageIds.length || index === currentImageIndex) {
+    const activeViewport = getActiveViewport();
+    if (!activeViewport || index < 0 || index >= imageIds.length || index === currentImageIndex) {
       return;
     }
 
@@ -959,7 +1183,7 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
       saveCurrentImageSettings();
       
       // Load the target image
-      await viewportRef.current.setStack([imageIds[index]], 0);
+      await activeViewport.setStack([imageIds[index]], 0);
       
       // Update current index
       setCurrentImageIndex(index);
@@ -969,7 +1193,7 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
       
       // Check photometric interpretation for the new image
       try {
-        const image = viewportRef.current.getCurrentImageData();
+        const image = activeViewport.getCurrentImageData();
         if (image && image.metadata) {
           const photometricInterpretation = image.metadata.PhotometricInterpretation;
           const shouldInvert = photometricInterpretation === 'MONOCHROME1';
@@ -977,12 +1201,12 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
           if (shouldInvert !== isInverted) {
             setIsInverted(shouldInvert);
             
-            const properties = viewportRef.current.getProperties();
-            viewportRef.current.setProperties({
+            const properties = activeViewport.getProperties();
+            activeViewport.setProperties({
               ...properties,
               invert: shouldInvert
             });
-            viewportRef.current.render();
+            activeViewport.render();
           }
         }
       } catch (photoError) {
@@ -992,7 +1216,7 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
     } catch (error) {
       // Ignore navigation errors
     }
-  }, [currentImageIndex, imageIds, saveCurrentImageSettings, restoreImageSettings, isInverted]);
+  }, [currentImageIndex, imageIds, saveCurrentImageSettings, restoreImageSettings, isInverted, getActiveViewport]);
 
   const nextImage = useCallback(() => {
     if (currentImageIndex < imageIds.length - 1) {
@@ -1006,18 +1230,20 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
     }
   }, [currentImageIndex, goToImage]);
 
+
   // Viewport manipulation functions
   const resetViewport = useCallback(() => {
-    if (viewportRef.current) {
-      viewportRef.current.resetCamera();
+    const activeViewport = getActiveViewport();
+    if (activeViewport) {
+      activeViewport.resetCamera();
       
-      const properties = viewportRef.current.getProperties();
-      viewportRef.current.setProperties({
+      const properties = activeViewport.getProperties();
+      activeViewport.setProperties({
         ...properties,
         invert: true
       });
       
-      const element = viewportRef.current.element;
+      const element = activeViewport.element;
       const canvas = element.querySelector('canvas');
       if (canvas) {
         canvas.style.transform = 'scaleX(1)';
@@ -1026,14 +1252,15 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
       setIsInverted(true);
       setIsFlippedHorizontal(false);
       
-      safeRender(viewportRef.current);
+      safeRender(activeViewport);
     }
-  }, [safeRender]);
+  }, [safeRender, getActiveViewport]);
 
   const rotateImage = useCallback((degrees: number) => {
-    if (viewportRef.current) {
+    const activeViewport = getActiveViewport();
+    if (activeViewport) {
       try {
-        const camera = viewportRef.current.getCamera();
+        const camera = activeViewport.getCamera();
         const currentRotation = camera.viewUp || [0, -1, 0];
         
         const angle = (degrees * Math.PI) / 180;
@@ -1046,24 +1273,25 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
           currentRotation[2]
         ];
         
-        viewportRef.current.setCamera({
+        activeViewport.setCamera({
           ...camera,
           viewUp: newViewUp
         });
-        safeRender(viewportRef.current);
+        safeRender(activeViewport);
       } catch (error) {
         // Ignore
       }
     }
-  }, [safeRender]);
+  }, [safeRender, getActiveViewport]);
 
   const flipHorizontal = useCallback(() => {
-    if (viewportRef.current) {
+    const activeViewport = getActiveViewport();
+    if (activeViewport) {
       try {
         const newHorizontalState = !isFlippedHorizontal;
         setIsFlippedHorizontal(newHorizontalState);
         
-        const element = viewportRef.current.element;
+        const element = activeViewport.element;
         const canvas = element.querySelector('canvas');
         if (canvas) {
           canvas.style.transform = newHorizontalState ? 'scaleX(-1)' : 'scaleX(1)';
@@ -1075,33 +1303,35 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
         // Ignore
       }
     }
-  }, [isFlippedHorizontal, saveCurrentImageSettings]);
+  }, [isFlippedHorizontal, saveCurrentImageSettings, getActiveViewport]);
 
   const invertImage = useCallback(() => {
-    if (viewportRef.current) {
+    const activeViewport = getActiveViewport();
+    if (activeViewport) {
       try {
         const newInvertState = !isInverted;
         setIsInverted(newInvertState);
         
-        const properties = viewportRef.current.getProperties();
-        viewportRef.current.setProperties({
+        const properties = activeViewport.getProperties();
+        activeViewport.setProperties({
           ...properties,
           invert: newInvertState
         });
         
-        safeRender(viewportRef.current);
+        safeRender(activeViewport);
         saveCurrentImageSettings();
         
       } catch (error) {
         // Ignore
       }
     }
-  }, [isInverted, safeRender, saveCurrentImageSettings]);
+  }, [isInverted, safeRender, saveCurrentImageSettings, getActiveViewport]);
 
   const clearAnnotations = useCallback(() => {
-    if (viewportRef.current) {
+    const activeViewport = getActiveViewport();
+    if (activeViewport) {
       try {
-        const frameOfReferenceUID = viewportRef.current.getFrameOfReferenceUID();
+        const frameOfReferenceUID = activeViewport.getFrameOfReferenceUID();
         
         annotation.state.removeAllAnnotations();
         
@@ -1109,7 +1339,7 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
           annotation.state.removeFrameOfReferenceAnnotations(frameOfReferenceUID);
         }
         
-        const element = viewportRef.current.element;
+        const element = activeViewport.element;
         if (element) {
           const svgLayer = element.querySelector('.cornerstone-svg-layer');
           if (svgLayer) {
@@ -1117,16 +1347,16 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
           }
         }
         
-        safeRender(viewportRef.current);
+        safeRender(activeViewport);
         
       } catch (error) {
         try {
-          const element = viewportRef.current.element;
+          const element = activeViewport.element;
           if (element) {
             const svgLayer = element.querySelector('.cornerstone-svg-layer');
             if (svgLayer) {
               svgLayer.innerHTML = '';
-              safeRender(viewportRef.current);
+              safeRender(activeViewport);
             }
           }
         } catch (fallbackError) {
@@ -1134,7 +1364,7 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
         }
       }
     }
-  }, [safeRender]);
+  }, [safeRender, getActiveViewport]);
 
   const toggleOverlayVisibility = useCallback(() => {
     if (setShowOverlay) {
@@ -1206,6 +1436,7 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
       </div>
     );
   }
+
 
   return (
     <div className="w-full h-full flex flex-col bg-background">
@@ -1396,18 +1627,74 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
       {/* Main Content */}
       <div className="flex-1 flex">
         {/* DICOM Viewport */}
-        <div
-          ref={mainViewportRef}
-          className="flex-1 bg-black"
-          style={{ 
-            minHeight: '400px',
-            position: 'relative',
-            overflow: 'hidden',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}
-        >
+        {currentLayout.cols * currentLayout.rows > 1 ? (
+          // Multi-viewport grid layout
+          <div className="flex-1 bg-black">
+            <div 
+              className={`grid gap-[1px] bg-gray-800 h-full p-[1px]`}
+              style={{
+                gridTemplateColumns: `repeat(${currentLayout.cols}, 1fr)`,
+                gridTemplateRows: `repeat(${currentLayout.rows}, 1fr)`
+              }}
+            >
+              {Array.from({ length: currentLayout.cols * currentLayout.rows }, (_, index) => (
+                <div
+                  key={`viewport-${index}`}
+                  ref={(el) => multiViewportRefs.current.set(index, el)}
+                  className={`relative bg-black cursor-pointer transition-all ${
+                    activeViewportIndex === index 
+                      ? 'ring-2 ring-blue-500 ring-inset' 
+                      : 'hover:ring-1 hover:ring-gray-500'
+                  }`}
+                  onClick={() => setActiveViewportIndex(index)}
+                  style={{ 
+                    minHeight: '200px',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  {loading && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-10">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                    </div>
+                  )}
+                  
+                  <div className="absolute top-2 left-2 text-white text-xs px-2 py-1 rounded z-20 bg-black/70">
+                    {index + 1}
+                  </div>
+                  
+                  {showOverlay && activeViewportIndex === index && (
+                    <DicomOverlay
+                      isVisible={true}
+                      studyMetadata={studyMetadata}
+                      examinations={examinations}
+                      enhancedDicomData={enhancedDicomData}
+                      windowLevel={dynamicOverlayData.windowLevel}
+                      zoomPercentage={dynamicOverlayData.zoomPercentage}
+                      mousePosition={dynamicOverlayData.mousePosition}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          // Single DICOM Viewport
+          <div
+            ref={mainViewportRef}
+            className="flex-1 bg-black"
+            style={{ 
+              minHeight: '400px',
+              position: 'relative',
+              overflow: 'hidden',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
           {/* Loading Overlay */}
           {loading && (
             <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
@@ -1435,7 +1722,8 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
             zoomPercentage={dynamicOverlayData.zoomPercentage}
             mousePosition={dynamicOverlayData.mousePosition}
           />
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Individual Image Thumbnails - Only show if multiple images */}
