@@ -678,9 +678,13 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
     }
   }, []);
 
-  // Initialize Cornerstone3D
+  // Initialize Cornerstone3D (single viewport only)
   useEffect(() => {
     if (initializationRef.current) return;
+    
+    // Skip single viewport initialization if we're in multiviewport mode
+    const totalViewports = currentLayout.cols * currentLayout.rows;
+    if (totalViewports > 1) return;
     
     if (!imageIds || imageIds.length === 0) {
       setLoading(false);
@@ -890,7 +894,7 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
         }
       }
     };
-  }, [imageIds]);
+  }, [imageIds, currentLayout]);
 
   // Multi-viewport initialization
   useEffect(() => {
@@ -1092,7 +1096,7 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
         }
       }
     };
-  }, [currentLayout, imageIds, pacsServerId, currentImageIndex, viewportIdSuffix]);
+  }, [currentLayout, imageIds, pacsServerId, viewportIdSuffix]);
 
   // Tool management
   const setToolActive = useCallback((tool: Tool) => {
