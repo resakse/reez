@@ -762,7 +762,6 @@ export default function LegacyStudyViewerPage() {
               // Single viewer component - handles all modes internally
               const ViewerComponent = isProjectionModality ? ProjectionDicomViewer : SimpleDicomViewer;
               const viewerProps = {
-                key: `layout-${currentLayout.cols}x${currentLayout.rows}`,
                 imageIds,
                 studyMetadata,
                 showOverlay,
@@ -775,7 +774,7 @@ export default function LegacyStudyViewerPage() {
                 ...(isProjectionModality ? {} : { seriesInfo })
               };
 
-              return <ViewerComponent {...viewerProps} />;
+              return <ViewerComponent key={`layout-${currentLayout.cols}x${currentLayout.rows}`} {...viewerProps} />;
             };
 
             return renderViewer(true); // Full-window mode
@@ -893,7 +892,6 @@ export default function LegacyStudyViewerPage() {
                 // Single viewer component - handles all modes internally
                 const ViewerComponent = isProjectionModality ? ProjectionDicomViewer : SimpleDicomViewer;
                 const viewerProps = {
-                  key: `layout-${currentLayout.cols}x${currentLayout.rows}`,
                   imageIds,
                   studyMetadata,
                   showOverlay,
@@ -906,7 +904,7 @@ export default function LegacyStudyViewerPage() {
                   ...(isProjectionModality ? {} : { seriesInfo })
                 };
 
-                return <ViewerComponent {...viewerProps} />;
+                return <ViewerComponent key={`layout-${currentLayout.cols}x${currentLayout.rows}`} {...viewerProps} />;
               };
 
               return renderViewer(false); // Regular windowed mode
