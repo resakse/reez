@@ -305,7 +305,6 @@ export default function LegacyStudyViewerPage() {
   const [error, setError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [isPanelCollapsed, setIsPanelCollapsed] = useState(true); // Right panel starts collapsed
-  const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] = useState(false); // Left sidebar starts expanded
   const [isFullWindow, setIsFullWindow] = useState(false);
   const [isImportedToRis, setIsImportedToRis] = useState(false);
   const [risStudyId, setRisStudyId] = useState<number | null>(null);
@@ -326,6 +325,20 @@ export default function LegacyStudyViewerPage() {
   // Debug layout changes
   useEffect(() => {
     console.log('page.tsx currentLayout changed:', currentLayout);
+  }, [currentLayout]);
+
+  // Auto-collapse LEFT sidebar when multiviewport is active
+  useEffect(() => {
+    const isMultiViewport = currentLayout.cols * currentLayout.rows > 1;
+    const sidebarState = (window as any).__sidebarState;
+    
+    if (sidebarState) {
+      if (isMultiViewport && !sidebarState.isCollapsed) {
+        sidebarState.setCollapsed(true);
+      } else if (!isMultiViewport && sidebarState.isCollapsed) {
+        sidebarState.setCollapsed(false);
+      }
+    }
   }, [currentLayout]);
 
   // Multi-viewport functionality is handled by SimpleDicomViewer and ProjectionDicomViewer components
