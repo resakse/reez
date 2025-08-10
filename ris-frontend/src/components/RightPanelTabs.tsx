@@ -178,11 +178,9 @@ export const RightPanelTabs: React.FC<RightPanelTabsProps> = ({
 }) => {
   const [internalActiveTab, setInternalActiveTab] = useState(activeTab);
   
-  // Use annotation hook to get real-time count
+  // Use annotation hook to get real-time count (no polling needed - using custom events)
   const { stats, loading: annotationLoading } = useAnnotations({ 
-    studyUid,
-    autoRefresh: true,
-    refreshInterval: 30000 // Refresh every 30 seconds
+    studyUid
   });
 
   // Determine which tab is currently active

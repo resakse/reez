@@ -272,8 +272,9 @@ export function useAnnotations(params: UseAnnotationsParams = {}): UseAnnotation
   /**
    * Filter annotations by user ID
    */
-  const getUserAnnotations = useCallback((userId: number): DicomAnnotation[] => {
-    return annotations.filter(annotation => annotation.user === userId);
+  const getUserAnnotations = useCallback((userId: number | string): DicomAnnotation[] => {
+    // Handle both string and number user IDs for comparison
+    return annotations.filter(annotation => annotation.user == userId); // Use == for type coercion
   }, [annotations]);
 
   /**

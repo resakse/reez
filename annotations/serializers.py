@@ -20,11 +20,11 @@ class DicomAnnotationSerializer(serializers.ModelSerializer):
             'sop_instance_uid', 'image_id', 'frame_number',
             'annotation_type', 'annotation_data', 'label', 'description',
             'measurement_value', 'measurement_unit', 'created_at', 'modified_at',
-            'user_full_name', 'user_username', 'can_delete', 'can_edit',
+            'user', 'user_full_name', 'user_username', 'can_delete', 'can_edit',
             'display_name', 'measurement_display'
         ]
         read_only_fields = [
-            'id', 'created_at', 'modified_at', 'user_full_name', 
+            'id', 'created_at', 'modified_at', 'user', 'user_full_name', 
             'user_username', 'can_delete', 'can_edit', 'display_name', 
             'measurement_display'
         ]
@@ -88,10 +88,10 @@ class DicomAnnotationListSerializer(serializers.ModelSerializer):
         model = DicomAnnotation
         fields = [
             'id', 'study_instance_uid', 'annotation_type', 'label', 'display_name',
-            'measurement_display', 'created_at', 'user_full_name', 'can_delete'
+            'measurement_display', 'created_at', 'user', 'user_full_name', 'can_delete'
         ]
         read_only_fields = [
-            'id', 'created_at', 'user_full_name', 'can_delete', 
+            'id', 'created_at', 'user', 'user_full_name', 'can_delete', 
             'display_name', 'measurement_display'
         ]
         

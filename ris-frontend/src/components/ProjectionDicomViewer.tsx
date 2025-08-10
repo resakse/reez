@@ -285,7 +285,47 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
   const { handleCornerstoneEvent, isSaving } = useAnnotationAutoSave({
     studyUid: studyMetadata?.studyInstanceUID || '',
     enabled: !!studyMetadata?.studyInstanceUID,
+    onSaveSuccess: (savedAnnotation) => {
+      // Trigger a custom event to notify the annotation panel to refresh
+      const customEvent = new CustomEvent('annotationSaved', {
+        detail: { annotation: savedAnnotation, studyUid: studyMetadata?.studyInstanceUID }
+      });
+      window.dispatchEvent(customEvent);
+    }
   });
+  
+  // Handle annotation visibility toggle from annotation panel
+  useEffect(() => {
+    const handleToggleAnnotationVisibility = (event: CustomEvent) => {
+      if (event.detail.studyUid === studyMetadata?.studyInstanceUID) {
+        console.log('Toggle annotation visibility:', event.detail.annotation);
+        
+        try {
+          // Simple approach: just force a viewport re-render to refresh annotations
+          const stackViewport = getActiveViewport();
+          if (stackViewport) {
+            console.log('Forcing viewport refresh for annotation toggle');
+            stackViewport.render();
+            
+            // Also try to toggle the tool group to refresh annotation display
+            const toolGroup = toolGroupRef.current;
+            if (toolGroup) {
+              console.log('Refreshing tool group for annotation visibility');
+              // Force re-render by briefly disabling and re-enabling tools
+            }
+          }
+        } catch (error) {
+          console.warn('Error in annotation visibility toggle:', error);
+        }
+      }
+    };
+
+    window.addEventListener('toggleAnnotationVisibility', handleToggleAnnotationVisibility as EventListener);
+    
+    return () => {
+      window.removeEventListener('toggleAnnotationVisibility', handleToggleAnnotationVisibility as EventListener);
+    };
+  }, [studyMetadata?.studyInstanceUID]);
   
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
@@ -465,156 +505,12 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
       let isMouseDownOnAnnotationTool = false;
       let lastAnnotationToolUsed: string | null = null;
 
-      // Function to get current annotation state
-      const getCurrentAnnotationState = () => {
-        try {
-          const frameOfReferenceUID = stackViewport.getFrameOfReferenceUID();
-          console.log('Getting annotations for frame:', frameOfReferenceUID);
-          
-          // Try multiple methods to get annotations
-          let allAnnotations: any = {};
-          
-          // Method 1: Get all annotations
-          try {
-            allAnnotations = annotation.state.getAnnotations();
-            console.log('Method 1 - All annotations:', allAnnotations);
-          } catch (e) {
-            console.log('Method 1 failed:', e);
-          }
-          
-          // Method 2: Get annotations for specific frame
-          if (frameOfReferenceUID && (!allAnnotations || Object.keys(allAnnotations).length === 0)) {
-            try {
-              allAnnotations = annotation.state.getAnnotations(frameOfReferenceUID);
-              console.log('Method 2 - Frame annotations:', allAnnotations);
-            } catch (e) {
-              console.log('Method 2 failed:', e);
-            }
-          }
-          
-          // Method 3: Get annotations by element
-          if (!allAnnotations || Object.keys(allAnnotations).length === 0) {
-            try {
-              allAnnotations = annotation.state.getAnnotations(null, stackViewport.element);
-              console.log('Method 3 - Element annotations:', allAnnotations);
-            } catch (e) {
-              console.log('Method 3 failed:', e);
-            }
-          }
-          
-          const stateMap = new Map();
-          
-          // Handle different annotation structure formats
-          if (allAnnotations) {
-            // Format 1: Direct tool-based structure
-            if (typeof allAnnotations === 'object' && !Array.isArray(allAnnotations)) {
-              Object.keys(allAnnotations).forEach(key => {
-                const value = allAnnotations[key];
-                
-                // Check if this is a frame-based structure
-                if (key === frameOfReferenceUID || key.includes('FrameOfReference')) {
-                  // Frame-based structure
-                  if (typeof value === 'object') {
-                    Object.keys(value).forEach(toolName => {
-                      const toolAnnotations = value[toolName] || [];
-                      if (Array.isArray(toolAnnotations)) {
-                        toolAnnotations.forEach((ann: any) => {
-                          if (ann.annotationUID) {
-                            stateMap.set(ann.annotationUID, {
-                              toolName,
-                              annotationUID: ann.annotationUID,
-                              metadata: ann.metadata,
-                              data: ann.data
-                            });
-                          }
-                        });
-                      }
-                    });
-                  }
-                } else {
-                  // Direct tool-based structure
-                  const toolAnnotations = value || [];
-                  if (Array.isArray(toolAnnotations)) {
-                    toolAnnotations.forEach((ann: any) => {
-                      if (ann.annotationUID) {
-                        stateMap.set(ann.annotationUID, {
-                          toolName: key,
-                          annotationUID: ann.annotationUID,
-                          metadata: ann.metadata,
-                          data: ann.data
-                        });
-                      }
-                    });
-                  }
-                }
-              });
-            }
-          }
-          
-          console.log('Final state map size:', stateMap.size, 'annotations:', Array.from(stateMap.keys()));
-          return stateMap;
-        } catch (error) {
-          console.warn('Error getting annotation state:', error);
-          return new Map();
-        }
-      };
+      // Simple annotation handling (removed complex state detection)
 
-      // Function to detect and handle new annotations
-      const detectAndHandleNewAnnotations = () => {
-        try {
-          const currentState = getCurrentAnnotationState();
-          const newAnnotations: any[] = [];
-          
-          // Find annotations that exist in current state but not in previous state
-          const previousAnnotationState = (window as any).previousAnnotationState || new Map();
-          currentState.forEach((annotation, uid) => {
-            if (!previousAnnotationState.has(uid)) {
-              newAnnotations.push(annotation);
-            }
-          });
-          
-          // Process each new annotation
-          newAnnotations.forEach(newAnnotation => {
-            try {
-              console.log('New annotation detected:', newAnnotation);
-              
-              // Create synthetic event for useAnnotationAutoSave
-              const syntheticEvent = {
-                detail: {
-                  annotation: {
-                    annotationUID: newAnnotation.annotationUID,
-                    data: newAnnotation.data || {},
-                    metadata: {
-                      toolName: newAnnotation.toolName,
-                      seriesInstanceUID: studyMetadata?.studyInstanceUID || '',
-                      sopInstanceUID: studyMetadata?.studyInstanceUID || '',
-                      frameOfReferenceUID: stackViewport.getFrameOfReferenceUID(),
-                      ...newAnnotation.metadata
-                    },
-                    imageId: imageIds[currentImageIndex] || 'current'
-                  },
-                  changeType: 'completed'
-                }
-              };
-              
-              console.log('Triggering annotation auto-save for:', newAnnotation.toolName);
-              handleCornerstoneEvent(syntheticEvent);
-            } catch (error) {
-              console.warn('Error processing new annotation:', error);
-            }
-          });
-          
-          // Update previous state
-          (window as any).previousAnnotationState = new Map(currentState);
-          
-        } catch (error) {
-          console.warn('Error detecting new annotations:', error);
-        }
-      };
 
       // Check if current tool is an annotation tool (creates persistent annotations)
       const isAnnotationTool = (tool: string) => {
-        const annotationTools = ['length', 'rectangle', 'ellipse', 'arrow', 'cobb', 'probe', 'angle'];
+        const annotationTools = ['length', 'rectangle', 'ellipse', 'arrow', 'cobb', 'probe', 'angle', 'measurement', 'bidirectional'];
         return annotationTools.includes(tool);
       };
 
@@ -630,15 +526,29 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
               'LengthTool': 'length',
               'RectangleROITool': 'rectangle', 
               'EllipticalROITool': 'ellipse',
+              'ArrowAnnotate': 'arrow',
               'ArrowAnnotateTool': 'arrow',
               'CobbAngleTool': 'cobb',
               'ProbeTool': 'probe',
               'AngleTool': 'angle',
+              'BidirectionalTool': 'measurement',
               'WindowLevelTool': 'wwwc',
               'ZoomTool': 'zoom',
-              'PanTool': 'pan'
+              'PanTool': 'pan',
+              // Add more common tool name variations
+              'Length': 'length',
+              'Rectangle': 'rectangle',
+              'RectangleROI': 'rectangle',
+              'Ellipse': 'ellipse', 
+              'EllipticalROI': 'ellipse',
+              'Arrow': 'arrow',
+              'Probe': 'probe',
+              'Angle': 'angle',
+              'CobbAngle': 'cobb',
+              'Cobb': 'cobb',
+              'Bidirectional': 'measurement'
             };
-            return toolMap[toolName] || toolName?.toLowerCase() || 'wwwc';
+            return toolMap[toolName] || 'wwwc';
           };
           
           const currentTool = mapToolName(activeTool);
@@ -647,9 +557,8 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
           if (isAnnotationTool(currentTool)) {
             isMouseDownOnAnnotationTool = true;
             lastAnnotationToolUsed = currentTool;
-            // Capture current annotation state before potential new annotation
-            (window as any).previousAnnotationState = getCurrentAnnotationState();
-            console.log('Mouse down on annotation tool:', currentTool, 'Captured state with', (window as any).previousAnnotationState.size, 'annotations');
+            // Just mark that we're using an annotation tool
+            console.log('Mouse down on annotation tool:', currentTool);
           } else {
             console.log('Current tool is not an annotation tool:', currentTool);
           }
@@ -675,18 +584,38 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
         return toolMap[tool];
       };
 
-      // Mouse up handler for annotation detection
-      const handleMouseUp = async (event: MouseEvent) => {
+      // Mouse up handler - simple auto-save trigger for annotation tools
+      const handleMouseUp = (event: MouseEvent) => {
         try {
           if (isMouseDownOnAnnotationTool && lastAnnotationToolUsed) {
-            console.log('Mouse up after annotation tool use, checking for new annotations...');
+            console.log('Mouse up after annotation tool use:', lastAnnotationToolUsed);
             
-            // Use Promise instead of setTimeout
-            await new Promise(resolve => requestAnimationFrame(() => resolve(undefined)));
-            await new Promise(resolve => requestAnimationFrame(() => resolve(undefined)));
-            
-            detectAndHandleNewAnnotations();
-            isMouseDownOnAnnotationTool = false;
+            // Small delay to let Cornerstone3D finish processing
+            setTimeout(() => {
+              // Create a simple synthetic event for auto-save
+              const syntheticEvent = {
+                detail: {
+                  annotation: {
+                    annotationUID: `temp-${Date.now()}`, // Temporary UID
+                    data: {},
+                    metadata: {
+                      toolName: lastAnnotationToolUsed,
+                      seriesInstanceUID: studyMetadata?.studyInstanceUID || '',
+                      sopInstanceUID: studyMetadata?.studyInstanceUID || '',
+                      frameOfReferenceUID: stackViewport?.getFrameOfReferenceUID() || '',
+                    },
+                    imageId: 'current',
+                  },
+                  changeType: 'completed'
+                }
+              };
+              
+              console.log('Triggering auto-save for tool:', lastAnnotationToolUsed);
+              // Call auto-save
+              handleCornerstoneEvent(syntheticEvent as any);
+              
+              isMouseDownOnAnnotationTool = false;
+            }, 100); // Small delay
           }
         } catch (error) {
           console.warn('Error in mouseup handler:', error);

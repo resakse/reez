@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { Trash2, User, Calendar, Ruler, MessageSquare, ArrowRight, Square, Circle, Edit3, AlertCircle } from 'lucide-react';
+import { Trash2, User, Calendar, Ruler, MessageSquare, ArrowRight, Square, Circle, Edit3, AlertCircle, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -66,8 +66,9 @@ const formatTimestamp = (timestamp: string): string => {
 const AnnotationItem: React.FC<{
   annotation: DicomAnnotation;
   onDelete: (id: number) => Promise<void>;
+  onToggleVisibility?: (annotation: DicomAnnotation) => void;
   isCurrentImage?: boolean;
-}> = ({ annotation, onDelete, isCurrentImage }) => {
+}> = ({ annotation, onDelete, onToggleVisibility, isCurrentImage }) => {
   const [isDeleting, setIsDeleting] = React.useState(false);
   const IconComponent = annotationTypeIcons[annotation.annotation_type];
 
@@ -93,14 +94,24 @@ const AnnotationItem: React.FC<{
     }
   };
 
+  const handleToggleVisibility = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onToggleVisibility) {
+      onToggleVisibility(annotation);
+    }
+  };
+
   const hasMeasurement = annotation.measurement_value !== null && 
                         annotation.measurement_value !== undefined && 
                         annotation.measurement_value > 0;
 
   return (
-    <Card className={`transition-all duration-200 hover:shadow-md ${
-      isCurrentImage ? 'ring-2 ring-primary/20 bg-accent/5' : 'hover:bg-accent/5'
-    }`}>
+    <Card 
+      className={`transition-all duration-200 hover:shadow-md cursor-pointer ${
+        isCurrentImage ? 'ring-2 ring-primary/20 bg-accent/5' : 'hover:bg-accent/5'
+      }`}
+      onClick={handleToggleVisibility}
+    >
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0 space-y-2">
@@ -115,9 +126,12 @@ const AnnotationItem: React.FC<{
                   {annotation.annotation_type}
                 </span>
               </Badge>
-              <span className="text-xs text-muted-foreground">
-                {formatTimestamp(annotation.created_at)}
-              </span>
+              <div className="flex items-center gap-2">
+                <Eye className="w-3 h-3 text-muted-foreground opacity-60" title="Click to show/hide on image" />
+                <span className="text-xs text-muted-foreground">
+                  {formatTimestamp(annotation.created_at)}
+                </span>
+              </div>
             </div>
 
             {/* User information */}
@@ -250,6 +264,21 @@ export const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
     stats
   } = useAnnotations({ studyUid });
 
+  // Listen for annotation saved events to refresh the panel immediately
+  React.useEffect(() => {
+    const handleAnnotationSaved = (event: CustomEvent) => {
+      if (event.detail.studyUid === studyUid) {
+        console.log('Annotation saved, refreshing panel:', event.detail.annotation);
+        refreshAnnotations();
+      }
+    };
+
+    window.addEventListener('annotationSaved', handleAnnotationSaved as EventListener);
+    return () => {
+      window.removeEventListener('annotationSaved', handleAnnotationSaved as EventListener);
+    };
+  }, [studyUid, refreshAnnotations]);
+
   // Group annotations by current image and others
   const { currentImageAnnotations, otherAnnotations } = useMemo(() => {
     if (!currentImageId) {
@@ -278,6 +307,17 @@ export const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
 
   const handleDeleteAnnotation = async (annotationId: number) => {
     await deleteAnnotation(annotationId);
+  };
+
+  const handleToggleAnnotationVisibility = (annotation: DicomAnnotation) => {
+    // Create a custom event to notify the DICOM viewer to toggle annotation visibility
+    const toggleEvent = new CustomEvent('toggleAnnotationVisibility', {
+      detail: { annotation, studyUid }
+    });
+    window.dispatchEvent(toggleEvent);
+    
+    // Show feedback to user  
+    toast.info(`Clicked annotation ${annotation.annotation_type} (visibility toggle not fully implemented yet)`);
   };
 
   const handleRetry = () => {
@@ -332,7 +372,7 @@ export const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
         ) : annotations.length === 0 ? (
           <EmptyState hasCurrentImage={!!currentImageId} />
         ) : (
-          <ScrollArea className="h-full">
+          <ScrollArea className="flex-1" style={{ height: 'calc(100vh - 200px)', maxHeight: '1000px' }}>
             <div className="p-4 space-y-4">
               {/* Current image annotations */}
               {currentImageAnnotations.length > 0 && (
@@ -347,6 +387,7 @@ export const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
                       key={annotation.id}
                       annotation={annotation}
                       onDelete={handleDeleteAnnotation}
+                      onToggleVisibility={handleToggleAnnotationVisibility}
                       isCurrentImage={true}
                     />
                   ))}
@@ -366,6 +407,7 @@ export const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
                       key={annotation.id}
                       annotation={annotation}
                       onDelete={handleDeleteAnnotation}
+                      onToggleVisibility={handleToggleAnnotationVisibility}
                       isCurrentImage={false}
                     />
                   ))}
