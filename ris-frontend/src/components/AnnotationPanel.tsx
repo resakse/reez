@@ -158,7 +158,7 @@ const AnnotationItem: React.FC<{
             {/* Image reference for multi-image studies */}
             {!isCurrentImage && (
               <div className="text-xs text-muted-foreground font-mono bg-muted/30 rounded px-2 py-1 truncate">
-                Image: {annotation.image_id.split('/').pop() || annotation.image_id}
+                Image: {annotation.image_id ? (annotation.image_id.split('/').pop() || annotation.image_id) : 'Current'}
               </div>
             )}
           </div>
