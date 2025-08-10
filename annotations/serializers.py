@@ -18,7 +18,7 @@ class DicomAnnotationSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'study_instance_uid', 'series_instance_uid', 
             'sop_instance_uid', 'image_id', 'frame_number',
-            'annotation_type', 'annotation_data', 'cornerstone_annotation_uid', 
+            'annotation_type', 'annotation_data', 
             'label', 'description', 'measurement_value', 'measurement_unit', 
             'created_at', 'modified_at', 'user', 'user_full_name', 'user_username', 
             'can_delete', 'can_edit', 'display_name', 'measurement_display'
@@ -90,7 +90,7 @@ class DicomAnnotationListSerializer(serializers.ModelSerializer):
             'id', 'study_instance_uid', 'series_instance_uid', 'sop_instance_uid',
             'annotation_type', 'label', 'display_name', 'measurement_display', 
             'created_at', 'user', 'user_full_name', 'can_delete',
-            'cornerstone_annotation_uid', 'annotation_data', 'image_id'  # Include data for restoration
+            'annotation_data', 'image_id'
         ]
         read_only_fields = [
             'id', 'created_at', 'user', 'user_full_name', 'can_delete', 
@@ -113,7 +113,7 @@ class DicomAnnotationCreateSerializer(serializers.ModelSerializer):
         fields = [
             'study_instance_uid', 'series_instance_uid', 
             'sop_instance_uid', 'image_id', 'frame_number',
-            'annotation_type', 'annotation_data', 'cornerstone_annotation_uid',
+            'annotation_type', 'annotation_data',
             'label', 'description', 'measurement_value', 'measurement_unit'
         ]
         

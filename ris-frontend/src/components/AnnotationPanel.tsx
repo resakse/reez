@@ -73,33 +73,10 @@ const AnnotationItem: React.FC<{
   const [currentVisibility, setCurrentVisibility] = React.useState<boolean>(true);
   const IconComponent = annotationTypeIcons[annotation.annotation_type];
 
-  // Check current visibility status when component mounts or annotation UID changes
+  // Default to visible since annotations are restored on page load
   React.useEffect(() => {
-    if (annotation.cornerstone_annotation_uid) {
-      try {
-        const cornerstoneAnnotation = (window as any).annotation;
-        if (cornerstoneAnnotation?.visibility) {
-          const isVisible = cornerstoneAnnotation.visibility.isAnnotationVisible(
-            annotation.cornerstone_annotation_uid
-          );
-          
-          // If undefined, the annotation is not loaded in Cornerstone3D
-          // This likely means it's a saved annotation that needs to be restored
-          if (isVisible === undefined) {
-            console.log('Annotation UID not found in Cornerstone3D:', annotation.cornerstone_annotation_uid);
-            setCurrentVisibility(false); // Show as hidden since it's not active
-          } else {
-            setCurrentVisibility(isVisible);
-          }
-        }
-      } catch (error) {
-        console.warn('Could not check annotation visibility:', error);
-        setCurrentVisibility(false);
-      }
-    } else {
-      setCurrentVisibility(false);
-    }
-  }, [annotation.cornerstone_annotation_uid]);
+    setCurrentVisibility(true);
+  }, []);
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -158,21 +135,10 @@ const AnnotationItem: React.FC<{
                 </span>
               </Badge>
               <div className="flex items-center gap-2">
-                {annotation.cornerstone_annotation_uid ? (
-                  (() => {
-                    const cornerstoneAnnotation = (window as any).annotation;
-                    const isActive = cornerstoneAnnotation?.visibility?.isAnnotationVisible(annotation.cornerstone_annotation_uid) !== undefined;
-                    
-                    if (!isActive) {
-                      return <EyeOff className="w-3 h-3 text-orange-500 opacity-80" title="Annotation not active - saved but not currently loaded" />;
-                    } else if (currentVisibility) {
-                      return <Eye className="w-3 h-3 text-green-600 opacity-80" title="Annotation is visible - click to hide" />;
-                    } else {
-                      return <EyeOff className="w-3 h-3 text-red-600 opacity-80" title="Annotation is hidden - click to show" />;
-                    }
-                  })()
+                {currentVisibility ? (
+                  <Eye className="w-3 h-3 text-green-600 opacity-80" title="Annotation is visible - click to hide" />
                 ) : (
-                  <EyeOff className="w-3 h-3 text-muted-foreground opacity-60" title="Visibility control unavailable" />
+                  <EyeOff className="w-3 h-3 text-red-600 opacity-80" title="Annotation is hidden - click to show" />
                 )}
                 <span className="text-xs text-muted-foreground">
                   {formatTimestamp(annotation.created_at)}
@@ -189,20 +155,6 @@ const AnnotationItem: React.FC<{
                   Current Image
                 </Badge>
               )}
-              {(() => {
-                const cornerstoneAnnotation = (window as any).annotation;
-                const isActive = annotation.cornerstone_annotation_uid && 
-                  cornerstoneAnnotation?.visibility?.isAnnotationVisible(annotation.cornerstone_annotation_uid) !== undefined;
-                
-                if (annotation.cornerstone_annotation_uid && !isActive) {
-                  return (
-                    <Badge variant="outline" className="text-xs text-orange-600 border-orange-600">
-                      Saved
-                    </Badge>
-                  );
-                }
-                return null;
-              })()}
             </div>
 
             {/* Label */}
@@ -379,83 +331,9 @@ export const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
   };
 
   const handleToggleAnnotationVisibility = (annotation: DicomAnnotation) => {
-    // Check if the annotation has a Cornerstone3D UID for visibility control
-    if (!annotation.cornerstone_annotation_uid) {
-      toast.warning('Cannot toggle visibility: annotation UID not found');
-      return;
-    }
-
-    try {
-      // Use global annotation API (set by DICOM viewer during initialization)
-      const cornerstoneAnnotation = (window as any).annotation;
-      
-      if (!cornerstoneAnnotation?.visibility) {
-        toast.error('Cornerstone3D annotation API not available');
-        console.error('Missing annotation API on window:', cornerstoneAnnotation);
-        return;
-      }
-
-      // Check current visibility status
-      const isCurrentlyVisible = cornerstoneAnnotation.visibility.isAnnotationVisible(
-        annotation.cornerstone_annotation_uid
-      );
-      
-      console.log('Toggle requested for annotation:', {
-        id: annotation.id,
-        type: annotation.annotation_type,
-        uid: annotation.cornerstone_annotation_uid,
-        currentVisibility: isCurrentlyVisible
-      });
-      
-      // Handle undefined visibility status - annotation not loaded in Cornerstone3D
-      if (isCurrentlyVisible === undefined) {
-        console.warn('Cannot toggle annotation visibility: annotation not loaded in Cornerstone3D');
-        toast.warning(`${annotation.annotation_type.charAt(0).toUpperCase() + annotation.annotation_type.slice(1)} annotation not active - please recreate the annotation`);
-        return;
-      }
-      
-      const currentVisibility = isCurrentlyVisible;
-      const newVisibility = !currentVisibility;
-      cornerstoneAnnotation.visibility.setAnnotationVisibility(
-        annotation.cornerstone_annotation_uid, 
-        newVisibility
-      );
-      
-      // Trigger annotation rendering with the correct Cornerstone3D API
-      try {
-        const viewportInfo = (window as any).cornerstoneViewportInfo;
-        const currentViewportId = viewportInfo?.currentViewportId;
-        const renderingEngineId = viewportInfo?.currentRenderingEngineId;
-        
-        if (currentViewportId && renderingEngineId) {
-          const renderingEngine = (window as any).cornerstoneRenderingEngine?.getRenderingEngine?.(renderingEngineId);
-          if (renderingEngine) {
-            const viewport = renderingEngine.getViewport(currentViewportId);
-            if (viewport) {
-              viewport.render();
-              console.log('RENDER: Triggered viewport render for annotation visibility change');
-            }
-          }
-        }
-      } catch (renderError) {
-        console.warn('RENDER: Failed to trigger viewport render:', renderError);
-      }
-      
-      // Show user feedback with specific annotation type
-      const annotationTypeDisplay = annotation.annotation_type.charAt(0).toUpperCase() + annotation.annotation_type.slice(1);
-      const visibilityStatus = newVisibility ? 'shown' : 'hidden';
-      toast.success(`${annotationTypeDisplay} annotation ${visibilityStatus} on image`);
-      console.log('Toggled annotation visibility:', {
-        id: annotation.id,
-        uid: annotation.cornerstone_annotation_uid,
-        from: currentVisibility,
-        to: newVisibility
-      });
-      
-    } catch (error) {
-      console.error('Failed to toggle annotation visibility:', error);
-      toast.error('Failed to toggle annotation visibility');
-    }
+    // Since we don't have cornerstone UIDs anymore, this is just a UI state toggle
+    // The actual annotation restoration/visibility is handled at page load
+    toast.info('Annotation visibility toggle - UI state only');
   };
 
   const handleRetry = () => {

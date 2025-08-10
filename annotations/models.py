@@ -64,12 +64,6 @@ class DicomAnnotation(models.Model):
     annotation_data = models.JSONField(
         help_text="Cornerstone3D annotation data in JSON format"
     )
-    cornerstone_annotation_uid = models.CharField(
-        max_length=255,
-        blank=True,
-        null=True,
-        help_text="Cornerstone3D annotation UID for visibility control"
-    )
     
     # Metadata
     label = models.CharField(
@@ -112,14 +106,7 @@ class DicomAnnotation(models.Model):
             models.Index(fields=['annotation_type']),
             models.Index(fields=['study_instance_uid', 'image_id']),
         ]
-        constraints = [
-            # Ensure Cornerstone annotation UIDs are unique when not null
-            models.UniqueConstraint(
-                fields=['cornerstone_annotation_uid'], 
-                condition=models.Q(cornerstone_annotation_uid__isnull=False),
-                name='unique_cornerstone_annotation_uid'
-            ),
-        ]
+        constraints = []
         ordering = ['-created_at']
         verbose_name = "DICOM Annotation"
         verbose_name_plural = "DICOM Annotations"
