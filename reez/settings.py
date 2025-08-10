@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     'pesakit',
     'exam',
     'audit',  # Small-scale audit trails system
+    'annotations',  # DICOM annotations with auto-save
 
     'rest_framework',
     'corsheaders',

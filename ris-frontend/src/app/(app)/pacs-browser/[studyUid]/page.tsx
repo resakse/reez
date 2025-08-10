@@ -246,6 +246,19 @@ const ReportingPanel = dynamic(() => import('@/components/ReportingPanel'), {
   ),
 });
 
+const RightPanelTabs = dynamic(() => import('@/components/RightPanelTabs'), {
+  ssr: false,
+  loading: () => (
+    <div className="p-4">
+      <div className="animate-pulse space-y-3">
+        <div className="h-8 bg-muted rounded w-full"></div>
+        <div className="h-4 bg-muted rounded w-3/4"></div>
+        <div className="h-20 bg-muted rounded"></div>
+      </div>
+    </div>
+  ),
+});
+
 const ReportingModal = dynamic(() => import('@/components/ReportingModal'), {
   ssr: false,
 });
@@ -314,9 +327,6 @@ export default function LegacyStudyViewerPage() {
   const [showReporting, setShowReporting] = useState(false);
   const [showReportingModal, setShowReportingModal] = useState(false);
   const [currentReport, setCurrentReport] = useState<any>(null);
-  
-  const [reportLoading, setReportLoading] = useState(false);
-  const [reportFunctions, setReportFunctions] = useState<any>(null);
   const [showOverlay, setShowOverlay] = useState(true);
   const [viewMode, setViewMode] = useState<'single' | 'comparison'>('single');
   const [layoutHover, setLayoutHover] = useState<{cols: number, rows: number} | null>(null);
@@ -343,12 +353,6 @@ export default function LegacyStudyViewerPage() {
 
   // Multi-viewport functionality is handled by SimpleDicomViewer and ProjectionDicomViewer components
 
-  // Function to trigger report reload
-  const handleReportUpdate = () => {
-    if (reportFunctions && reportFunctions.loadReports) {
-      reportFunctions.loadReports();
-    }
-  };
   
   // Track fetched studies to prevent duplicate API calls
   const fetchedStudiesRef = useRef(new Set<string>());
@@ -832,8 +836,7 @@ export default function LegacyStudyViewerPage() {
           examinations={risExaminations}
           studyMetadata={metadata}
           currentReport={currentReport}
-          onReportUpdate={handleReportUpdate}
-        />
+          />
       </div>
     );
   }
@@ -1016,8 +1019,8 @@ export default function LegacyStudyViewerPage() {
         </div>
       </div>
 
-      {/* Collapsible Info/Report Panel */}
-      <div className={`${isPanelCollapsed ? 'w-12' : 'w-80'} border-l bg-muted/5 overflow-hidden transition-all duration-300 ease-in-out relative`}>
+      {/* Collapsible Tabbed Panel */}
+      <div className={`${isPanelCollapsed ? 'w-12' : 'w-80'} border-l bg-background overflow-hidden transition-all duration-300 ease-in-out relative`}>
         {/* Panel Toggle Buttons */}
         <div className="absolute top-4 left-1 z-20 flex flex-col gap-1">
           <Button
@@ -1033,363 +1036,29 @@ export default function LegacyStudyViewerPage() {
         </div>
         
         {!isPanelCollapsed && (
-          <div className="overflow-y-auto h-full">
-            {/* Toggle Button - Always Visible */}
-            {isImportedToRis && (
-              <div className="p-4 pb-0">
-                <div className="relative z-10">
-                  <Button 
-                    onClick={() => setShowReporting(!showReporting)}
-                    className="w-full"
-                    variant={showReporting ? "default" : "outline"}
-                    title={showReporting ? "Show Study Info" : "Show Reports"}
-                  >
-                    {showReporting ? <Eye className="w-4 h-4 mr-2" /> : <FileText className="w-4 h-4 mr-2" />}
-                    {showReporting ? "Show Info" : "Show Report"}
-                  </Button>
-                </div>
-              </div>
-            )}
-            
-            {showReporting ? (
-              <div className="p-4">
-                {/* Report Controls */}
-                <div className="mb-4 space-y-3">
-                  {/* Report Status and Metadata */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm font-medium">Radiology Report</span>
-                    </div>
-                    {currentReport && (
-                      <Badge 
-                        variant={currentReport.report_status === 'completed' ? 'default' : 'secondary'}
-                        className={`text-xs ${currentReport.report_status === 'completed' ? 'bg-green-500 hover:bg-green-600' : ''}`}
-                      >
-                        {currentReport.report_status === 'completed' ? (
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                        ) : (
-                          <Edit className="h-3 w-3 mr-1" />
-                        )}
-                        {currentReport.report_status === 'completed' ? 'Completed' : 'Draft'}
-                      </Badge>
-                    )}
-                  </div>
-                  
-                  {/* Report Metadata */}
-                  {currentReport && (
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <User className="h-3 w-3" />
-                        {currentReport.radiologist_name || 'Unknown User'}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {new Date(currentReport.modified).toLocaleDateString()}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Report Action Buttons */}
-                  {reportFunctions && reportFunctions.canReport && !reportFunctions.isEditing && (
-                    <div className="flex gap-2">
-                      {currentReport ? (
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => reportFunctions.editReport(currentReport)}
-                        >
-                          <Edit className="h-4 w-4 mr-2" />
-                          Edit
-                        </Button>
-                      ) : (
-                        <Button 
-                          size="sm"
-                          onClick={reportFunctions.startNewReport}
-                        >
-                          <FileText className="h-4 w-4 mr-2" />
-                          New Report
-                        </Button>
-                      )}
-                    </div>
-                  )}
-                </div>
-                
-                <ReportingPanel
-                  studyInstanceUID={studyUid}
-                  examinations={risExaminations}
-                  onReportChange={setHasReport}
-                  onCurrentReportChange={setCurrentReport}
-                  onFunctionsReady={setReportFunctions}
-                  showHeader={false}
-                />
-              </div>
-            ) : (
-              <div className="p-4 space-y-4">
-
-          {/* Import Button for non-RIS studies */}
-          {!isImportedToRis && user?.is_superuser ? (
-            <Button 
-              onClick={handleImportStudy}
-              disabled={importing}
-              className="w-full"
-              title="Import this study into the RIS database (Superuser only)"
-            >
-              {importing ? (
-                <>
-                  <div className="w-4 h-4 mr-2 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
-                  Importing...
-                </>
-              ) : (
-                <>
-                  <Download className="w-4 h-4 mr-2" />
-                  Import to RIS
-                </>
-              )}
-            </Button>
-          ) : null}
-
-          {/* Patient Information */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-sm">
-                <User className="h-4 w-4" />
-                Patient Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Name</label>
-                <p className="text-sm font-semibold">{metadata.PatientName}</p>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Patient ID</label>
-                <p className="text-sm font-mono">{metadata.PatientID}</p>
-              </div>
-              {metadata.PatientSex && (
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground">Gender</label>
-                  <p className="text-sm">
-                    {metadata.PatientSex === 'M' ? 'Male' : 
-                     metadata.PatientSex === 'F' ? 'Female' : 
-                     metadata.PatientSex}
-                  </p>
-                </div>
-              )}
-              {metadata.PatientBirthDate && (
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground">Age</label>
-                  <p className="text-sm">{calculateAge(metadata.PatientBirthDate)}</p>
-                </div>
-              )}
-              {metadata.InstitutionName && (
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground">Clinic</label>
-                  <p className="text-sm">{metadata.InstitutionName}</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Study Details */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-sm">
-                <Stethoscope className="h-4 w-4" />
-                Study Details
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {isImportedToRis && risExaminations.length > 0 ? (
-                // Show enhanced RIS examination details
-                <>
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">Study Date</label>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Calendar className="h-3 w-3 text-muted-foreground" />
-                      <p className="text-sm">{formatDate(metadata.StudyDate || '')}</p>
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">Examinations ({risExaminations.length})</label>
-                    <div className="mt-2 space-y-2">
-                      {risExaminations.map((exam, index) => (
-                        <div key={index} className="bg-muted/30 p-2 rounded text-xs">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Badge variant="secondary" className="text-xs">
-                              {exam.exam?.exam || 'N/A'}
-                            </Badge>
-                            <Badge variant="outline" className="text-xs">
-                              {exam.exam?.modaliti?.nama || 'N/A'}
-                            </Badge>
-                          </div>
-                          <div className="flex gap-2 text-xs text-muted-foreground">
-                            {exam.exam?.part && (
-                              <span>• {exam.exam.part.part}</span>
-                            )}
-                            {exam.patient_position && (
-                              <span>• {exam.patient_position}</span>
-                            )}
-                            {exam.laterality && (
-                              <span>• {exam.laterality}</span>
-                            )}
-                          </div>
-                          {exam.jxr && (
-                            <div className="text-xs text-muted-foreground mt-1">
-                              Radiographer: {exam.jxr.first_name} {exam.jxr.last_name}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">Images</label>
-                    <Badge variant="outline" className="mt-1 text-xs">
-                      {imageIds.length} images
-                    </Badge>
-                  </div>
-                </>
-              ) : enhancedDicomData.length > 0 ? (
-                // Show enhanced DICOM metadata for legacy studies
-                <>
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">Study Date</label>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Calendar className="h-3 w-3 text-muted-foreground" />
-                      <p className="text-sm">{formatDate(metadata.StudyDate || '')}</p>
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">Examinations ({enhancedDicomData.length})</label>
-                    <div className="mt-2 space-y-2">
-                      {enhancedDicomData.map((exam, index) => (
-                        <div key={index} className="bg-muted/30 p-2 rounded text-xs">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Badge variant="secondary" className="text-xs">
-                              {exam.exam_type}
-                            </Badge>
-                            <Badge variant="outline" className="text-xs">
-                              {exam.modality}
-                            </Badge>
-                          </div>
-                          <div className="flex gap-2 text-xs text-muted-foreground">
-                            {exam.body_part && (
-                              <span>• {exam.body_part}</span>
-                            )}
-                            {exam.position && (
-                              <span>• {exam.position}</span>
-                            )}
-                          </div>
-                          {exam.radiographer_name && (
-                            <div className="text-xs text-muted-foreground mt-1">
-                              Radiographer: {exam.radiographer_name}
-                            </div>
-                          )}
-                          <div className="text-xs text-muted-foreground mt-1">
-                            Images: {exam.instance_count}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">Total Images</label>
-                    <Badge variant="outline" className="mt-1 text-xs">
-                      {imageIds.length} images
-                    </Badge>
-                  </div>
-                </>
-              ) : (
-                // Show basic DICOM metadata fallback
-                <>
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">Study Date</label>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Calendar className="h-3 w-3 text-muted-foreground" />
-                      <p className="text-sm">{formatDate(metadata.StudyDate || '')}</p>
-                    </div>
-                  </div>
-                  {metadata.StudyTime && (
-                    <div>
-                      <label className="text-xs font-medium text-muted-foreground">Study Time</label>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Clock className="h-3 w-3 text-muted-foreground" />
-                        <p className="text-sm">{formatTime(metadata.StudyTime)}</p>
-                      </div>
-                    </div>
-                  )}
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">Modality</label>
-                    <Badge variant="secondary" className="mt-1 text-xs">
-                      {metadata.Modality}
-                    </Badge>
-                  </div>
-                  {metadata.AccessionNumber && (
-                    <div>
-                      <label className="text-xs font-medium text-muted-foreground">Accession Number</label>
-                      <p className="text-sm font-mono">{metadata.AccessionNumber}</p>
-                    </div>
-                  )}
-                  {metadata.ReferringPhysicianName && (
-                    <div>
-                      <label className="text-xs font-medium text-muted-foreground">Referring Doctor</label>
-                      <p className="text-sm">{metadata.ReferringPhysicianName}</p>
-                    </div>
-                  )}
-                  {metadata.OperatorsName && (
-                    <div>
-                      <label className="text-xs font-medium text-muted-foreground">Radiographer</label>
-                      <p className="text-sm">{metadata.OperatorsName}</p>
-                    </div>
-                  )}
-                  {metadata.StudyDescription && (
-                    <div>
-                      <label className="text-xs font-medium text-muted-foreground">Description</label>
-                      <p className="text-xs mt-1 p-2 bg-muted/50 rounded">
-                        {metadata.StudyDescription}
-                      </p>
-                    </div>
-                  )}
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">Images</label>
-                    <Badge variant="outline" className="mt-1 text-xs">
-                      {imageIds.length} images
-                    </Badge>
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* DICOM Technical Info */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-xs">DICOM Information</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Study Instance UID</label>
-                <p className="text-xs font-mono break-all bg-muted/50 p-2 rounded mt-1">
-                  {studyUid}
-                </p>
-              </div>
-              <Badge 
-                variant={isImportedToRis ? "default" : "outline"} 
-                className="text-xs mt-2"
-              >
-                <Archive className="h-3 w-3 mr-1" />
-                {isImportedToRis ? "RIS Study" : "Legacy Study"}
-              </Badge>
-            </CardContent>
-          </Card>
-              </div>
-            )}
-          </div>
+          <RightPanelTabs
+            studyUid={studyUid}
+            patientData={{
+              name: metadata.PatientName,
+              patientId: metadata.PatientID,
+              birthDate: metadata.PatientBirthDate,
+              gender: metadata.PatientSex === 'M' ? 'male' : metadata.PatientSex === 'F' ? 'female' : metadata.PatientSex
+            }}
+            studyData={{
+              studyDescription: metadata.StudyDescription,
+              studyDate: metadata.StudyDate,
+              modality: metadata.Modality,
+              accessionNumber: metadata.AccessionNumber,
+              studyInstanceUid: studyUid,
+              numberOfSeries: seriesInfo.length,
+              numberOfInstances: imageIds.length,
+              referringPhysician: metadata.ReferringPhysicianName,
+              operatorName: metadata.OperatorsName,
+              institutionName: metadata.InstitutionName
+            }}
+            activeTab={showReporting ? 'report' : 'patient'}
+            examinations={risExaminations}
+          />
         )}
       </div>
 
@@ -1401,7 +1070,6 @@ export default function LegacyStudyViewerPage() {
         examinations={risExaminations}
         studyMetadata={metadata}
         currentReport={currentReport}
-        onReportUpdate={handleReportUpdate}
       />
     </div>
   );

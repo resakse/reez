@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import AuthService from '@/lib/auth';
 import DicomOverlay from './DicomOverlay';
+import { useAnnotationAutoSave } from '@/hooks/useAnnotationAutoSave';
 
 // Modern Cornerstone3D imports
 import { init as coreInit, RenderingEngine, Enums as CoreEnums, type Types, eventTarget } from '@cornerstonejs/core';
@@ -279,6 +280,13 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
   
   
   const [imageIds, setImageIds] = useState<string[]>(initialImageIds);
+  
+  // Initialize annotation auto-save
+  const { handleCornerstoneEvent, isSaving } = useAnnotationAutoSave({
+    studyUid: studyMetadata?.studyInstanceUID || '',
+    enabled: !!studyMetadata?.studyInstanceUID,
+  });
+  
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -452,6 +460,22 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
       viewportElement.addEventListener('cornerstoneviewportcameramodified', handleCameraModified);
       viewportElement.addEventListener('cornerstoneviewportvoimodified', handleVoiModified);
 
+      // Add annotation event listeners for auto-save
+      const handleAnnotationCompleted = (evt: any) => {
+        if (evt.detail) {
+          handleCornerstoneEvent(evt);
+        }
+      };
+      
+      const handleAnnotationModified = (evt: any) => {
+        if (evt.detail) {
+          handleCornerstoneEvent(evt);
+        }
+      };
+
+      eventTarget.addEventListener('ANNOTATION_COMPLETED', handleAnnotationCompleted);
+      eventTarget.addEventListener('ANNOTATION_MODIFIED', handleAnnotationModified);
+
       // Listen for window resize and fullscreen changes to update zoom percentage
       const handleResizeOrFullscreen = () => {
         // Small delay to ensure layout has updated
@@ -492,7 +516,9 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
         handleCameraModified, 
         handleVoiModified,
         handleMouseMove,
-        handleResizeOrFullscreen
+        handleResizeOrFullscreen,
+        handleAnnotationCompleted,
+        handleAnnotationModified
       };
     };
 
@@ -524,7 +550,9 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
           handleCameraModified,
           handleVoiModified,
           handleMouseMove,
-          handleResizeOrFullscreen
+          handleResizeOrFullscreen,
+          handleAnnotationCompleted,
+          handleAnnotationModified
         } = listenerSetup;
         if (viewportElement) {
           viewportElement.removeEventListener('cornerstoneimagerendered', handleImageRendered);
@@ -533,6 +561,10 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
           viewportElement.removeEventListener('mousemove', handleMouseMove);
           viewportElement.removeEventListener('cornerstoneviewportcameramodified', handleCameraModified);
           viewportElement.removeEventListener('cornerstoneviewportvoimodified', handleVoiModified);
+          
+          // Remove annotation event listeners
+          eventTarget.removeEventListener('ANNOTATION_COMPLETED', handleAnnotationCompleted);
+          eventTarget.removeEventListener('ANNOTATION_MODIFIED', handleAnnotationModified);
           
           // Remove window and fullscreen listeners
           window.removeEventListener('resize', handleResizeOrFullscreen);
