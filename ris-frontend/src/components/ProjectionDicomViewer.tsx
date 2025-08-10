@@ -537,6 +537,143 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
       let lastAnnotationToolUsed: string | null = null;
 
       // Simple annotation handling (removed complex state detection)
+      
+      // Load saved annotations from database and restore them in Cornerstone3D
+      const restoreSavedAnnotations = async () => {
+        try {
+          if (!studyMetadata?.studyInstanceUID) {
+            console.log('No study UID available for annotation restoration');
+            return;
+          }
+
+          console.log('RESTORE: Attempting to restore saved annotations for study:', studyMetadata.studyInstanceUID);
+
+          // Use the existing auth service for consistent API calls
+          const response = await AuthService.authenticatedFetch(`/api/annotations/by_study/?study_uid=${encodeURIComponent(studyMetadata.studyInstanceUID)}`);
+
+          if (response.ok) {
+            const savedAnnotations = await response.json();
+            console.log(`RESTORE: Found ${savedAnnotations.length} saved annotations to restore`);
+            
+            if (savedAnnotations.length === 0) {
+              return;
+            }
+            
+            let restoredCount = 0;
+            const cornerstoneAnnotation = (window as any).annotation;
+            const currentViewport = getActiveViewport();
+            
+            if (!cornerstoneAnnotation) {
+              console.warn('RESTORE: Cornerstone3D annotation API not available');
+              return;
+            }
+            
+            if (!currentViewport) {
+              console.warn('RESTORE: Viewport not available for restoration');
+              return;
+            }
+            
+            console.log('RESTORE: Using viewport:', currentViewport.id);
+            console.log('RESTORE: Cornerstone annotation API structure:', {
+              hasState: !!cornerstoneAnnotation.state,
+              hasSelection: !!cornerstoneAnnotation.selection,
+              hasLocking: !!cornerstoneAnnotation.locking,
+              hasVisibility: !!cornerstoneAnnotation.visibility,
+              stateKeys: cornerstoneAnnotation.state ? Object.keys(cornerstoneAnnotation.state) : 'none',
+              frameOfRefUID: currentViewport.getFrameOfReferenceUID()
+            });
+            
+            for (const ann of savedAnnotations) {
+              try {
+                if (!ann.cornerstone_annotation_uid || !ann.annotation_data) {
+                  console.log(`RESTORE: Skipping annotation ${ann.id} - UID: ${!!ann.cornerstone_annotation_uid}, Data: ${!!ann.annotation_data}`);
+                  continue;
+                }
+                
+                console.log(`RESTORE: Attempting to restore annotation ${ann.id}:`, {
+                  type: ann.annotation_type,
+                  uid: ann.cornerstone_annotation_uid,
+                  image_id: ann.image_id,
+                  data_keys: Object.keys(ann.annotation_data || {})
+                });
+                
+                // Get the current frame of reference and tool name
+                const frameOfReferenceUID = currentViewport.getFrameOfReferenceUID();
+                const toolName = getToolNameForType(ann.annotation_type);
+                
+                // Reconstruct the annotation object exactly as Cornerstone3D expects
+                const restoredAnnotation = {
+                  annotationUID: ann.cornerstone_annotation_uid,
+                  data: ann.annotation_data,
+                  highlighted: false,
+                  invalidated: false,
+                  isLocked: false,
+                  isVisible: true,
+                  metadata: {
+                    toolName: toolName,
+                    viewport: currentViewport.id,
+                    FrameOfReferenceUID: frameOfReferenceUID,
+                    referencedImageId: ann.image_id
+                  }
+                };
+                
+                // Add the annotation directly to the correct location in Cornerstone3D state
+                if (!cornerstoneAnnotation.state.annotations[frameOfReferenceUID]) {
+                  cornerstoneAnnotation.state.annotations[frameOfReferenceUID] = {};
+                }
+                if (!cornerstoneAnnotation.state.annotations[frameOfReferenceUID][toolName]) {
+                  cornerstoneAnnotation.state.annotations[frameOfReferenceUID][toolName] = [];
+                }
+                
+                cornerstoneAnnotation.state.annotations[frameOfReferenceUID][toolName].push(restoredAnnotation);
+                
+                console.log(`RESTORE: Successfully restored annotation ${ann.id} (${ann.annotation_type}) with UID ${ann.cornerstone_annotation_uid}`);
+                restoredCount++;
+                
+              } catch (error) {
+                console.warn(`RESTORE: Failed to restore annotation ${ann.id}:`, error);
+              }
+            }
+            
+            // Trigger viewport render to show restored annotations
+            if (restoredCount > 0) {
+              currentViewport.render();
+              console.log(`RESTORE: Successfully restored ${restoredCount} annotations and triggered render`);
+              
+              // Also trigger the annotation panel to refresh
+              const refreshEvent = new CustomEvent('annotationsRestored', {
+                detail: { count: restoredCount, studyUid: studyMetadata.studyInstanceUID }
+              });
+              window.dispatchEvent(refreshEvent);
+            } else {
+              console.log('RESTORE: No annotations were restored');
+            }
+          } else {
+            console.warn('RESTORE: Failed to fetch saved annotations:', response.status, response.statusText);
+          }
+        } catch (error) {
+          console.warn('RESTORE: Failed to restore saved annotations:', error);
+        }
+      };
+      
+      // Helper function to map annotation types to Cornerstone3D tool names
+      const getToolNameForType = (annotationType: string): string => {
+        const typeMap: Record<string, string> = {
+          'measurement': 'Length',
+          'length': 'Length', 
+          'rectangle': 'RectangleROI',
+          'ellipse': 'EllipticalROI',
+          'arrow': 'ArrowAnnotate',
+          'angle': 'Angle',
+          'probe': 'Probe',
+          'bidirectional': 'Bidirectional',
+          'annotation': 'Length' // Default fallback
+        };
+        return typeMap[annotationType] || 'Length';
+      };
+
+      // Restore annotations after viewport setup
+      setTimeout(restoreSavedAnnotations, 2000);
 
 
       // Check if current tool is an annotation tool (creates persistent annotations)
@@ -1012,6 +1149,11 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
           (window as any).cornerstoneViewportInfo.currentViewportId = viewportId;
           (window as any).cornerstoneViewportInfo.currentRenderingEngineId = renderingEngineId;
         }
+        
+        // Make rendering engine available globally for annotation rendering
+        (window as any).cornerstoneRenderingEngine = {
+          getRenderingEngine: (id: string) => renderingEngineRef.current
+        };
 
         // Determine start index 
         const startIndex = Math.min(currentImageIndex, imageIds.length - 1);

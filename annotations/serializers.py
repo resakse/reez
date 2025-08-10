@@ -87,9 +87,10 @@ class DicomAnnotationListSerializer(serializers.ModelSerializer):
     class Meta:
         model = DicomAnnotation
         fields = [
-            'id', 'study_instance_uid', 'annotation_type', 'label', 'display_name',
-            'measurement_display', 'created_at', 'user', 'user_full_name', 'can_delete',
-            'cornerstone_annotation_uid'  # Include UID for visibility toggle
+            'id', 'study_instance_uid', 'series_instance_uid', 'sop_instance_uid',
+            'annotation_type', 'label', 'display_name', 'measurement_display', 
+            'created_at', 'user', 'user_full_name', 'can_delete',
+            'cornerstone_annotation_uid', 'annotation_data', 'image_id'  # Include data for restoration
         ]
         read_only_fields = [
             'id', 'created_at', 'user', 'user_full_name', 'can_delete', 

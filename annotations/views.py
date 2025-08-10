@@ -4,6 +4,7 @@ from rest_framework.decorators import action
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
+from django.db import IntegrityError
 from audit.models import AuditLog
 from .models import DicomAnnotation
 from .serializers import (
@@ -68,22 +69,73 @@ class DicomAnnotationViewSet(viewsets.ModelViewSet):
         else:
             return DicomAnnotationSerializer
     
-    def perform_create(self, serializer):
-        """Auto-assign current user to annotation"""
-        annotation = serializer.save(user=self.request.user)
+    def create(self, request, *args, **kwargs):
+        """Create annotation with duplicate UID handling"""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
         
-        # Log successful creation (already handled by model save method)
-        # This is just for additional API-specific logging if needed
-        AuditLog.log_action(
-            user=self.request.user,
-            action='API_POST',
-            resource_type='DicomAnnotation',
-            resource_id=str(annotation.pk),
-            resource_name=f"API Create - {annotation.get_display_name()}",
-            new_data={'endpoint': '/api/annotations/', 'method': 'POST'},
-            ip_address=self.get_client_ip(),
-            success=True
-        )
+        try:
+            # Try to create the annotation
+            annotation = serializer.save(user=request.user)
+            
+            # Log successful creation (already handled by model save method)
+            AuditLog.log_action(
+                user=request.user,
+                action='API_POST',
+                resource_type='DicomAnnotation',
+                resource_id=str(annotation.pk),
+                resource_name=f"API Create - {annotation.get_display_name()}",
+                new_data={'endpoint': '/api/annotations/', 'method': 'POST'},
+                ip_address=self.get_client_ip(),
+                success=True
+            )
+            
+            headers = self.get_success_headers(serializer.data)
+            return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+            
+        except IntegrityError as e:
+            # Handle duplicate Cornerstone UID constraint violation
+            if 'unique_cornerstone_annotation_uid' in str(e):
+                cornerstone_uid = serializer.validated_data.get('cornerstone_annotation_uid')
+                
+                if cornerstone_uid:
+                    # Try to find the existing annotation with this UID
+                    try:
+                        existing_annotation = DicomAnnotation.objects.get(
+                            cornerstone_annotation_uid=cornerstone_uid
+                        )
+                        
+                        # Log the duplicate attempt
+                        AuditLog.log_action(
+                            user=request.user,
+                            action='API_POST_DUPLICATE',
+                            resource_type='DicomAnnotation',
+                            resource_id=str(existing_annotation.pk),
+                            resource_name=f"Duplicate UID attempt - {existing_annotation.get_display_name()}",
+                            new_data={
+                                'endpoint': '/api/annotations/', 
+                                'method': 'POST',
+                                'duplicate_uid': cornerstone_uid,
+                                'existing_annotation_id': existing_annotation.id
+                            },
+                            ip_address=self.get_client_ip(),
+                            success=False
+                        )
+                        
+                        # Return the existing annotation data instead of creating a duplicate
+                        existing_serializer = self.get_serializer(existing_annotation)
+                        return Response(
+                            existing_serializer.data, 
+                            status=status.HTTP_200_OK,
+                            headers={'X-Duplicate-Prevention': 'true'}
+                        )
+                        
+                    except DicomAnnotation.DoesNotExist:
+                        # Race condition - the duplicate was deleted between constraint check and this query
+                        pass
+            
+            # Re-raise the IntegrityError if it's not the expected duplicate UID constraint
+            raise
     
     def destroy(self, request, *args, **kwargs):
         """Only allow users to delete their own annotations"""

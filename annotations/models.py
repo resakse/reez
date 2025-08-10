@@ -112,6 +112,14 @@ class DicomAnnotation(models.Model):
             models.Index(fields=['annotation_type']),
             models.Index(fields=['study_instance_uid', 'image_id']),
         ]
+        constraints = [
+            # Ensure Cornerstone annotation UIDs are unique when not null
+            models.UniqueConstraint(
+                fields=['cornerstone_annotation_uid'], 
+                condition=models.Q(cornerstone_annotation_uid__isnull=False),
+                name='unique_cornerstone_annotation_uid'
+            ),
+        ]
         ordering = ['-created_at']
         verbose_name = "DICOM Annotation"
         verbose_name_plural = "DICOM Annotations"

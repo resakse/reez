@@ -60,8 +60,22 @@ export function useAnnotationAutoSave(params: UseAnnotationAutoSaveParams): UseA
       savingRef.current = true;
       setSaveError(undefined);
 
+      // Check if an annotation with this Cornerstone UID already exists to prevent duplicates
+      if (annotationData.cornerstone_annotation_uid) {
+        console.log('AUTO-SAVE: Checking for existing annotation with UID:', annotationData.cornerstone_annotation_uid);
+        
+        // For now, proceed with the save - the backend should handle duplicate prevention
+        // In the future, we could add a check here by fetching existing annotations
+      }
+
       // Create new annotation
       const savedAnnotation = await createAnnotation(annotationData);
+      
+      console.log('AUTO-SAVE: Successfully saved annotation:', {
+        id: savedAnnotation.id,
+        cornerstone_uid: savedAnnotation.cornerstone_annotation_uid,
+        type: savedAnnotation.annotation_type
+      });
       
       setLastSaveTime(new Date());
       
@@ -188,6 +202,16 @@ export function useAnnotationAutoSave(params: UseAnnotationAutoSaveParams): UseA
         measurement_value: measurementValue,
         measurement_unit: measurementUnit,
       };
+
+      // Debug logging to investigate duplicate UID issue
+      console.log('AUTO-SAVE: Annotation UID being saved:', {
+        cornerstone_uid: annotation.annotationUID,
+        annotation_type: annotationData.annotation_type,
+        tool_name: annotation.metadata.toolName,
+        change_type: changeType,
+        image_id: annotation.imageId,
+        has_measurement: !!measurementValue
+      });
 
 
       // Trigger debounced save
