@@ -208,6 +208,21 @@ const initializeCornerstone = async () => {
         throw new Error(`Tool registration failed: ${toolError.message}`);
       }
       
+      // Make Cornerstone3D annotation API available globally for annotation panel
+      (window as any).annotation = annotation;
+      
+      // Also make cornerstoneTools available for rendering functions
+      (window as any).cornerstoneTools = {
+        annotation,
+        triggerAnnotationRenderForViewportIds: (await import('@cornerstonejs/tools')).triggerAnnotationRenderForViewportIds
+      };
+      
+      // Store current viewport info globally for annotation panel
+      (window as any).cornerstoneViewportInfo = {
+        currentViewportId: null,
+        currentRenderingEngineId: null
+      };
+      
       isCornerstoneInitialized = true;
     } catch (error) {
       cornerstoneInitPromise = null;
@@ -320,10 +335,26 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
       }
     };
 
+    const handleForceViewportRender = (event: CustomEvent) => {
+      try {
+        console.log('Force viewport render requested for annotation:', event.detail.annotationUID);
+        const stackViewport = getActiveViewport();
+        if (stackViewport) {
+          // Force viewport re-render
+          stackViewport.render();
+          console.log('Viewport re-rendered after visibility change');
+        }
+      } catch (error) {
+        console.warn('Error in force viewport render:', error);
+      }
+    };
+
     window.addEventListener('toggleAnnotationVisibility', handleToggleAnnotationVisibility as EventListener);
+    window.addEventListener('forceViewportRender', handleForceViewportRender as EventListener);
     
     return () => {
       window.removeEventListener('toggleAnnotationVisibility', handleToggleAnnotationVisibility as EventListener);
+      window.removeEventListener('forceViewportRender', handleForceViewportRender as EventListener);
     };
   }, [studyMetadata?.studyInstanceUID]);
   
@@ -590,32 +621,100 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
           if (isMouseDownOnAnnotationTool && lastAnnotationToolUsed) {
             console.log('Mouse up after annotation tool use:', lastAnnotationToolUsed);
             
-            // Small delay to let Cornerstone3D finish processing
-            setTimeout(() => {
-              // Create a simple synthetic event for auto-save
-              const syntheticEvent = {
-                detail: {
-                  annotation: {
-                    annotationUID: `temp-${Date.now()}`, // Temporary UID
-                    data: {},
-                    metadata: {
-                      toolName: lastAnnotationToolUsed,
-                      seriesInstanceUID: studyMetadata?.studyInstanceUID || '',
-                      sopInstanceUID: studyMetadata?.studyInstanceUID || '',
-                      frameOfReferenceUID: stackViewport?.getFrameOfReferenceUID() || '',
-                    },
-                    imageId: 'current',
-                  },
-                  changeType: 'completed'
+            // Process annotation immediately
+            (async () => {
+              try {
+                // Get the actual new annotation from Cornerstone3D
+                // Try multiple ways to get frame of reference UID
+                let frameOfReferenceUID = null;
+                
+                try {
+                  // Debug viewport information
+                  console.log('stackViewport:', stackViewport);
+                  console.log('stackViewport methods:', stackViewport ? Object.getOwnPropertyNames(Object.getPrototypeOf(stackViewport)) : 'no viewport');
+                  
+                  // First try the viewport method
+                  if (stackViewport && typeof stackViewport.getFrameOfReferenceUID === 'function') {
+                    frameOfReferenceUID = stackViewport.getFrameOfReferenceUID();
+                    console.log('Frame of reference from viewport:', frameOfReferenceUID);
+                  } else if (stackViewport) {
+                    console.log('stackViewport exists but getFrameOfReferenceUID method not found');
+                  }
+                  
+                  // If that fails, try getting it from the current image
+                  if (!frameOfReferenceUID && stackViewport) {
+                    const currentImage = stackViewport.getCurrentImageId();
+                    console.log('Current image ID:', currentImage);
+                    
+                    // Try to get metadata for the current image
+                    if (currentImage) {
+                      try {
+                        const { metaData } = await import('@cornerstonejs/core');
+                        const imagePlane = metaData.get('imagePlaneModule', currentImage);
+                        frameOfReferenceUID = imagePlane?.frameOfReferenceUID;
+                        console.log('Frame of reference from image metadata:', frameOfReferenceUID);
+                      } catch (metaError) {
+                        console.log('Failed to get metadata:', metaError);
+                      }
+                    }
+                  }
+                  
+                  // If still no UID, try a fallback using the study UID
+                  if (!frameOfReferenceUID) {
+                    frameOfReferenceUID = studyMetadata?.studyInstanceUID;
+                    console.log('Using study UID as fallback frame of reference:', frameOfReferenceUID);
+                  }
+                } catch (uidError) {
+                  console.warn('Error getting frame of reference UID:', uidError);
+                  frameOfReferenceUID = studyMetadata?.studyInstanceUID;
                 }
-              };
-              
-              console.log('Triggering auto-save for tool:', lastAnnotationToolUsed);
-              // Call auto-save
-              handleCornerstoneEvent(syntheticEvent as any);
+                
+                const viewportElement = stackViewport?.element;
+                if (frameOfReferenceUID && viewportElement) {
+                  // Get annotations for the current tool from this element
+                  const toolName = getToolName(lastAnnotationToolUsed);
+                  console.log('Getting annotations for tool:', toolName, 'from element:', viewportElement);
+                  const toolAnnotations = annotation.state.getAnnotations(toolName, viewportElement);
+                  console.log('Tool annotations:', toolAnnotations);
+                  
+                  // The getAnnotations method returns an array of annotations directly
+                  if (Array.isArray(toolAnnotations) && toolAnnotations.length > 0) {
+                    // Take the last annotation in the array (most recently created)
+                    const newestAnnotation = toolAnnotations[toolAnnotations.length - 1];
+                    console.log('Found newest annotation:', newestAnnotation);
+                    
+                    // Create auto-save event with real Cornerstone3D data
+                    const syntheticEvent = {
+                      detail: {
+                        annotation: {
+                          annotationUID: newestAnnotation.annotationUID,
+                          data: newestAnnotation.data || {},
+                          metadata: {
+                            toolName: newestAnnotation.metadata?.toolName || lastAnnotationToolUsed,
+                            seriesInstanceUID: studyMetadata?.studyInstanceUID || '',
+                            sopInstanceUID: studyMetadata?.studyInstanceUID || '',
+                            frameOfReferenceUID: newestAnnotation.metadata?.FrameOfReferenceUID || frameOfReferenceUID,
+                          },
+                          imageId: newestAnnotation.metadata?.referencedImageId || 'current',
+                        },
+                        changeType: 'completed'
+                      }
+                    };
+                    
+                    console.log('Triggering auto-save with real UID:', newestAnnotation.annotationUID);
+                    handleCornerstoneEvent(syntheticEvent as any);
+                  } else {
+                    console.log('No new annotation found, skipping auto-save');
+                  }
+                } else {
+                  console.log('No frame of reference UID or viewport element, cannot retrieve annotations');
+                }
+              } catch (error) {
+                console.warn('Error getting new annotation:', error);
+              }
               
               isMouseDownOnAnnotationTool = false;
-            }, 100); // Small delay
+            })(); // Execute immediately
           }
         } catch (error) {
           console.warn('Error in mouseup handler:', error);
@@ -907,6 +1006,12 @@ const ProjectionDicomViewer: React.FC<ProjectionDicomViewerProps> = ({
         engine.enableElement(viewportInput);
         const stackViewport = engine.getViewport(viewportId);
         viewportRef.current = stackViewport;
+        
+        // Update global viewport info for annotation panel
+        if ((window as any).cornerstoneViewportInfo) {
+          (window as any).cornerstoneViewportInfo.currentViewportId = viewportId;
+          (window as any).cornerstoneViewportInfo.currentRenderingEngineId = renderingEngineId;
+        }
 
         // Determine start index 
         const startIndex = Math.min(currentImageIndex, imageIds.length - 1);

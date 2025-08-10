@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { Trash2, User, Calendar, Ruler, MessageSquare, ArrowRight, Square, Circle, Edit3, AlertCircle, Eye } from 'lucide-react';
+import { Trash2, User, Calendar, Ruler, MessageSquare, ArrowRight, Square, Circle, Edit3, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -127,7 +127,11 @@ const AnnotationItem: React.FC<{
                 </span>
               </Badge>
               <div className="flex items-center gap-2">
-                <Eye className="w-3 h-3 text-muted-foreground opacity-60" title="Click to show/hide on image" />
+                {annotation.cornerstone_annotation_uid ? (
+                  <Eye className="w-3 h-3 text-green-600 opacity-80" title="Click to toggle visibility" />
+                ) : (
+                  <EyeOff className="w-3 h-3 text-muted-foreground opacity-60" title="Visibility control unavailable" />
+                )}
                 <span className="text-xs text-muted-foreground">
                   {formatTimestamp(annotation.created_at)}
                 </span>
@@ -268,7 +272,6 @@ export const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
   React.useEffect(() => {
     const handleAnnotationSaved = (event: CustomEvent) => {
       if (event.detail.studyUid === studyUid) {
-        console.log('Annotation saved, refreshing panel:', event.detail.annotation);
         refreshAnnotations();
       }
     };
@@ -310,14 +313,76 @@ export const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
   };
 
   const handleToggleAnnotationVisibility = (annotation: DicomAnnotation) => {
-    // Create a custom event to notify the DICOM viewer to toggle annotation visibility
-    const toggleEvent = new CustomEvent('toggleAnnotationVisibility', {
-      detail: { annotation, studyUid }
-    });
-    window.dispatchEvent(toggleEvent);
-    
-    // Show feedback to user  
-    toast.info(`Clicked annotation ${annotation.annotation_type} (visibility toggle not fully implemented yet)`);
+    // Check if the annotation has a Cornerstone3D UID for visibility control
+    if (!annotation.cornerstone_annotation_uid) {
+      toast.warning('Cannot toggle visibility: annotation UID not found');
+      return;
+    }
+
+    try {
+      // Use global annotation API (set by DICOM viewer during initialization)
+      const cornerstoneAnnotation = (window as any).annotation;
+      
+      if (!cornerstoneAnnotation?.visibility) {
+        toast.error('Cornerstone3D annotation API not available');
+        console.error('Missing annotation API on window:', cornerstoneAnnotation);
+        return;
+      }
+
+      // Check current visibility status
+      const isCurrentlyVisible = cornerstoneAnnotation.visibility.isAnnotationVisible(
+        annotation.cornerstone_annotation_uid
+      );
+      
+      console.log('Current visibility status for', annotation.cornerstone_annotation_uid, ':', isCurrentlyVisible);
+      
+      // Handle undefined visibility status (treat as visible by default)
+      const currentVisibility = isCurrentlyVisible !== false; // undefined or true = visible
+      const newVisibility = !currentVisibility;
+      cornerstoneAnnotation.visibility.setAnnotationVisibility(
+        annotation.cornerstone_annotation_uid, 
+        newVisibility
+      );
+      
+      // Use Cornerstone3D's built-in annotation render trigger
+      try {
+        // Import and use the proper Cornerstone3D function
+        if (window.cornerstoneTools?.triggerAnnotationRenderForViewportIds) {
+          // Get the current viewport ID from global info
+          const viewportInfo = (window as any).cornerstoneViewportInfo;
+          const currentViewportId = viewportInfo?.currentViewportId;
+          
+          if (currentViewportId) {
+            const viewportIds = [currentViewportId];
+            window.cornerstoneTools.triggerAnnotationRenderForViewportIds(viewportIds);
+            console.log('Triggered annotation render for viewports:', viewportIds);
+          } else {
+            console.warn('No viewport ID available for annotation rendering');
+          }
+        } else {
+          // Fallback: dispatch custom event 
+          const renderEvent = new CustomEvent('forceViewportRender', {
+            detail: { studyUid, annotationUID: annotation.cornerstone_annotation_uid }
+          });
+          window.dispatchEvent(renderEvent);
+        }
+      } catch (renderError) {
+        console.warn('Could not trigger annotation render:', renderError);
+      }
+      
+      // Show user feedback
+      const visibilityStatus = newVisibility ? 'shown' : 'hidden';
+      toast.success(`Annotation ${visibilityStatus} on image`);
+      console.log('Toggled annotation visibility:', {
+        uid: annotation.cornerstone_annotation_uid,
+        from: currentVisibility,
+        to: newVisibility
+      });
+      
+    } catch (error) {
+      console.error('Failed to toggle annotation visibility:', error);
+      toast.error('Failed to toggle annotation visibility');
+    }
   };
 
   const handleRetry = () => {

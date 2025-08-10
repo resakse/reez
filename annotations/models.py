@@ -64,6 +64,12 @@ class DicomAnnotation(models.Model):
     annotation_data = models.JSONField(
         help_text="Cornerstone3D annotation data in JSON format"
     )
+    cornerstone_annotation_uid = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Cornerstone3D annotation UID for visibility control"
+    )
     
     # Metadata
     label = models.CharField(

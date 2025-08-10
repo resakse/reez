@@ -183,10 +183,12 @@ export function useAnnotationAutoSave(params: UseAnnotationAutoSaveParams): UseA
         frame_number: 1, // Default frame number
         annotation_type: mapCornerstoneToolToType(annotation.metadata.toolName),
         annotation_data: annotation.data,
+        cornerstone_annotation_uid: annotation.annotationUID, // Store the Cornerstone3D UID
         label,
         measurement_value: measurementValue,
         measurement_unit: measurementUnit,
       };
+
 
       // Trigger debounced save
       await debouncedSave(annotationData);

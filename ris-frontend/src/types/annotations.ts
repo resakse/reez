@@ -54,6 +54,7 @@ export interface DicomAnnotation {
   // Annotation core data
   annotation_type: AnnotationType;
   annotation_data: CornerstoneAnnotationData;
+  cornerstone_annotation_uid?: string; // For visibility control with Cornerstone3D
   
   // Metadata
   label?: string;
@@ -181,6 +182,7 @@ export interface CreateAnnotationRequest {
   // Annotation data
   annotation_type: AnnotationType;
   annotation_data: CornerstoneAnnotationData;
+  cornerstone_annotation_uid?: string; // Store Cornerstone3D annotation UID
   
   // Optional metadata
   label?: string;
@@ -198,6 +200,7 @@ export interface CreateAnnotationRequest {
 export interface UpdateAnnotationRequest {
   id: number;
   annotation_data?: CornerstoneAnnotationData;
+  cornerstone_annotation_uid?: string;
   label?: string;
   description?: string;
   measurement_value?: number;
@@ -611,6 +614,7 @@ export type AnnotationApiFields = Pick<DicomAnnotation,
   'image_id' | 
   'annotation_type' | 
   'annotation_data' | 
+  'cornerstone_annotation_uid' |
   'label' | 
   'description' | 
   'measurement_value' | 
